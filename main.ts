@@ -43,6 +43,12 @@ export default class DrpbxFetcherPlugin extends Plugin {
       json: async () => Promise.resolve(response.json),
       text: async () => Promise.resolve(response.text),
       arrayBuffer: async () => Promise.resolve(response.arrayBuffer),
+      blob: async () => {
+        // Create a Blob from the arrayBuffer
+        const buffer = response.arrayBuffer;
+        const contentType = response.headers["content-type"] || "application/octet-stream";
+        return new Blob([buffer], { type: contentType });
+      },
     } as unknown as Response;
   }
 
@@ -109,8 +115,8 @@ export default class DrpbxFetcherPlugin extends Plugin {
   }
 
   // Async function to fetch all files from Dropbox with pagination
-  private async getAllFiles(dbx: Dropbox, folderPath: string): Promise<files.FileMetadataReference[]> {
-    let allFiles: files.FileMetadataReference[] = [];
+  private async getAllFiles(dbx: Dropbox, folderPath: string): Promise<(files.FileMetadataReference | files.FolderMetadataReference | files.DeletedMetadataReference)[]> {
+    let allFiles: (files.FileMetadataReference | files.FolderMetadataReference | files.DeletedMetadataReference)[] = [];
     let hasMore = true;
     let cursor: string | undefined;
 
@@ -132,7 +138,7 @@ export default class DrpbxFetcherPlugin extends Plugin {
   }
 
   // Sync files from Dropbox to Obsidian vault
-  private async syncFiles(): Promise<void> {
+  async syncFiles(): Promise<void> {
     if (this.isSyncing) {
       new Notice("Sync already in progress");
       return;
@@ -153,7 +159,12 @@ export default class DrpbxFetcherPlugin extends Plugin {
 
       for (const mapping of this.settings.folderMappings) {
         try {
-          console.log(\`Syncing \${mapping.remotePath} to \${mapping.localPath}\`);
+          console.log(`Syncing ${mapping.remotePath} to ${mapping.localPath}`);
+
+          // Validate remote path format
+          if (!mapping.remotePath.startsWith("/")) {
+            throw new Error(`Remote path must start with /: ${mapping.remotePath}`);
+          }
 
           // Get all files from Dropbox folder
           const entries = await this.getAllFiles(dbx, mapping.remotePath);
@@ -191,6 +202,7 @@ export default class DrpbxFetcherPlugin extends Plugin {
               }
 
               // Download file from Dropbox
+              console.log(`Downloading: ${file.path_display}`);
               const response = await dbx.filesDownload({ path: file.path_lower! });
               const fileBlob = (response.result as any).fileBlob as Blob;
               const arrayBuffer = await fileBlob.arrayBuffer();
@@ -220,20 +232,36 @@ export default class DrpbxFetcherPlugin extends Plugin {
                 }
                 syncedFiles++;
               }
-            } catch (error) {
-              console.error(\`Error syncing file \${file.path_display}:\`, error);
+            } catch (error: any) {
+              console.error(`Error syncing file ${file.path_display}:`, error);
+              console.error(`  - Status: ${error.status}`);
+              console.error(`  - Message: ${error.message}`);
+              if (error.error) {
+                console.error(`  - Dropbox error:`, error.error);
+              }
             }
           }
-        } catch (error) {
-          console.error(\`Error syncing folder \${mapping.remotePath}:\`, error);
-          new Notice(\`Error syncing \${mapping.remotePath}: \${error.message}\`);
+        } catch (error: any) {
+          console.error(`Error syncing folder ${mapping.remotePath}:`, error);
+
+          // Provide more helpful error messages for common issues
+          let errorMsg = error.message;
+          if (error.status === 409) {
+            errorMsg = `Path not found or inaccessible: ${mapping.remotePath}. Please verify the path exists in your Dropbox and check spelling/case.`;
+          } else if (error.status === 401) {
+            errorMsg = `Authentication failed. Please re-authenticate in plugin settings.`;
+          } else if (error.status === 403) {
+            errorMsg = `Permission denied. Check app permissions in Dropbox settings.`;
+          }
+
+          new Notice(`Error syncing ${mapping.remotePath}: ${errorMsg}`);
         }
       }
 
-      new Notice(\`Sync complete: \${syncedFiles} files synced (\${totalFiles} total)\`);
+      new Notice(`Sync complete: ${syncedFiles} files synced (${totalFiles} total)`);
     } catch (error) {
       console.error("Sync error:", error);
-      new Notice(\`Sync failed: \${error.message}\`);
+      new Notice(`Sync failed: ${error.message}`);
     } finally {
       this.isSyncing = false;
     }
@@ -363,8 +391,8 @@ class DrpbxFetcherSettingTab extends PluginSettingTab {
     for (let i = 0; i < this.plugin.settings.folderMappings.length; i++) {
       const mapping = this.plugin.settings.folderMappings[i];
       new Setting(containerEl)
-        .setName(\`Mapping \${i + 1}\`)
-        .setDesc(\`\${mapping.remotePath} → \${mapping.localPath}\`)
+        .setName(`Mapping ${i + 1}`)
+        .setDesc(`${mapping.remotePath} → ${mapping.localPath}`)
         .addButton((button) =>
           button.setButtonText("Delete").onClick(async () => {
             this.plugin.settings.folderMappings.splice(i, 1);
@@ -496,7 +524,7 @@ class DrpbxFetcherSettingTab extends PluginSettingTab {
 
           // Send response to browser
           res.writeHead(200, { "Content-Type": "text/html" });
-          res.end(\`
+          res.end(`
                         <html>
                             <body>
                                 <h1>Authentication Complete</h1>
@@ -504,7 +532,7 @@ class DrpbxFetcherSettingTab extends PluginSettingTab {
                                 <script>window.close()</script>
                             </body>
                         </html>
-                    \`);
+                    `);
 
           // Close the server
           server.close();
