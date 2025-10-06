@@ -93,10 +93,21 @@ export default class DrpbxFetcherPlugin extends Plugin {
     const obsidianFetch = async (url: string, init?: RequestInit): Promise<Response> => {
       try {
         // Create options object for requestUrl from fetch parameters
+        const headersObj = init?.headers as Record<string, string> || {};
+
+        // Android fix: Dropbox API requires specific Content-Type headers
+        // Android's requestUrl automatically adds "application/x-www-form-urlencoded" for POST
+        // but Dropbox expects "application/octet-stream" or "text/plain"
+        if (PlatformHelper.isAndroid() && init?.method === "POST" && url.includes("dropboxapi.com")) {
+          if (!headersObj["Content-Type"]) {
+            headersObj["Content-Type"] = "application/octet-stream";
+          }
+        }
+
         const options: RequestUrlParam = {
           url,
           method: init?.method || "GET",
-          headers: init?.headers as Record<string, string>,
+          headers: headersObj,
           body: init?.body as string,
         };
 
