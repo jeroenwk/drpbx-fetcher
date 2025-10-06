@@ -1,10 +1,7 @@
 import { App, Plugin, PluginSettingTab, Setting, Notice, requestUrl, RequestUrlParam, RequestUrlResponse, TFolder } from "obsidian";
 import { Dropbox, files } from "dropbox";
-import * as http from "http";
-
-// Get electron modules
-const electron = require("electron");
-const { remote } = electron;
+import { OAuthManager } from "./src/auth/OAuthManager";
+import { PlatformHelper } from "./src/utils/platform";
 
 interface FolderMapping {
   remotePath: string;
@@ -17,6 +14,8 @@ interface DrpbxFetcherSettings {
   clientId: string;
   codeVerifier: string;
   folderMappings: FolderMapping[];
+  // Mobile auth state
+  authInProgress: boolean;
 }
 
 const DEFAULT_SETTINGS: DrpbxFetcherSettings = {
@@ -25,12 +24,15 @@ const DEFAULT_SETTINGS: DrpbxFetcherSettings = {
   clientId: "",
   codeVerifier: "",
   folderMappings: [],
+  authInProgress: false,
 };
 
 export default class DrpbxFetcherPlugin extends Plugin {
   settings: DrpbxFetcherSettings;
   dbx: Dropbox | null = null;
   private isSyncing: boolean = false;
+  oauthManager: OAuthManager | null = null;
+  settingsTab: DrpbxFetcherSettingTab | null = null;
 
   // Pure function to create a fetch-compatible response from Obsidian's RequestUrlResponse
   private static createFetchResponse(response: RequestUrlResponse): Response {
@@ -187,8 +189,10 @@ export default class DrpbxFetcherPlugin extends Plugin {
           // Download and save each file
           for (const file of files) {
             try {
-              // Get relative path from the remote folder
-              const relativePath = file.path_lower!.replace(mapping.remotePath.toLowerCase(), "");
+              // Get relative path from the remote folder, preserving case
+              // Use path_display to keep original capitalization
+              const remoteFolderRegex = new RegExp("^" + mapping.remotePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "i");
+              const relativePath = file.path_display!.replace(remoteFolderRegex, "");
               const localFilePath = localFolder + relativePath;
 
               // Ensure parent directories exist
@@ -208,18 +212,23 @@ export default class DrpbxFetcherPlugin extends Plugin {
               const arrayBuffer = await fileBlob.arrayBuffer();
               const uint8Array = new Uint8Array(arrayBuffer);
 
-              // Check if file exists and has same size
+              // Check if THIS EXACT file already exists with same size
               let shouldWrite = true;
               try {
                 const existingFile = this.app.vault.getAbstractFileByPath(localFilePath);
                 if (existingFile && existingFile instanceof TFolder === false) {
                   const stat = await this.app.vault.adapter.stat(localFilePath);
                   if (stat && stat.size === file.size) {
+                    // File exists with same name and same size - skip download
                     shouldWrite = false;
+                    console.log(`Skipping ${localFilePath} - already exists with same size (${file.size} bytes)`);
+                  } else {
+                    console.log(`Updating ${localFilePath} - size changed (old: ${stat?.size}, new: ${file.size})`);
                   }
                 }
               } catch (error) {
                 // File doesn't exist, we should write it
+                console.log(`Creating new file: ${localFilePath}`);
               }
 
               if (shouldWrite) {
@@ -231,6 +240,7 @@ export default class DrpbxFetcherPlugin extends Plugin {
                   await this.app.vault.createBinary(localFilePath, uint8Array);
                 }
                 syncedFiles++;
+                console.log(`✓ Synced: ${localFilePath} (${file.size} bytes)`);
               }
             } catch (error: any) {
               console.error(`Error syncing file ${file.path_display}:`, error);
@@ -269,7 +279,20 @@ export default class DrpbxFetcherPlugin extends Plugin {
 
   async onload() {
     await this.loadSettings();
-    this.addSettingTab(new DrpbxFetcherSettingTab(this.app, this));
+
+    // Initialize OAuth manager
+    this.oauthManager = new OAuthManager(this, this.settings.clientId);
+
+    // Register protocol handler for mobile OAuth callback
+    this.registerObsidianProtocolHandler("dropbox-callback", async (params) => {
+      if (PlatformHelper.isMobile() && this.oauthManager) {
+        await this.oauthManager.handleMobileCallback(params);
+      }
+    });
+
+    // Add settings tab
+    this.settingsTab = new DrpbxFetcherSettingTab(this.app, this);
+    this.addSettingTab(this.settingsTab);
 
     // Add ribbon icon
     this.addRibbonIcon("sync", "Sync Dropbox files", async () => {
@@ -292,6 +315,13 @@ export default class DrpbxFetcherPlugin extends Plugin {
         console.log("Running initial Dropbox sync...");
         await this.syncFiles();
       }, 3000);
+    }
+  }
+
+  onunload() {
+    // Cleanup OAuth manager
+    if (this.oauthManager) {
+      this.oauthManager.cleanup();
     }
   }
 
@@ -328,52 +358,47 @@ class DrpbxFetcherSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.clientId = value;
             await this.plugin.saveSettings();
+            // Reinitialize OAuth manager with new clientId
+            if (this.plugin.oauthManager) {
+              this.plugin.oauthManager = new OAuthManager(this.plugin, value);
+            }
           })
       );
 
+    // Platform indicator
+    new Setting(containerEl)
+      .setName("Platform")
+      .setDesc(`Running on: ${PlatformHelper.getPlatformName()}${PlatformHelper.isMobile() ? " (Mobile)" : ""}`);
+
+    // Authentication
     new Setting(containerEl)
       .setName("Authenticate with Dropbox")
-      .setDesc("Click to start OAuth flow")
+      .setDesc(
+        this.plugin.settings.refreshToken
+          ? "✓ Connected to Dropbox"
+          : PlatformHelper.isMobile()
+          ? "Click to authenticate. You'll be redirected to Dropbox in your browser, then back to Obsidian."
+          : "Click to start OAuth flow"
+      )
       .addButton((button) =>
-        button.setButtonText("Authenticate").onClick(async () => {
-          if (!this.plugin.settings.clientId) {
-            new Notice("Please set your Client ID first");
-            return;
-          }
-
-          // Generate PKCE code verifier and challenge
-          const codeVerifier = this.generateCodeVerifier();
-          const codeChallenge = await this.generateCodeChallenge(codeVerifier);
-
-          // Store code verifier temporarily
-          this.plugin.settings.codeVerifier = codeVerifier;
-          await this.plugin.saveSettings();
-
-          // Construct OAuth URL
-          const authUrl = new URL("https://www.dropbox.com/oauth2/authorize");
-          authUrl.searchParams.append("client_id", this.plugin.settings.clientId);
-          authUrl.searchParams.append("response_type", "code");
-          authUrl.searchParams.append("code_challenge", codeChallenge);
-          authUrl.searchParams.append("code_challenge_method", "S256");
-          authUrl.searchParams.append("token_access_type", "offline");
-          authUrl.searchParams.append("redirect_uri", "http://localhost:53134/callback");
-
-          // Open OAuth window
-          window.open(authUrl.toString());
-
-          // Start local server to handle callback
-          this.startOAuthServer();
-        })
+        button
+          .setButtonText(this.plugin.settings.refreshToken ? "Re-authenticate" : "Authenticate")
+          .onClick(async () => {
+            if (this.plugin.oauthManager) {
+              await this.plugin.oauthManager.authenticate();
+            }
+          })
       );
 
     if (this.plugin.settings.refreshToken) {
       new Setting(containerEl)
-        .setName("Authentication status")
-        .setDesc("You are authenticated with Dropbox")
+        .setName("Clear Authentication")
+        .setDesc("Disconnect from Dropbox")
         .addButton((button) =>
           button.setButtonText("Clear Authentication").onClick(async () => {
             this.plugin.settings.accessToken = "";
             this.plugin.settings.refreshToken = "";
+            this.plugin.settings.authInProgress = false;
             await this.plugin.saveSettings();
             this.display();
           })
@@ -460,97 +485,4 @@ class DrpbxFetcherSettingTab extends PluginSettingTab {
       );
   }
 
-  private generateCodeVerifier(): string {
-    const array = new Uint8Array(32);
-    crypto.getRandomValues(array);
-    return Array.from(array, (byte) => byte.toString(16).padStart(2, "0")).join("");
-  }
-
-  private async generateCodeChallenge(verifier: string): Promise<string> {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(verifier);
-    const hash = await crypto.subtle.digest("SHA-256", data);
-    return btoa(String.fromCharCode(...new Uint8Array(hash)))
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/, "");
-  }
-
-  private async startOAuthServer() {
-    const server = http.createServer(async (req, res) => {
-      if (req.url?.startsWith("/callback")) {
-        const url = new URL(req.url, "http://localhost:53134");
-        const code = url.searchParams.get("code");
-
-        if (code) {
-          try {
-            // Exchange the code for tokens
-            const response = await requestUrl({
-              url: "https://api.dropboxapi.com/oauth2/token",
-              method: "POST",
-              headers: {
-                "Content-Type": "application/x-www-form-urlencoded",
-              },
-              body: new URLSearchParams({
-                code,
-                grant_type: "authorization_code",
-                client_id: this.plugin.settings.clientId,
-                code_verifier: this.plugin.settings.codeVerifier,
-                redirect_uri: "http://localhost:53134/callback",
-              }).toString(),
-            });
-
-            if (response.status === 200) {
-              const data = response.json;
-
-              // Store the tokens
-              this.plugin.settings.accessToken = data.access_token;
-              this.plugin.settings.refreshToken = data.refresh_token;
-              await this.plugin.saveSettings();
-
-              // Show success message
-              new Notice("Successfully authenticated with Dropbox!");
-
-              // Update the settings UI
-              this.display();
-            } else {
-              new Notice("Failed to authenticate with Dropbox");
-              console.error("Token exchange failed:", response.text);
-            }
-          } catch (error) {
-            new Notice("Error during authentication");
-            console.error("Authentication error:", error);
-          }
-
-          // Send response to browser
-          res.writeHead(200, { "Content-Type": "text/html" });
-          res.end(`
-                        <html>
-                            <body>
-                                <h1>Authentication Complete</h1>
-                                <p>You can close this window and return to Obsidian.</p>
-                                <script>window.close()</script>
-                            </body>
-                        </html>
-                    `);
-
-          // Close the server
-          server.close();
-        }
-      }
-    });
-
-    // Start listening on the port
-    server.listen(53134, "localhost", () => {});
-
-    // Handle server errors
-    server.on("error", (error: NodeJS.ErrnoException) => {
-      if (error.code === "EADDRINUSE") {
-        new Notice("Port 53134 is already in use. Please try again in a few moments.");
-      } else {
-        new Notice("Error starting OAuth server");
-        console.error("Server error:", error);
-      }
-    });
-  }
 }

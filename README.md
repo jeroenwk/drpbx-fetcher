@@ -29,7 +29,9 @@ This plugin automatically syncs files from your Dropbox folders to your Obsidian
 3. Choose "Scoped access"
 4. Choose "Full Dropbox" access
 5. Name your app (e.g., "My Obsidian Sync")
-6. In the app settings, add `http://localhost:53134/callback` as a redirect URI
+6. In the app settings, add redirect URIs:
+   - **Desktop**: `http://localhost:53134/callback`
+   - **Mobile** (iOS/Android): `obsidian://dropbox-callback`
 7. Under "Permissions", enable:
    - `files.metadata.read`
    - `files.content.read`
@@ -103,6 +105,34 @@ The compiled plugin will be in the `dist` directory.
 4. Make changes to the code
 5. Reload Obsidian (Ctrl/Cmd+R) to test your changes
 
+## Mobile Support (iOS/Android)
+
+**✅ This plugin now supports mobile devices!**
+
+### Mobile Setup
+
+1. Install the plugin on your mobile device
+2. Make sure you've added `obsidian://dropbox-callback` as a redirect URI in your Dropbox app settings (see Setup step 1.6)
+3. In plugin settings, enter your Client ID
+4. Tap "Authenticate"
+5. You'll be redirected to Dropbox in your external browser (Safari/Chrome)
+6. After authorizing, you'll automatically return to Obsidian
+7. Configure your folder mappings and sync!
+
+### Mobile Considerations
+
+- **OAuth Flow**: Opens your default browser for authentication
+- **Large Files**: May take longer to download on mobile networks
+- **Background Sync**: Not supported on mobile - use manual sync
+- **Auto-sync**: Works on app startup (after 3-second delay)
+
+### Platform Differences
+
+The plugin automatically detects your platform and adapts:
+- **Desktop**: Uses localhost OAuth server
+- **Mobile**: Uses custom URI scheme (`obsidian://dropbox-callback`)
+- Settings UI shows platform-specific instructions
+
 ## Security and Privacy
 
 - This plugin uses OAuth 2.0 with PKCE for secure authentication
@@ -134,6 +164,15 @@ If you encounter any issues or have feature requests:
 3. Include your Obsidian version and operating system details
 
 ## Changelog
+
+### 0.2.0
+- ✨ **Mobile support** for iOS and Android
+- 🔧 Refactored OAuth to support both desktop and mobile platforms
+- 📱 Custom URI scheme for mobile authentication (`obsidian://dropbox-callback`)
+- 🌐 Platform detection with adaptive UI
+- 🔐 Web Crypto API for cross-platform PKCE
+- 📊 Platform indicator in settings
+- 🐛 Better error handling and user feedback
 
 ### 0.1.0
 - Initial release
