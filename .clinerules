@@ -1,0 +1,1 @@
+This repository contains an Obsidian plugin that syncs files from Dropbox folders to the Obsidian vault. Users configure folder mappings in settings, and the plugin automatically downloads files on startup and via manual sync.

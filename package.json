@@ -1,0 +1,43 @@
+{
+  "name": "drpbx-fetcher",
+  "version": "0.1.0",
+  "description": "Sync files from Dropbox folders to your Obsidian vault",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "npm run clean && tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node auto-version-bump.mjs && npm run copy-assets",
+    "clean": "rm -rf dist",
+    "copy-assets": "cp manifest.json dist/ && cp versions.json dist/",
+    "cleanup": "rm -f main.js *.js.map",
+    "version": "node version-bump.mjs && git add manifest.json versions.json",
+    "lint": "eslint . --ext .ts"
+  },
+  "keywords": [
+    "obsidian",
+    "obsidian-plugin",
+    "dropbox",
+    "sync",
+    "files",
+    "fetcher"
+  ],
+  "author": "Jeroen de Zwart",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jeroendezwart/drpbx-fetcher"
+  },
+  "devDependencies": {
+    "@types/node": "^16.11.6",
+    "@typescript-eslint/eslint-plugin": "5.29.0",
+    "@typescript-eslint/parser": "5.29.0",
+    "builtin-modules": "3.3.0",
+    "esbuild": "0.17.3",
+    "eslint": "^8.32.0",
+    "obsidian": "latest",
+    "tslib": "2.4.0",
+    "typescript": "4.7.4"
+  },
+  "dependencies": {
+    "dropbox": "^10.34.0"
+  }
+}
