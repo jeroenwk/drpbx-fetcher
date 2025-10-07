@@ -165,7 +165,7 @@ If you encounter any issues or have feature requests:
 
 ## Changelog
 
-### 0.2.0
+### 0.2.1
 - ✨ **Mobile support** for iOS and Android
 - 🔧 Refactored OAuth to support both desktop and mobile platforms
 - 📱 Custom URI scheme for mobile authentication (`obsidian://dropbox-callback`)
