@@ -15,7 +15,7 @@ This plugin automatically syncs files from your Dropbox folders to your Obsidian
 ## Installation
 
 ### Manual Installation
-1. Download the latest release from the [releases page](https://github.com/jeroendezwart/drpbx-fetcher/releases)
+1. Download the latest release from the [releases page](https://github.com/jeroenwk/drpbx-fetcher/releases)
 2. Extract the files to your vault's `.obsidian/plugins/drpbx-fetcher/` directory
 3. Reload Obsidian
 4. Enable the plugin in the Community Plugins settings
@@ -159,7 +159,7 @@ Click "Authenticate" in the plugin settings to reconnect to Dropbox.
 
 If you encounter any issues or have feature requests:
 
-1. Check the [GitHub Issues](https://github.com/jeroendezwart/drpbx-fetcher/issues) page
+1. Check the [GitHub Issues](https://github.com/jeroenwk/drpbx-fetcher/issues) page
 2. Create a new issue if your problem hasn't been reported
 3. Include your Obsidian version and operating system details
 

@@ -6,7 +6,7 @@ This guide explains how to submit the Dropbox Fetcher plugin to the official Obs
 
 Before submitting, ensure you have:
 
-- ✅ Published release v0.1.4 on GitHub with `main.js` and `manifest.json`
+- ✅ Published release v0.2.1 on GitHub with `main.js` and `manifest.json`
 - ✅ README.md with setup instructions
 - ✅ LICENSE file
 - ✅ No obfuscated code, ads, or telemetry (complies with Obsidian developer policies)
@@ -67,7 +67,7 @@ git push origin master
      This PR adds the Dropbox Fetcher plugin to the community plugins directory.
 
      **Plugin repository:** https://github.com/jeroenwk/drpbx-fetcher
-     **Release:** https://github.com/jeroenwk/drpbx-fetcher/releases/tag/0.1.4
+     **Release:** https://github.com/jeroenwk/drpbx-fetcher/releases/tag/v0.2.1
 
      ### Plugin Description
      Dropbox Fetcher allows users to sync files from Dropbox folders to their Obsidian vault with automatic and manual sync options.
@@ -77,7 +77,7 @@ git push origin master
      - [x] My plugin follows Obsidian developer policies (no obfuscation, ads, or telemetry)
      - [x] I have included a README.md with setup instructions
      - [x] I have included a LICENSE file
-     - [x] The plugin is marked as desktop-only (uses Node.js http module)
+     - [x] The plugin supports desktop and mobile platforms (iOS and Android)
      ```
 5. Click **"Create pull request"**
 
