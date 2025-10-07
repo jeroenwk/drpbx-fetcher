@@ -2,7 +2,7 @@
   "id": "drpbx-fetcher",
   "name": "Dropbox Fetcher",
   "minAppVersion": "0.15.0",
-  "description": "Sync files from Dropbox folders to your Obsidian vault",
+  "description": "Sync files from Dropbox folders to your vault",
   "author": "Jeroen de Zwart",
   "authorUrl": "https://github.com/jeroendezwart",
   "isDesktopOnly": false,
