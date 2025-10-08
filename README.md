@@ -4,13 +4,16 @@ This plugin automatically syncs files from your Dropbox folders to your Obsidian
 
 ## Features
 
-- Automatic sync on Obsidian startup
-- Manual sync via ribbon icon or command palette
-- Configure multiple folder mappings (Dropbox folder → Vault folder)
-- Recursive folder syncing with subdirectories
-- Skip files that are already up-to-date (based on file size)
-- Secure OAuth 2.0 authentication with PKCE
-- No data sent to third-party servers
+- **Automatic sync** on Obsidian startup
+- **Manual sync** via ribbon icon or command palette
+- **Multiple folder mappings** (Dropbox folder → Vault folder)
+- **Recursive folder syncing** with subdirectories
+- **Smart file processing** - Extract and transform different file types
+- **viwoods Notes support** - Extract text highlights from EPUB reader .note files
+- **Custom templates** - Customize markdown output with Obsidian-style templates
+- **Skip unchanged files** (based on file size)
+- **Secure OAuth 2.0** authentication with PKCE
+- **Privacy-first** - No data sent to third-party servers
 
 ## Installation
 
@@ -68,10 +71,31 @@ The plugin automatically syncs all configured folders when Obsidian starts (with
 - **Settings**: Click the "Sync" button in the plugin settings
 
 ### Sync Behavior
-- Files are downloaded from Dropbox and saved to your vault
+- Files are downloaded from Dropbox and processed based on file type
+- File processors can extract content and generate markdown files
 - Subdirectories are created automatically
 - Files with the same size are skipped (assumed to be up-to-date)
 - Existing files with different sizes are overwritten
+
+### File Processors (New!)
+
+The plugin can intelligently process different file types during sync:
+
+**viwoods Notes (.note files)**
+- Extract text highlights from EPUB reader format
+- Extract EPUB files from .note archives
+- Generate organized highlight markdown files
+- Use custom templates for output formatting
+- **Coming soon**: Handwriting and annotation extraction
+- **[Quick Start Guide](docs/viwoods-setup.md)**
+
+**Coming Soon**
+- PDF annotation extraction
+- EPUB highlights processing
+- Image metadata extraction
+- And more...
+
+**[📖 Read the File Processors Documentation](docs/FILE-PROCESSORS.md)**
 
 ## Development
 
@@ -164,6 +188,15 @@ If you encounter any issues or have feature requests:
 3. Include your Obsidian version and operating system details
 
 ## Changelog
+
+### 0.2.6
+- ✨ **File Processors** - Intelligent file type processing system
+- 📝 **viwoods Notes support** - Extract text highlights from EPUB reader .note files
+- 📚 **EPUB extraction** - Automatically extract EPUB files from .note archives
+- 🎨 **Custom templates** - Use Obsidian-style templates for output formatting
+- 🔧 **Modular architecture** - Extensible processor system for future file types
+- 📚 **Comprehensive documentation** - Setup guides and API documentation
+- 🔜 **Coming soon**: Handwriting and annotation extraction from .note files
 
 ### 0.2.1
 - ✨ **Mobile support** for iOS and Android

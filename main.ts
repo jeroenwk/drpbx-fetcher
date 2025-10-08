@@ -1,36 +1,20 @@
-import { App, Plugin, PluginSettingTab, Setting, Notice, requestUrl, RequestUrlParam, RequestUrlResponse, TFolder } from "obsidian";
+import { App, Plugin, PluginSettingTab, Setting, Notice, requestUrl, RequestUrlParam, RequestUrlResponse, TFolder, Modal } from "obsidian";
 import { Dropbox, files } from "dropbox";
 import { OAuthManager } from "./src/auth/OAuthManager";
 import { PlatformHelper } from "./src/utils/platform";
-
-interface FolderMapping {
-  remotePath: string;
-  localPath: string;
-}
-
-interface DrpbxFetcherSettings {
-  accessToken: string;
-  refreshToken: string;
-  clientId: string;
-  codeVerifier: string;
-  folderMappings: FolderMapping[];
-  // Mobile auth state
-  authInProgress: boolean;
-}
-
-const DEFAULT_SETTINGS: DrpbxFetcherSettings = {
-  accessToken: "",
-  refreshToken: "",
-  clientId: "",
-  codeVerifier: "",
-  folderMappings: [],
-  authInProgress: false,
-};
+import { DrpbxFetcherSettings, DEFAULT_SETTINGS } from "./src/models/Settings";
+import { ProcessorRegistry } from "./src/processors/ProcessorRegistry";
+import { DefaultProcessor } from "./src/processors/DefaultProcessor";
+import { ViwoodsProcessor } from "./src/processors/ViwoodsProcessor";
+import { FileUtils } from "./src/utils/FileUtils";
+import { TemplateResolver } from "./src/processors/templates/TemplateResolver";
+import { ProcessorConfigModal } from "./src/ui/ProcessorConfigModal";
+import { FileTypeMapping } from "./src/models/Settings";
 
 export default class DrpbxFetcherPlugin extends Plugin {
   settings: DrpbxFetcherSettings;
   dbx: Dropbox | null = null;
-  private isSyncing: boolean = false;
+  private isSyncing = false;
   oauthManager: OAuthManager | null = null;
   settingsTab: DrpbxFetcherSettingTab | null = null;
 
@@ -167,8 +151,12 @@ export default class DrpbxFetcherPlugin extends Plugin {
 
     try {
       const dbx = await this.getDropboxClient();
-      let totalFiles = 0;
-      let syncedFiles = 0;
+      let totalSourceFiles = 0;
+      let processedSourceFiles = 0;
+      let createdFiles = 0;
+      let regularFiles = 0;
+      let skippedFiles = 0;
+      let skippedProcessors = 0;
 
       for (const mapping of this.settings.folderMappings) {
         try {
@@ -184,7 +172,7 @@ export default class DrpbxFetcherPlugin extends Plugin {
 
           // Filter only files (not folders)
           const files = entries.filter((entry) => entry[".tag"] === "file") as files.FileMetadata[];
-          totalFiles += files.length;
+          totalSourceFiles += files.length;
 
           // Ensure local folder exists
           const localFolder = mapping.localPath.startsWith("/")
@@ -200,6 +188,14 @@ export default class DrpbxFetcherPlugin extends Plugin {
           // Download and save each file
           for (const file of files) {
             try {
+              // Check if this file extension should be skipped
+              const fileExtension = FileUtils.getExtension(file.name);
+              if (this.settings.skippedExtensions.includes(fileExtension.toLowerCase())) {
+                console.log(`Skipping ${file.name} - extension .${fileExtension} is in skip list`);
+                skippedFiles++;
+                continue;
+              }
+
               // Get relative path from the remote folder, preserving case
               // Use path_display to keep original capitalization
               const remoteFolderRegex = new RegExp("^" + mapping.remotePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "i");
@@ -223,6 +219,72 @@ export default class DrpbxFetcherPlugin extends Plugin {
               const arrayBuffer = await fileBlob.arrayBuffer();
               const uint8Array = new Uint8Array(arrayBuffer);
 
+              // Check if file should be processed by a processor
+              const registry = ProcessorRegistry.getInstance();
+              const processor = registry.getByExtension(fileExtension, this.settings.fileTypeMappings);
+
+              if (processor) {
+                // Use processor
+                console.log(`Processing ${file.name} with ${processor.name}`);
+                const mapping = this.settings.fileTypeMappings.find(
+                  (m) => m.extension.toLowerCase() === fileExtension.toLowerCase() && m.enabled
+                );
+
+                if (mapping) {
+                  // Check if this file was already processed with same size (skip to preserve user edits)
+                  let shouldProcess = true;
+                  const fileId = file.id; // Unique Dropbox file ID
+
+                  if (this.settings.processedFiles[fileId] === file.size) {
+                    // File already processed with same size - skip to preserve user edits
+                    shouldProcess = false;
+                    skippedProcessors++;
+                    console.log(`Skipping ${file.name} - already processed (${file.size} bytes)`);
+                  } else if (this.settings.processedFiles[fileId]) {
+                    // File exists but size changed - reprocess
+                    console.log(`Reprocessing ${file.name} - changed (old: ${this.settings.processedFiles[fileId]}, new: ${file.size})`);
+                  } else {
+                    // New file - process it
+                    console.log(`Processing new file: ${file.name}`);
+                  }
+
+                  if (shouldProcess) {
+                    try {
+                      const templateResolver = new TemplateResolver(this.app.vault);
+                      const result = await processor.process(
+                        uint8Array,
+                        file.path_display!,
+                        file,
+                        mapping.config,
+                        {
+                          vault: this.app.vault,
+                          app: this.app,
+                          templateResolver,
+                        }
+                      );
+
+                      if (result.success) {
+                        processedSourceFiles++;
+                        createdFiles += result.createdFiles.length;
+                        // Track successful processing
+                        this.settings.processedFiles[fileId] = file.size;
+                        await this.saveSettings();
+                        console.log(`✓ Processed: ${result.createdFiles.length} files created`);
+                        if (result.warnings && result.warnings.length > 0) {
+                          console.warn(`Warnings: ${result.warnings.join(", ")}`);
+                        }
+                      } else {
+                        console.error(`✗ Processing failed: ${result.errors?.join(", ")}`);
+                      }
+                    } catch (procError: any) {
+                      console.error(`Error processing file with ${processor.name}:`, procError);
+                    }
+                  }
+                  continue; // Skip default file handling
+                }
+              }
+
+              // Default file handling (no processor)
               // Check if THIS EXACT file already exists with same size
               let shouldWrite = true;
               try {
@@ -250,7 +312,7 @@ export default class DrpbxFetcherPlugin extends Plugin {
                 } else {
                   await this.app.vault.createBinary(localFilePath, uint8Array);
                 }
-                syncedFiles++;
+                regularFiles++;
                 console.log(`✓ Synced: ${localFilePath} (${file.size} bytes)`);
               }
             } catch (error: any) {
@@ -279,7 +341,30 @@ export default class DrpbxFetcherPlugin extends Plugin {
         }
       }
 
-      new Notice(`Sync complete: ${syncedFiles} files synced (${totalFiles} total)`);
+      // Build summary message
+      const totalOutputFiles = createdFiles + regularFiles;
+      let summary = `Sync complete: ${totalSourceFiles} source files`;
+
+      if (processedSourceFiles > 0 && regularFiles > 0) {
+        // Mixed: some processed, some regular
+        summary += ` → ${totalOutputFiles} files (${processedSourceFiles} processed → ${createdFiles} created, ${regularFiles} copied)`;
+      } else if (processedSourceFiles > 0) {
+        // Only processed files
+        summary += ` → ${createdFiles} files created`;
+      } else if (regularFiles > 0) {
+        // Only regular files
+        summary += ` → ${regularFiles} files copied`;
+      }
+
+      if (skippedFiles > 0) {
+        summary += `, ${skippedFiles} skipped`;
+      }
+
+      if (skippedProcessors > 0) {
+        summary += ` (${skippedProcessors} already processed)`;
+      }
+
+      new Notice(summary);
     } catch (error) {
       console.error("Sync error:", error);
       new Notice(`Sync failed: ${error.message}`);
@@ -290,6 +375,12 @@ export default class DrpbxFetcherPlugin extends Plugin {
 
   async onload() {
     await this.loadSettings();
+
+    // Register file processors
+    const registry = ProcessorRegistry.getInstance();
+    registry.register(new DefaultProcessor());
+    registry.register(new ViwoodsProcessor());
+    console.log("Registered file processors:", registry.listAll().map(p => p.name).join(", "));
 
     // Initialize OAuth manager
     this.oauthManager = new OAuthManager(this, this.settings.clientId);
@@ -306,14 +397,14 @@ export default class DrpbxFetcherPlugin extends Plugin {
     this.addSettingTab(this.settingsTab);
 
     // Add ribbon icon
-    this.addRibbonIcon("sync", "Sync Dropbox files", async () => {
+    this.addRibbonIcon("sync", "Synchronize Dropbox files", async () => {
       await this.syncFiles();
     });
 
     // Add command
     this.addCommand({
       id: "sync-dropbox-files",
-      name: "Sync Dropbox files",
+      name: "Synchronize Dropbox files",
       callback: async () => {
         await this.syncFiles();
       },
@@ -357,7 +448,23 @@ class DrpbxFetcherSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "Dropbox Fetcher Settings" });
+    const titleEl = containerEl.createEl("h2", { text: "Dropbox Fetcher Settings" });
+    titleEl.style.fontSize = "1.5em";
+    titleEl.style.fontWeight = "bold";
+    titleEl.style.marginBottom = "1em";
+
+    // Synchronize section
+    new Setting(containerEl)
+      .setName("Fetch now")
+      .setDesc("Manually trigger fetching")
+      .addButton((button) =>
+        button.setButtonText("Fetch").onClick(async () => {
+          await this.plugin.syncFiles();
+        })
+      );
+
+    // General Settings section
+    containerEl.createEl("h3", { text: "General Settings" });
 
     new Setting(containerEl)
       .setName("Dropbox client ID")
@@ -485,15 +592,328 @@ class DrpbxFetcherSettingTab extends PluginSettingTab {
         })
       );
 
-    // Manual sync button
+    // Skipped Extensions section
+    containerEl.createEl("h3", { text: "Skipped File Extensions" });
+    containerEl.createEl("p", {
+      text: "File extensions listed here will be completely ignored - not downloaded or processed. Useful for skipping large files like videos, archives, etc.",
+      cls: "setting-item-description"
+    });
+
+    // Display existing skipped extensions
+    if (this.plugin.settings.skippedExtensions.length > 0) {
+      for (let i = 0; i < this.plugin.settings.skippedExtensions.length; i++) {
+        const ext = this.plugin.settings.skippedExtensions[i];
+        new Setting(containerEl)
+          .setName(`.${ext}`)
+          .setDesc(`Files with this extension will be skipped`)
+          .addButton((button) =>
+            button.setButtonText("Remove").onClick(async () => {
+              this.plugin.settings.skippedExtensions.splice(i, 1);
+              await this.plugin.saveSettings();
+              this.display();
+            })
+          );
+      }
+    }
+
+    // Add new skipped extension
     new Setting(containerEl)
-      .setName("Sync now")
-      .setDesc("Manually trigger a sync of all configured folders")
+      .setName("Add extension to skip")
+      .setDesc("Enter file extension without the dot (e.g., 'mp4', 'zip')")
+      .addText((text) => {
+        text.setPlaceholder("Extension");
+      })
       .addButton((button) =>
-        button.setButtonText("Sync").onClick(async () => {
-          await this.plugin.syncFiles();
+        button.setButtonText("Add").onClick(async () => {
+          const input = button.buttonEl.parentElement?.querySelector("input[type='text']") as HTMLInputElement;
+          const extension = input?.value.trim().toLowerCase().replace(/\./g, "") || "";
+
+          if (!extension) {
+            new Notice("Please enter an extension");
+            return;
+          }
+
+          if (this.plugin.settings.skippedExtensions.includes(extension)) {
+            new Notice(`Extension "${extension}" is already in the skip list`);
+            return;
+          }
+
+          this.plugin.settings.skippedExtensions.push(extension);
+          await this.plugin.saveSettings();
+          this.display();
+          new Notice(`Will skip .${extension} files`);
+        })
+      );
+
+    // File Processors section
+    containerEl.createEl("h3", { text: "File Processors" });
+    containerEl.createEl("p", {
+      text: "Configure how specific file types are processed. Processors can extract content, generate markdown files, and organize files in your vault.",
+      cls: "setting-item-description"
+    });
+
+    // Display existing file type mappings
+    for (let i = 0; i < this.plugin.settings.fileTypeMappings.length; i++) {
+      const mapping = this.plugin.settings.fileTypeMappings[i];
+      const registry = ProcessorRegistry.getInstance();
+      const processor = registry.getByType(mapping.processorType);
+      const processorName = processor ? processor.name : mapping.processorType;
+
+      new Setting(containerEl)
+        .setName(`${mapping.extension} → ${processorName}`)
+        .setDesc(processor ? processor.description : "Unknown processor")
+        .addToggle((toggle) =>
+          toggle.setValue(mapping.enabled).onChange(async (value) => {
+            this.plugin.settings.fileTypeMappings[i].enabled = value;
+            await this.plugin.saveSettings();
+            this.display();
+          })
+        )
+        .addButton((button) =>
+          button.setButtonText("Edit Extension").onClick(() => {
+            this.editExtension(mapping);
+          })
+        )
+        .addButton((button) =>
+          button.setButtonText("Configure").onClick(() => {
+            this.showProcessorConfig(mapping);
+          })
+        )
+        .addButton((button) =>
+          button.setButtonText("Delete").onClick(async () => {
+            this.plugin.settings.fileTypeMappings.splice(i, 1);
+            await this.plugin.saveSettings();
+            this.display();
+          })
+        );
+    }
+
+    // Add new file processor mapping
+    const registry = ProcessorRegistry.getInstance();
+    const processors = registry.listAll();
+
+    new Setting(containerEl)
+      .setName("Add file processor")
+      .setDesc("Select a processor and specify the file extension to process")
+      .addDropdown((dropdown) => {
+        processors.forEach((processor) => {
+          dropdown.addOption(processor.type, processor.name);
+        });
+        return dropdown;
+      })
+      .addText((text) => {
+        // Get default extension from selected processor
+        const selectedType = processors[0]?.type;
+        const selectedProcessor = selectedType ? registry.getByType(selectedType) : null;
+        const defaultExt = selectedProcessor?.supportedExtensions[0] || "";
+
+        text
+          .setPlaceholder("Extension (e.g., note)")
+          .setValue(defaultExt);
+
+        // Update placeholder when dropdown changes
+        const dropdown = text.inputEl.parentElement?.parentElement?.querySelector("select");
+        if (dropdown) {
+          dropdown.addEventListener("change", () => {
+            const procType = dropdown.value;
+            const proc = registry.getByType(procType);
+            const ext = proc?.supportedExtensions[0] || "";
+            text.setValue(ext);
+          });
+        }
+      })
+      .addButton((button) =>
+        button.setButtonText("Add").onClick(async () => {
+          const dropdown = button.buttonEl.parentElement?.querySelector("select");
+          const extensionInput = button.buttonEl.parentElement?.querySelector("input[type='text']") as HTMLInputElement;
+
+          const processorType = dropdown?.value || processors[0]?.type;
+          const extension = extensionInput?.value.trim().toLowerCase().replace(/\./g, "") || "";
+
+          if (!processorType) {
+            new Notice("No processors available");
+            return;
+          }
+
+          if (!extension) {
+            new Notice("Please enter a file extension");
+            return;
+          }
+
+          const processor = registry.getByType(processorType);
+          if (!processor) {
+            new Notice("Processor not found");
+            return;
+          }
+
+          // Validate unique extension
+          if (!this.validateUniqueExtension(extension)) {
+            return;
+          }
+
+          // Create new mapping with default config
+          const newMapping = {
+            id: Date.now().toString(),
+            extension: extension,
+            processorType: processor.type,
+            enabled: true,
+            config: processor.getDefaultConfig(),
+          };
+
+          this.plugin.settings.fileTypeMappings.push(newMapping);
+          await this.plugin.saveSettings();
+          this.display();
+          new Notice(`Added processor for .${extension} files`);
         })
       );
   }
 
+  /**
+   * Validate that an extension is unique among enabled mappings
+   * @param extension Extension to validate (without dot)
+   * @param excludeMappingId Optional mapping ID to exclude from check (for editing)
+   * @returns True if extension is unique
+   */
+  private validateUniqueExtension(extension: string, excludeMappingId?: string): boolean {
+    const normalizedExt = extension.toLowerCase().trim();
+
+    if (!normalizedExt) {
+      new Notice("Extension cannot be empty");
+      return false;
+    }
+
+    const duplicate = this.plugin.settings.fileTypeMappings.find(
+      (m) =>
+        m.extension.toLowerCase() === normalizedExt &&
+        m.enabled &&
+        m.id !== excludeMappingId
+    );
+
+    if (duplicate) {
+      new Notice(`Extension "${extension}" is already used by another enabled processor`);
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Show modal to edit extension for a mapping
+   */
+  private async editExtension(mapping: FileTypeMapping): Promise<void> {
+    const modal = new ExtensionEditModal(
+      this.app,
+      mapping.extension,
+      async (newExtension: string) => {
+        if (this.validateUniqueExtension(newExtension, mapping.id)) {
+          const index = this.plugin.settings.fileTypeMappings.findIndex(
+            (m) => m.id === mapping.id
+          );
+          if (index !== -1) {
+            this.plugin.settings.fileTypeMappings[index].extension = newExtension.toLowerCase().trim();
+            await this.plugin.saveSettings();
+            this.display();
+            new Notice(`Extension updated to "${newExtension}"`);
+          }
+        }
+      }
+    );
+    modal.open();
+  }
+
+  private showProcessorConfig(mapping: FileTypeMapping): void {
+    const registry = ProcessorRegistry.getInstance();
+    const processor = registry.getByType(mapping.processorType);
+
+    if (!processor) {
+      new Notice("Processor not found");
+      return;
+    }
+
+    // Open configuration modal
+    const modal = new ProcessorConfigModal(
+      this.app,
+      processor,
+      mapping.config,
+      async (newConfig) => {
+        // Find the mapping in settings and update it
+        const index = this.plugin.settings.fileTypeMappings.findIndex(
+          (m: FileTypeMapping) => m.id === mapping.id
+        );
+        if (index !== -1) {
+          this.plugin.settings.fileTypeMappings[index].config = newConfig;
+          await this.plugin.saveSettings();
+          // Refresh settings display
+          this.display();
+        }
+      }
+    );
+    modal.open();
+  }
+
+}
+
+/**
+ * Modal for editing file extension
+ */
+class ExtensionEditModal extends Modal {
+  private currentExtension: string;
+  private onSave: (newExtension: string) => Promise<void>;
+
+  constructor(app: App, currentExtension: string, onSave: (newExtension: string) => Promise<void>) {
+    super(app);
+    this.currentExtension = currentExtension;
+    this.onSave = onSave;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+
+    contentEl.createEl("h2", { text: "Edit File Extension" });
+
+    let extensionInput: HTMLInputElement;
+
+    new Setting(contentEl)
+      .setName("File Extension")
+      .setDesc("Enter the file extension without the dot (e.g., 'note', 'pdf')")
+      .addText((text) => {
+        extensionInput = text.inputEl;
+        text
+          .setValue(this.currentExtension)
+          .onChange((value) => {
+            // Remove any dots that user might type
+            const cleaned = value.replace(/\./g, "");
+            if (cleaned !== value) {
+              text.setValue(cleaned);
+            }
+          });
+      });
+
+    new Setting(contentEl)
+      .addButton((button) =>
+        button
+          .setButtonText("Save")
+          .setCta()
+          .onClick(async () => {
+            const newExtension = extensionInput.value.trim();
+            if (newExtension) {
+              await this.onSave(newExtension);
+              this.close();
+            } else {
+              new Notice("Extension cannot be empty");
+            }
+          })
+      )
+      .addButton((button) =>
+        button.setButtonText("Cancel").onClick(() => {
+          this.close();
+        })
+      );
+  }
+
+  onClose() {
+    const { contentEl } = this;
+    contentEl.empty();
+  }
 }
