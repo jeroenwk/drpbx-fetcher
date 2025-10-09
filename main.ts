@@ -10,7 +10,7 @@ import { FileUtils } from "./src/utils/FileUtils";
 import { TemplateResolver } from "./src/processors/templates/TemplateResolver";
 import { ProcessorConfigModal } from "./src/ui/ProcessorConfigModal";
 import { FileTypeMapping } from "./src/models/Settings";
-import { FileLogger } from "./src/utils/logger";
+import { StreamLogger } from "./src/utils/StreamLogger";
 
 export default class DrpbxFetcherPlugin extends Plugin {
   settings: DrpbxFetcherSettings;
@@ -149,6 +149,9 @@ export default class DrpbxFetcherPlugin extends Plugin {
 
     this.isSyncing = true;
     new Notice("Starting Dropbox sync...");
+    StreamLogger.log("[DrpbxFetcher] Starting sync...", {
+      folderMappings: this.settings.folderMappings.length
+    });
 
     try {
       const dbx = await this.getDropboxClient();
@@ -162,6 +165,10 @@ export default class DrpbxFetcherPlugin extends Plugin {
       for (const mapping of this.settings.folderMappings) {
         try {
           console.log(`Syncing ${mapping.remotePath} to ${mapping.localPath}`);
+          StreamLogger.log(`[DrpbxFetcher] Syncing folder mapping`, {
+            remotePath: mapping.remotePath,
+            localPath: mapping.localPath
+          });
 
           // Validate remote path format
           if (!mapping.remotePath.startsWith("/")) {
@@ -174,6 +181,10 @@ export default class DrpbxFetcherPlugin extends Plugin {
           // Filter only files (not folders)
           const files = entries.filter((entry) => entry[".tag"] === "file") as files.FileMetadata[];
           totalSourceFiles += files.length;
+          StreamLogger.log(`[DrpbxFetcher] Found ${files.length} files in folder`, {
+            remotePath: mapping.remotePath,
+            fileCount: files.length
+          });
 
           // Ensure local folder exists
           const localFolder = mapping.localPath.startsWith("/")
@@ -187,12 +198,39 @@ export default class DrpbxFetcherPlugin extends Plugin {
           }
 
           // Download and save each file
-          for (const file of files) {
+          StreamLogger.log(`[DrpbxFetcher] Processing ${files.length} files...`);
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i];
             try {
+              StreamLogger.log(`[DrpbxFetcher] Processing file ${i + 1}/${files.length}`, {
+                fileName: file.name,
+                size: file.size,
+                path: file.path_display
+              });
+
               // Check if this file extension should be skipped
               const fileExtension = FileUtils.getExtension(file.name);
               if (this.settings.skippedExtensions.includes(fileExtension.toLowerCase())) {
                 console.log(`Skipping ${file.name} - extension .${fileExtension} is in skip list`);
+                StreamLogger.log(`[DrpbxFetcher] Skipping file (extension in skip list)`, {
+                  fileName: file.name,
+                  extension: fileExtension
+                });
+                skippedFiles++;
+                continue;
+              }
+
+              // Check file size limit on mobile platforms
+              if (PlatformHelper.isMobile() && file.size > this.settings.maxFileSizeMobile) {
+                const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                const limitMB = (this.settings.maxFileSizeMobile / (1024 * 1024)).toFixed(0);
+                console.log(`Skipping ${file.name} - file too large for mobile (${sizeMB} MB > ${limitMB} MB limit)`);
+                StreamLogger.warn(`[DrpbxFetcher] Skipping file (too large for mobile)`, {
+                  fileName: file.name,
+                  fileSizeMB: sizeMB,
+                  limitMB: limitMB,
+                  platform: PlatformHelper.getPlatformName()
+                });
                 skippedFiles++;
                 continue;
               }
@@ -215,10 +253,16 @@ export default class DrpbxFetcherPlugin extends Plugin {
 
               // Download file from Dropbox
               console.log(`Downloading: ${file.path_display}`);
+              StreamLogger.log(`[DrpbxFetcher] Downloading file...`, {
+                fileName: file.name,
+                size: file.size
+              });
               const response = await dbx.filesDownload({ path: file.path_lower! });
+              StreamLogger.log(`[DrpbxFetcher] Download complete, converting to buffer...`);
               const fileBlob = (response.result as any).fileBlob as Blob;
               const arrayBuffer = await fileBlob.arrayBuffer();
               const uint8Array = new Uint8Array(arrayBuffer);
+              StreamLogger.log(`[DrpbxFetcher] Buffer ready`, { bytes: uint8Array.length });
 
               // Check if file should be processed by a processor
               const registry = ProcessorRegistry.getInstance();
@@ -227,6 +271,11 @@ export default class DrpbxFetcherPlugin extends Plugin {
               if (processor) {
                 // Use processor
                 console.log(`Processing ${file.name} with ${processor.name}`);
+                StreamLogger.log(`[DrpbxFetcher] Found processor for file`, {
+                  fileName: file.name,
+                  processorName: processor.name,
+                  extension: fileExtension
+                });
                 const mapping = this.settings.fileTypeMappings.find(
                   (m) => m.extension.toLowerCase() === fileExtension.toLowerCase() && m.enabled
                 );
@@ -251,6 +300,10 @@ export default class DrpbxFetcherPlugin extends Plugin {
 
                   if (shouldProcess) {
                     try {
+                      StreamLogger.log(`[DrpbxFetcher] Starting processor...`, {
+                        fileName: file.name,
+                        processor: processor.name
+                      });
                       const templateResolver = new TemplateResolver(this.app.vault);
                       const result = await processor.process(
                         uint8Array,
@@ -263,6 +316,11 @@ export default class DrpbxFetcherPlugin extends Plugin {
                           templateResolver,
                         }
                       );
+                      StreamLogger.log(`[DrpbxFetcher] Processor completed`, {
+                        fileName: file.name,
+                        success: result.success,
+                        createdFiles: result.createdFiles?.length || 0
+                      });
 
                       if (result.success) {
                         processedSourceFiles++;
@@ -273,12 +331,25 @@ export default class DrpbxFetcherPlugin extends Plugin {
                         console.log(`✓ Processed: ${result.createdFiles.length} files created`);
                         if (result.warnings && result.warnings.length > 0) {
                           console.warn(`Warnings: ${result.warnings.join(", ")}`);
+                          StreamLogger.warn(`[DrpbxFetcher] Processor warnings`, {
+                            warnings: result.warnings
+                          });
                         }
                       } else {
                         console.error(`✗ Processing failed: ${result.errors?.join(", ")}`);
+                        StreamLogger.error(`[DrpbxFetcher] Processor failed`, {
+                          fileName: file.name,
+                          errors: result.errors
+                        });
                       }
                     } catch (procError: any) {
                       console.error(`Error processing file with ${processor.name}:`, procError);
+                      StreamLogger.error(`[DrpbxFetcher] Processor exception`, {
+                        fileName: file.name,
+                        processor: processor.name,
+                        error: procError.message,
+                        stack: procError.stack
+                      });
                     }
                   }
                   continue; // Skip default file handling
@@ -323,6 +394,13 @@ export default class DrpbxFetcherPlugin extends Plugin {
               if (error.error) {
                 console.error(`  - Dropbox error:`, error.error);
               }
+              StreamLogger.error(`[DrpbxFetcher] File sync error`, {
+                fileName: file.name,
+                path: file.path_display,
+                error: error.message,
+                status: error.status,
+                stack: error.stack
+              });
             }
           }
         } catch (error: any) {
@@ -366,8 +444,18 @@ export default class DrpbxFetcherPlugin extends Plugin {
       }
 
       new Notice(summary);
+      StreamLogger.log("[DrpbxFetcher] Sync completed successfully", {
+        totalSourceFiles,
+        processedSourceFiles,
+        createdFiles,
+        regularFiles,
+        skippedFiles,
+        skippedProcessors,
+        summary
+      });
     } catch (error) {
       console.error("Sync error:", error);
+      StreamLogger.error("[DrpbxFetcher] Sync failed", error);
       new Notice(`Sync failed: ${error.message}`);
     } finally {
       this.isSyncing = false;
@@ -377,16 +465,26 @@ export default class DrpbxFetcherPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
 
-    // Initialize file logger
-    FileLogger.initialize(this.app, this.settings.logFilePath, this.settings.enableFileLogging);
-    await FileLogger.log("[DrpbxFetcher] Plugin loading...");
+    // Initialize stream logger
+    const manifest = (this.app as any).plugins?.manifests?.["drpbx-fetcher"];
+    const version = manifest?.version || "unknown";
+    const platform = PlatformHelper.getPlatformName();
+
+    StreamLogger.initialize({
+      type: this.settings.loggerType,
+      host: this.settings.streamLogHost,
+      port: this.settings.streamLogPort,
+      version,
+      platform,
+    });
+    StreamLogger.log("[DrpbxFetcher] Plugin loading...");
 
     // Register file processors
     const registry = ProcessorRegistry.getInstance();
     registry.register(new DefaultProcessor());
     registry.register(new ViwoodsProcessor());
     console.log("Registered file processors:", registry.listAll().map(p => p.name).join(", "));
-    await FileLogger.log("[DrpbxFetcher] Registered file processors:", { processors: registry.listAll().map(p => p.name) });
+    StreamLogger.log("[DrpbxFetcher] Registered file processors:", { processors: registry.listAll().map(p => p.name) });
 
     // Initialize OAuth manager
     this.oauthManager = new OAuthManager(this, this.settings.clientId);
@@ -419,14 +517,14 @@ export default class DrpbxFetcherPlugin extends Plugin {
     // Sync on startup if configured
     if (this.settings.syncOnStartup && this.settings.folderMappings.length > 0 && this.settings.accessToken) {
       // Delay initial sync to allow Obsidian to fully load
-      await FileLogger.log(`[DrpbxFetcher] Scheduling startup sync with ${this.settings.syncStartupDelay}ms delay...`);
+      StreamLogger.log(`[DrpbxFetcher] Scheduling startup sync with ${this.settings.syncStartupDelay}ms delay...`);
       setTimeout(async () => {
         console.log("Running initial Dropbox sync...");
-        await FileLogger.log("[DrpbxFetcher] Running startup sync...");
+        StreamLogger.log("[DrpbxFetcher] Running startup sync...");
         await this.syncFiles();
       }, this.settings.syncStartupDelay);
     } else {
-      await FileLogger.log("[DrpbxFetcher] Startup sync disabled or not configured");
+      StreamLogger.log("[DrpbxFetcher] Startup sync disabled or not configured");
     }
   }
 
@@ -503,31 +601,100 @@ class DrpbxFetcherSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Enable file logging")
-      .setDesc("Write detailed logs to a file in the vault (for debugging)")
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.enableFileLogging).onChange(async (value) => {
-          this.plugin.settings.enableFileLogging = value;
-          await this.plugin.saveSettings();
-          // Reinitialize logger with new settings
-          FileLogger.initialize(this.plugin.app, this.plugin.settings.logFilePath, value);
-        })
+      .setName("Mobile file size limit (MB)")
+      .setDesc("Maximum file size for mobile devices to prevent crashes. Large files will be skipped on mobile.")
+      .addText((text) =>
+        text
+          .setPlaceholder("10")
+          .setValue(String(Math.round(this.plugin.settings.maxFileSizeMobile / (1024 * 1024))))
+          .onChange(async (value) => {
+            const sizeMB = parseInt(value);
+            if (!isNaN(sizeMB) && sizeMB > 0) {
+              this.plugin.settings.maxFileSizeMobile = sizeMB * 1024 * 1024;
+              await this.plugin.saveSettings();
+            }
+          })
       );
 
     new Setting(containerEl)
-      .setName("Log file path")
-      .setDesc("Path to the log file in the vault")
-      .addText((text) =>
-        text
-          .setPlaceholder("drpbx-fetcher.log")
-          .setValue(this.plugin.settings.logFilePath)
-          .onChange(async (value) => {
-            this.plugin.settings.logFilePath = value || "drpbx-fetcher.log";
+      .setName("Logger type")
+      .setDesc("Choose between console logging or network stream logging")
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOption("console", "Console")
+          .addOption("stream", "Network Stream")
+          .setValue(this.plugin.settings.loggerType)
+          .onChange(async (value: "console" | "stream") => {
+            this.plugin.settings.loggerType = value;
             await this.plugin.saveSettings();
-            // Reinitialize logger with new path
-            FileLogger.initialize(this.plugin.app, this.plugin.settings.logFilePath, this.plugin.settings.enableFileLogging);
+            // Reinitialize logger with new settings
+            const manifest = (this.plugin.app as any).plugins?.manifests?.["drpbx-fetcher"];
+            const version = manifest?.version || "unknown";
+            const platform = PlatformHelper.getPlatformName();
+            StreamLogger.initialize({
+              type: value,
+              host: this.plugin.settings.streamLogHost,
+              port: this.plugin.settings.streamLogPort,
+              version,
+              platform,
+            });
+            this.display(); // Refresh settings to show/hide stream options
           })
       );
+
+    // Show stream logger settings only when stream logging is enabled
+    if (this.plugin.settings.loggerType === "stream") {
+      new Setting(containerEl)
+        .setName("Stream log server host")
+        .setDesc("IP address or hostname of the log server (default: localhost)")
+        .addText((text) =>
+          text
+            .setPlaceholder("localhost")
+            .setValue(this.plugin.settings.streamLogHost)
+            .onChange(async (value) => {
+              this.plugin.settings.streamLogHost = value || "localhost";
+              await this.plugin.saveSettings();
+              // Reinitialize logger with new host
+              const manifest = (this.plugin.app as any).plugins?.manifests?.["drpbx-fetcher"];
+              const version = manifest?.version || "unknown";
+              const platform = PlatformHelper.getPlatformName();
+              StreamLogger.initialize({
+                type: this.plugin.settings.loggerType,
+                host: this.plugin.settings.streamLogHost,
+                port: this.plugin.settings.streamLogPort,
+                version,
+                platform,
+              });
+            })
+        );
+
+      new Setting(containerEl)
+        .setName("Stream log server port")
+        .setDesc("Port number of the log server (default: 3000)")
+        .addText((text) =>
+          text
+            .setPlaceholder("3000")
+            .setValue(String(this.plugin.settings.streamLogPort))
+            .onChange(async (value) => {
+              const port = parseInt(value);
+              if (!isNaN(port) && port > 0 && port <= 65535) {
+                this.plugin.settings.streamLogPort = port;
+                await this.plugin.saveSettings();
+                // Reinitialize logger with new port
+                const manifest = (this.plugin.app as any).plugins?.manifests?.["drpbx-fetcher"];
+                const version = manifest?.version || "unknown";
+                const platform = PlatformHelper.getPlatformName();
+                StreamLogger.initialize({
+                  type: this.plugin.settings.loggerType,
+                  host: this.plugin.settings.streamLogHost,
+                  port: this.plugin.settings.streamLogPort,
+                  version,
+                  platform,
+                });
+              }
+            })
+        );
+    }
 
     new Setting(containerEl)
       .setName("Dropbox client ID")

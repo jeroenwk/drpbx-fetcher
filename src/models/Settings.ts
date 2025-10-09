@@ -37,8 +37,11 @@ export interface DrpbxFetcherSettings {
 	syncOnStartup: boolean; // Whether to sync automatically on startup
 	syncStartupDelay: number; // Delay in milliseconds before starting sync (default 3000)
 	// Logging settings
-	enableFileLogging: boolean; // Write logs to a file in the vault
-	logFilePath: string; // Path to log file (default: "drpbx-fetcher.log")
+	loggerType: 'console' | 'stream'; // Logger type: console or network stream
+	streamLogHost: string; // Host for stream logger (default: "localhost")
+	streamLogPort: number; // Port for stream logger (default: 3000)
+	// Mobile file size limit
+	maxFileSizeMobile: number; // Maximum file size in bytes for mobile platforms (default: 10MB)
 }
 
 /**
@@ -56,6 +59,8 @@ export const DEFAULT_SETTINGS: DrpbxFetcherSettings = {
 	authInProgress: false,
 	syncOnStartup: false, // Default off
 	syncStartupDelay: 3000, // 3 seconds
-	enableFileLogging: false, // Default off
-	logFilePath: "drpbx-fetcher.log",
+	loggerType: 'console', // Default to console logging
+	streamLogHost: 'localhost', // Default host
+	streamLogPort: 3000, // Default port
+	maxFileSizeMobile: 10 * 1024 * 1024, // 10 MB default for mobile
 };

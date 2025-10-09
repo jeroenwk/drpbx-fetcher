@@ -1,6 +1,6 @@
 {
   "name": "drpbx-fetcher",
-  "version": "0.2.26",
+  "version": "0.2.30",
   "description": "Sync files from Dropbox folders to your Obsidian vault",
   "main": "dist/main.js",
   "scripts": {
@@ -10,7 +10,9 @@
     "copy-assets": "cp manifest.json dist/ && cp versions.json dist/",
     "cleanup": "rm -f main.js *.js.map",
     "version": "node version-bump.mjs && git add manifest.json versions.json",
-    "lint": "eslint . --ext .ts"
+    "lint": "eslint . --ext .ts",
+    "log-server": "node log-server.js",
+    "log-server:dev": "node log-server.js --port 3001"
   },
   "keywords": [
     "obsidian",
