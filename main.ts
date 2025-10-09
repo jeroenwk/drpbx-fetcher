@@ -10,6 +10,7 @@ import { FileUtils } from "./src/utils/FileUtils";
 import { TemplateResolver } from "./src/processors/templates/TemplateResolver";
 import { ProcessorConfigModal } from "./src/ui/ProcessorConfigModal";
 import { FileTypeMapping } from "./src/models/Settings";
+import { FileLogger } from "./src/utils/logger";
 
 export default class DrpbxFetcherPlugin extends Plugin {
   settings: DrpbxFetcherSettings;
@@ -376,11 +377,16 @@ export default class DrpbxFetcherPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
 
+    // Initialize file logger
+    FileLogger.initialize(this.app, this.settings.logFilePath, this.settings.enableFileLogging);
+    await FileLogger.log("[DrpbxFetcher] Plugin loading...");
+
     // Register file processors
     const registry = ProcessorRegistry.getInstance();
     registry.register(new DefaultProcessor());
     registry.register(new ViwoodsProcessor());
     console.log("Registered file processors:", registry.listAll().map(p => p.name).join(", "));
+    await FileLogger.log("[DrpbxFetcher] Registered file processors:", { processors: registry.listAll().map(p => p.name) });
 
     // Initialize OAuth manager
     this.oauthManager = new OAuthManager(this, this.settings.clientId);
@@ -411,12 +417,16 @@ export default class DrpbxFetcherPlugin extends Plugin {
     });
 
     // Sync on startup if configured
-    if (this.settings.folderMappings.length > 0 && this.settings.accessToken) {
+    if (this.settings.syncOnStartup && this.settings.folderMappings.length > 0 && this.settings.accessToken) {
       // Delay initial sync to allow Obsidian to fully load
+      await FileLogger.log(`[DrpbxFetcher] Scheduling startup sync with ${this.settings.syncStartupDelay}ms delay...`);
       setTimeout(async () => {
         console.log("Running initial Dropbox sync...");
+        await FileLogger.log("[DrpbxFetcher] Running startup sync...");
         await this.syncFiles();
-      }, 3000);
+      }, this.settings.syncStartupDelay);
+    } else {
+      await FileLogger.log("[DrpbxFetcher] Startup sync disabled or not configured");
     }
   }
 
@@ -465,6 +475,59 @@ class DrpbxFetcherSettingTab extends PluginSettingTab {
 
     // General Settings section
     containerEl.createEl("h3", { text: "General Settings" });
+
+    new Setting(containerEl)
+      .setName("Sync on startup")
+      .setDesc("Automatically sync when Obsidian starts")
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.syncOnStartup).onChange(async (value) => {
+          this.plugin.settings.syncOnStartup = value;
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Startup sync delay")
+      .setDesc("Delay in milliseconds before starting sync on startup (default: 3000)")
+      .addText((text) =>
+        text
+          .setPlaceholder("3000")
+          .setValue(String(this.plugin.settings.syncStartupDelay))
+          .onChange(async (value) => {
+            const delay = parseInt(value);
+            if (!isNaN(delay) && delay >= 0) {
+              this.plugin.settings.syncStartupDelay = delay;
+              await this.plugin.saveSettings();
+            }
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Enable file logging")
+      .setDesc("Write detailed logs to a file in the vault (for debugging)")
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.enableFileLogging).onChange(async (value) => {
+          this.plugin.settings.enableFileLogging = value;
+          await this.plugin.saveSettings();
+          // Reinitialize logger with new settings
+          FileLogger.initialize(this.plugin.app, this.plugin.settings.logFilePath, value);
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Log file path")
+      .setDesc("Path to the log file in the vault")
+      .addText((text) =>
+        text
+          .setPlaceholder("drpbx-fetcher.log")
+          .setValue(this.plugin.settings.logFilePath)
+          .onChange(async (value) => {
+            this.plugin.settings.logFilePath = value || "drpbx-fetcher.log";
+            await this.plugin.saveSettings();
+            // Reinitialize logger with new path
+            FileLogger.initialize(this.plugin.app, this.plugin.settings.logFilePath, this.plugin.settings.enableFileLogging);
+          })
+      );
 
     new Setting(containerEl)
       .setName("Dropbox client ID")

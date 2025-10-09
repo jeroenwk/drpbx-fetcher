@@ -1,6 +1,7 @@
 import { FileUtils } from "../utils/FileUtils";
 import { ZipUtils } from "../utils/ZipUtils";
 import { TemplateEngine } from "./templates/TemplateEngine";
+import { FileLogger } from "../utils/logger";
 import {
 	FileProcessor,
 	ProcessorConfig,
@@ -64,20 +65,30 @@ export class ViwoodsProcessor implements FileProcessor {
 		config: ProcessorConfig,
 		context: ProcessorContext
 	): Promise<ProcessorResult> {
+		await FileLogger.log(`[ViwoodsProcessor] Starting processing of ${metadata.name}`);
+		await FileLogger.log(`[ViwoodsProcessor] File size: ${fileData.length} bytes`);
+		await FileLogger.log(`[ViwoodsProcessor] Original path: ${originalPath}`);
+
 		const viwoodsConfig = config as ViwoodsProcessorConfig;
 		const createdFiles: string[] = [];
 		const errors: string[] = [];
 		const warnings: string[] = [];
 
 		try {
+			await FileLogger.log(`[ViwoodsProcessor] Loading ZIP file...`);
 			// Load ZIP file
 			const zip = await ZipUtils.loadZip(fileData);
+			await FileLogger.log(`[ViwoodsProcessor] ZIP file loaded successfully`);
 
 			// Check which format this is by looking at file names
 			const allFiles = ZipUtils.listFiles(zip);
+			await FileLogger.log(`[ViwoodsProcessor] Files in ZIP:`, { count: allFiles.length, files: allFiles });
+
 			const hasEpubFormat = allFiles.some(f => f.includes("_BookBean.json") || f.includes("_ReadNoteBean.json"));
+			await FileLogger.log(`[ViwoodsProcessor] Format detected: ${hasEpubFormat ? 'EPUB' : 'Handwritten'}`);
 
 			if (hasEpubFormat) {
+				await FileLogger.log(`[ViwoodsProcessor] Processing as EPUB format...`);
 				// EPUB reader format - use different processing
 				return await this.processEpubFormat(zip, fileData, originalPath, metadata, viwoodsConfig, context);
 			}
@@ -286,22 +297,32 @@ export class ViwoodsProcessor implements FileProcessor {
 		config: ViwoodsProcessorConfig,
 		context: ProcessorContext
 	): Promise<ProcessorResult> {
+		await FileLogger.log(`[ViwoodsProcessor.processEpubFormat] Starting EPUB format processing`);
 		const createdFiles: string[] = [];
 		const errors: string[] = [];
 
 		try {
 			// Find the JSON files (they have prefix based on book name)
+			await FileLogger.log(`[ViwoodsProcessor.processEpubFormat] Looking for JSON files in ZIP...`);
 			const allFiles = ZipUtils.listFiles(zip);
 			const pageTextAnnotationFile = allFiles.find(f => f.endsWith("_PageTextAnnotation.json"));
 			const bookBeanFile = allFiles.find(f => f.endsWith("_BookBean.json"));
 			const epubFile = allFiles.find(f => f.endsWith(".epub"));
 
+			await FileLogger.log(`[ViwoodsProcessor.processEpubFormat] Found files:`, {
+				pageTextAnnotationFile,
+				bookBeanFile,
+				epubFile
+			});
+
 			if (!pageTextAnnotationFile) {
+				await FileLogger.error("No PageTextAnnotation.json found in EPUB note file");
 				errors.push("No PageTextAnnotation.json found in EPUB note file");
 				return { success: false, createdFiles, errors };
 			}
 
 			// Extract highlights
+			await FileLogger.log(`[ViwoodsProcessor.processEpubFormat] Extracting highlights from ${pageTextAnnotationFile}...`);
 			const highlights = await ZipUtils.extractJson<Array<{
 				bookName: string;
 				chapterName: string;
@@ -313,7 +334,12 @@ export class ViwoodsProcessor implements FileProcessor {
 				createTime: number;
 			}>>(zip, pageTextAnnotationFile);
 
+			await FileLogger.log(`[ViwoodsProcessor.processEpubFormat] Extracted highlights:`, {
+				count: highlights?.length || 0
+			});
+
 			if (!highlights || highlights.length === 0) {
+				await FileLogger.error("No highlights found in note file");
 				errors.push("No highlights found in note file");
 				return { success: false, createdFiles, errors };
 			}
@@ -322,12 +348,20 @@ export class ViwoodsProcessor implements FileProcessor {
 			const bookSlug = FileUtils.slugify(bookName);
 			const totalPages = highlights[0].pageCount;
 
+			await FileLogger.log(`[ViwoodsProcessor.processEpubFormat] Book info:`, {
+				bookName,
+				bookSlug,
+				totalPages
+			});
+
 			// Extract EPUB file if configured
 			let epubPath = "";
 			if (epubFile && config.sourcesFolder) {
+				await FileLogger.log(`[ViwoodsProcessor.processEpubFormat] Extracting EPUB file: ${epubFile}`);
 				const epubData = await ZipUtils.extractFile(zip, epubFile);
 				if (epubData) {
 					epubPath = FileUtils.joinPath(config.sourcesFolder, `${bookSlug}.epub`);
+					await FileLogger.log(`[ViwoodsProcessor.processEpubFormat] Creating folder: ${config.sourcesFolder}`);
 					await FileUtils.ensurePath(context.vault, config.sourcesFolder);
 					await context.vault.adapter.writeBinary(epubPath, epubData);
 					createdFiles.push(epubPath);
@@ -335,10 +369,13 @@ export class ViwoodsProcessor implements FileProcessor {
 			}
 
 			// Generate highlight for each annotation
+			await FileLogger.log(`[ViwoodsProcessor.processEpubFormat] Creating highlights folder: ${config.highlightsFolder}`);
 			await FileUtils.ensurePath(context.vault, config.highlightsFolder);
 
+			await FileLogger.log(`[ViwoodsProcessor.processEpubFormat] Processing ${highlights.length} highlights...`);
 			for (let i = 0; i < highlights.length; i++) {
 				const highlight = highlights[i];
+				await FileLogger.log(`[ViwoodsProcessor.processEpubFormat] Processing highlight ${i + 1}/${highlights.length}`);
 				const dateHighlighted = new Date(highlight.createTime * 1000);
 
 				// Build location string

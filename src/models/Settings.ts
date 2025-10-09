@@ -33,6 +33,12 @@ export interface DrpbxFetcherSettings {
 	processedFiles: Record<string, number>; // Dropbox file.id -> file.size (tracks processed files)
 	// Mobile auth state
 	authInProgress: boolean;
+	// Sync settings
+	syncOnStartup: boolean; // Whether to sync automatically on startup
+	syncStartupDelay: number; // Delay in milliseconds before starting sync (default 3000)
+	// Logging settings
+	enableFileLogging: boolean; // Write logs to a file in the vault
+	logFilePath: string; // Path to log file (default: "drpbx-fetcher.log")
 }
 
 /**
@@ -48,4 +54,8 @@ export const DEFAULT_SETTINGS: DrpbxFetcherSettings = {
 	skippedExtensions: [],
 	processedFiles: {},
 	authInProgress: false,
+	syncOnStartup: false, // Default off
+	syncStartupDelay: 3000, // 3 seconds
+	enableFileLogging: false, // Default off
+	logFilePath: "drpbx-fetcher.log",
 };
