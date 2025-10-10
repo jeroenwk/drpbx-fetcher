@@ -29,6 +29,11 @@ export interface ViwoodsProcessorConfig extends ProcessorConfig {
 	includeThumbnail: boolean;
 	extractImages: boolean;
 	createIndex: boolean;
+	// Annotation processing options
+	processAnnotations?: boolean;
+	annotationImagesFolder?: string;
+	includeSummaryInAnnotation?: boolean;
+	createCompositeImages?: boolean;
 }
 
 /**
@@ -47,6 +52,34 @@ interface LayoutText {
 
 interface LayoutImage {
 	[key: string]: unknown;
+}
+
+/**
+ * ReadNoteBean structure for EPUB annotations
+ */
+interface ReadNoteBean {
+	id: number;
+	bookId: string;
+	bookName: string;
+	userId: string;
+	// Page & Location
+	epubPageIndex: number;
+	pageIndex: number;
+	pageIndexItem: number;
+	rootChapterName: string;
+	rootChapterLinkUri: string;
+	title: string;
+	// Content
+	sumary: string; // Note: misspelling in source data
+	alias: string;
+	// Images
+	noteImagePath: string; // PNG overlay
+	pageImage: string; // JPG background
+	// Metadata
+	upDataTime: number;
+	noteType: number;
+	epubSettingStr: string;
+	bookType: number;
 }
 
 /**
@@ -468,6 +501,38 @@ export class ViwoodsProcessor implements FileProcessor {
 				}
 			}
 
+			// Process annotations from ReadNoteBean
+			if (config.processAnnotations !== false) {
+				const readNoteBeanFile = allFiles.find(f => f.endsWith('_ReadNoteBean.json'));
+
+				if (readNoteBeanFile) {
+					await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] Found ReadNoteBean file: ${readNoteBeanFile}`);
+					const annotations = await StreamingZipUtils.extractJson<ReadNoteBean[]>(
+						zipReader,
+						readNoteBeanFile
+					);
+
+					if (annotations && annotations.length > 0) {
+						await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] Processing ${annotations.length} annotations...`);
+
+						for (const annotation of annotations) {
+							const files = await this.processAnnotation(
+								zipReader,
+								annotation,
+								bookSlug,
+								totalPages,
+								epubPath,
+								config,
+								context
+							);
+							createdFiles.push(...files);
+						}
+					}
+				} else {
+					await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] No ReadNoteBean file found, skipping annotations`);
+				}
+			}
+
 			return {
 				success: true,
 				createdFiles,
@@ -588,6 +653,231 @@ ${(data.createdFiles as string[]).map((f) => `- [[${f}]]`).join("\n")}
 		}
 	}
 
+	/**
+	 * Process a single annotation from ReadNoteBean
+	 */
+	private async processAnnotation(
+		zipReader: ZipReader<Blob>,
+		annotation: ReadNoteBean,
+		bookSlug: string,
+		totalPages: number,
+		epubPath: string,
+		config: ViwoodsProcessorConfig,
+		context: ProcessorContext
+	): Promise<string[]> {
+		const createdFiles: string[] = [];
+
+		try {
+			// 1. Extract image filenames from paths
+			const pngFilename = annotation.noteImagePath.split('/').pop();
+			const jpgFilename = annotation.pageImage.split('/').pop();
+
+			if (!pngFilename || !jpgFilename) {
+				await StreamLogger.error(`Missing image filenames for annotation ${annotation.id}`);
+				return createdFiles;
+			}
+
+			await StreamLogger.log(`[processAnnotation] Processing annotation ${annotation.id}, PNG: ${pngFilename}, JPG: ${jpgFilename}`);
+
+			// 2. Extract both images from ZIP
+			const pngData = await StreamingZipUtils.extractFile(zipReader, pngFilename);
+			const jpgData = await StreamingZipUtils.extractFile(zipReader, jpgFilename);
+
+			if (!pngData || !jpgData) {
+				await StreamLogger.error(`Missing image files for annotation ${annotation.id}`);
+				return createdFiles;
+			}
+
+			await StreamLogger.log(`[processAnnotation] Extracted images, PNG: ${pngData.length} bytes, JPG: ${jpgData.length} bytes`);
+
+			// 3. Create composite image
+			const compositeImage = await this.createCompositeAnnotationImage(
+				jpgData,
+				pngData,
+				config.createCompositeImages !== false
+			);
+
+			// 4. Save composite image
+			const imageFolder = config.annotationImagesFolder || config.annotationsFolder;
+			await FileUtils.ensurePath(context.vault, imageFolder);
+
+			const pageStr = String(annotation.pageIndex).padStart(3, '0');
+			const imageName = `${bookSlug}-p${pageStr}-annotation-${annotation.id}.png`;
+			const imagePath = FileUtils.joinPath(imageFolder, imageName);
+
+			const imageBuffer = await compositeImage.arrayBuffer();
+			await context.vault.adapter.writeBinary(imagePath, new Uint8Array(imageBuffer));
+			createdFiles.push(imagePath);
+
+			await StreamLogger.log(`[processAnnotation] Saved composite image: ${imagePath}`);
+
+			// 5. Generate markdown file
+			const mdPath = await this.generateAnnotationMarkdownFromBean(
+				annotation,
+				bookSlug,
+				totalPages,
+				epubPath,
+				imagePath,
+				config,
+				context
+			);
+
+			if (mdPath) {
+				createdFiles.push(mdPath);
+				await StreamLogger.log(`[processAnnotation] Saved markdown file: ${mdPath}`);
+			}
+
+			return createdFiles;
+		} catch (error: any) {
+			await StreamLogger.error(`Failed to process annotation ${annotation.id}: ${error.message}`);
+			return createdFiles;
+		}
+	}
+
+	/**
+	 * Create composite annotation image from JPG page and PNG overlay
+	 */
+	private async createCompositeAnnotationImage(
+		jpgData: Uint8Array,
+		pngData: Uint8Array,
+		shouldComposite: boolean
+	): Promise<Blob> {
+		// If composition disabled, return PNG only
+		if (!shouldComposite) {
+			return new Blob([pngData], { type: 'image/png' });
+		}
+
+		// Create blobs for image loading
+		const jpgBlob = new Blob([jpgData], { type: 'image/jpeg' });
+		const pngBlob = new Blob([pngData], { type: 'image/png' });
+
+		const jpgUrl = URL.createObjectURL(jpgBlob);
+		const pngUrl = URL.createObjectURL(pngBlob);
+
+		try {
+			// Load both images
+			const jpgImg = await this.loadImage(jpgUrl);
+			const pngImg = await this.loadImage(pngUrl);
+
+			// Create canvas with JPG dimensions
+			const canvas = document.createElement('canvas');
+			canvas.width = jpgImg.width;
+			canvas.height = jpgImg.height;
+
+			const ctx = canvas.getContext('2d');
+			if (!ctx) {
+				throw new Error('Failed to get canvas context');
+			}
+
+			// Draw JPG background
+			ctx.drawImage(jpgImg, 0, 0);
+
+			// Draw PNG overlay
+			ctx.drawImage(pngImg, 0, 0);
+
+			// Convert to blob
+			return new Promise<Blob>((resolve, reject) => {
+				canvas.toBlob((blob) => {
+					if (blob) {
+						resolve(blob);
+					} else {
+						reject(new Error('Failed to create blob from canvas'));
+					}
+				}, 'image/png');
+			});
+		} finally {
+			// Cleanup object URLs
+			URL.revokeObjectURL(jpgUrl);
+			URL.revokeObjectURL(pngUrl);
+		}
+	}
+
+	/**
+	 * Load an image from a URL
+	 */
+	private loadImage(url: string): Promise<HTMLImageElement> {
+		return new Promise((resolve, reject) => {
+			const img = new Image();
+			img.onload = () => resolve(img);
+			img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
+			img.src = url;
+		});
+	}
+
+	/**
+	 * Generate markdown file for annotation from ReadNoteBean
+	 */
+	private async generateAnnotationMarkdownFromBean(
+		annotation: ReadNoteBean,
+		bookSlug: string,
+		totalPages: number,
+		epubPath: string,
+		imagePath: string,
+		config: ViwoodsProcessorConfig,
+		context: ProcessorContext
+	): Promise<string | null> {
+		try {
+			const dateAnnotated = new Date(annotation.upDataTime * 1000);
+
+			// Build location string
+			const location = annotation.rootChapterName
+				? `${annotation.rootChapterName} → ${annotation.title}`
+				: annotation.title;
+
+			// Build EPUB deep link
+			const sourceLink = epubPath
+				? `${epubPath}#${annotation.rootChapterLinkUri}`
+				: annotation.rootChapterLinkUri;
+
+			// Build template data
+			const templateData = {
+				bookName: annotation.bookName,
+				bookSlug,
+				location,
+				chapterName: annotation.title,
+				rootChapterName: annotation.rootChapterName,
+				pageNumber: annotation.pageIndex,
+				totalPages,
+				sourceLink,
+				annotationImagePath: imagePath,
+				annotationSummary: config.includeSummaryInAnnotation !== false
+					? annotation.sumary
+					: '',
+				dateAnnotated: TemplateEngine.formatDate(dateAnnotated, "YYYY-MM-DD"),
+				annotationId: annotation.id,
+			};
+
+			// Load template
+			const defaultTemplate = await this.loadDefaultTemplate("viwoods-epub-annotation.md");
+			const template = await context.templateResolver.resolve(
+				config.annotationTemplate,
+				defaultTemplate
+			);
+
+			// Render markdown
+			const content = TemplateEngine.render(template, templateData, dateAnnotated);
+
+			// Generate filename
+			const pageStr = String(annotation.pageIndex).padStart(3, '0');
+			const filename = `${bookSlug}-p${pageStr}-annotation-${annotation.id}.md`;
+			const filepath = FileUtils.joinPath(config.annotationsFolder, filename);
+
+			// Only write if file doesn't exist (preserve user edits)
+			const existingFile = context.vault.getAbstractFileByPath(filepath);
+			if (!existingFile) {
+				await FileUtils.ensurePath(context.vault, config.annotationsFolder);
+				await context.vault.adapter.write(filepath, content);
+				return filepath;
+			} else {
+				await StreamLogger.log(`Preserving existing annotation: ${filename}`);
+				return null;
+			}
+		} catch (error: any) {
+			await StreamLogger.error(`Failed to generate annotation markdown: ${error.message}`);
+			return null;
+		}
+	}
+
 	private async loadDefaultTemplate(name: string): Promise<string> {
 		// In production, templates are bundled with the plugin
 		// For now, we'll use inline defaults as fallback
@@ -631,6 +921,29 @@ Points: {{pointCount}}
 
 ---
 #annotation #viwoods/{{noteSlug}}`,
+			"viwoods-epub-annotation.md": `## {{bookName}} - Annotation
+
+**Location:** {{location}}
+**Page:** {{pageNumber}}/{{totalPages}}
+**Date:** {{dateAnnotated}}
+**Source:** [Open in EPUB]({{sourceLink}})
+
+---
+
+![[{{annotationImagePath}}]]
+
+{{#if annotationSummary}}
+### Summary
+
+{{annotationSummary}}
+{{/if}}
+
+### Notes
+
+*Add your thoughts here*
+
+---
+#annotation #book/{{bookSlug}} #page/{{pageNumber}}`,
 			"viwoods-page.md": `# {{noteTitle}} - Page {{pageNumber}}
 
 **Created:** {{createTime}}
@@ -685,6 +998,10 @@ Points: {{pointCount}}
 			includeThumbnail: true,
 			extractImages: true,
 			createIndex: true,
+			processAnnotations: true,
+			annotationImagesFolder: "",
+			includeSummaryInAnnotation: true,
+			createCompositeImages: true,
 		};
 	}
 
@@ -780,6 +1097,35 @@ Points: {{pointCount}}
 					key: "createIndex",
 					label: "Create Index",
 					description: "Create an index file linking all content",
+					type: "boolean",
+					defaultValue: true,
+				},
+				{
+					key: "processAnnotations",
+					label: "Process Annotations",
+					description: "Extract and process handwritten annotations from ReadNoteBean.json (EPUB format)",
+					type: "boolean",
+					defaultValue: true,
+				},
+				{
+					key: "annotationImagesFolder",
+					label: "Annotation Images Folder",
+					description: "Folder for annotation images. Leave empty to use same as Annotations Folder.",
+					type: "folder",
+					required: false,
+					placeholder: "Example: viwoods/Annotation-Images",
+				},
+				{
+					key: "includeSummaryInAnnotation",
+					label: "Include Summary Text",
+					description: "Include annotation summary text in markdown files",
+					type: "boolean",
+					defaultValue: true,
+				},
+				{
+					key: "createCompositeImages",
+					label: "Create Composite Images",
+					description: "Combine page image (JPG) with annotation overlay (PNG). If disabled, only PNG will be saved.",
 					type: "boolean",
 					defaultValue: true,
 				},
