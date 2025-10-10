@@ -11,6 +11,7 @@ import { TemplateResolver } from "./src/processors/templates/TemplateResolver";
 import { ProcessorConfigModal } from "./src/ui/ProcessorConfigModal";
 import { FileTypeMapping } from "./src/models/Settings";
 import { StreamLogger } from "./src/utils/StreamLogger";
+import { TempFileManager } from "./src/utils/TempFileManager";
 
 export default class DrpbxFetcherPlugin extends Plugin {
   settings: DrpbxFetcherSettings;
@@ -18,6 +19,7 @@ export default class DrpbxFetcherPlugin extends Plugin {
   private isSyncing = false;
   oauthManager: OAuthManager | null = null;
   settingsTab: DrpbxFetcherSettingTab | null = null;
+  tempFileManager: TempFileManager | null = null;
 
   // Pure function to create a fetch-compatible response from Obsidian's RequestUrlResponse
   private static createFetchResponse(response: RequestUrlResponse): Response {
@@ -241,6 +243,117 @@ export default class DrpbxFetcherPlugin extends Plugin {
     });
 
     return completeFile;
+  }
+
+  /**
+   * Download a file from Dropbox in chunks directly to disk
+   * This approach uses minimal memory by writing chunks as they arrive
+   * @param filePath Dropbox file path
+   * @param fileSize Total file size in bytes
+   * @param chunkSize Size of each chunk in bytes
+   * @param tempFileManager Temp file manager instance
+   * @returns Path to temporary file containing the downloaded data
+   */
+  private async downloadFileInChunksToDisk(
+    filePath: string,
+    fileSize: number,
+    chunkSize: number,
+    tempFileManager: TempFileManager
+  ): Promise<string> {
+    StreamLogger.log(`[DrpbxFetcher] Starting chunked download to disk`, {
+      filePath,
+      fileSize,
+      chunkSize,
+      totalChunks: Math.ceil(fileSize / chunkSize)
+    });
+
+    // Generate temp file path
+    const tempPath = tempFileManager.getTempFilePath("download", "tmp");
+    await tempFileManager.ensureTempDir();
+
+    let downloadedBytes = 0;
+    let chunkNumber = 0;
+    const totalChunks = Math.ceil(fileSize / chunkSize);
+
+    try {
+      while (downloadedBytes < fileSize) {
+        const start = downloadedBytes;
+        const end = Math.min(start + chunkSize - 1, fileSize - 1);
+        chunkNumber++;
+
+        StreamLogger.log(`[DrpbxFetcher] Downloading chunk ${chunkNumber}/${totalChunks} to disk`, {
+          start,
+          end,
+          chunkBytes: end - start + 1,
+          progress: `${((downloadedBytes / fileSize) * 100).toFixed(1)}%`
+        });
+
+        try {
+          // Make direct HTTP request with Range header
+          const accessToken = this.settings.accessToken;
+
+          // Android fix: Dropbox API requires specific Content-Type headers
+          const headers: Record<string, string> = {
+            "Authorization": `Bearer ${accessToken}`,
+            "Dropbox-API-Arg": JSON.stringify({ path: filePath }),
+            "Range": `bytes=${start}-${end}`,
+          };
+
+          if (PlatformHelper.isAndroid()) {
+            headers["Content-Type"] = "application/octet-stream";
+          }
+
+          const response = await requestUrl({
+            url: "https://content.dropboxapi.com/2/files/download",
+            method: "POST",
+            headers,
+          });
+
+          if (response.status !== 206 && response.status !== 200) {
+            throw new Error(`Chunk download failed with status ${response.status}`);
+          }
+
+          // Get chunk data and write to disk immediately
+          const chunkData = new Uint8Array(response.arrayBuffer);
+
+          // Append chunk to temp file
+          await tempFileManager.append(tempPath, chunkData);
+          downloadedBytes += chunkData.length;
+
+          StreamLogger.log(`[DrpbxFetcher] Chunk ${chunkNumber}/${totalChunks} written to disk`, {
+            downloadedBytes,
+            totalBytes: fileSize,
+            progress: `${((downloadedBytes / fileSize) * 100).toFixed(1)}%`,
+            tempFileSize: await tempFileManager.getSize(tempPath)
+          });
+
+        } catch (error: any) {
+          StreamLogger.error(`[DrpbxFetcher] Chunk download failed`, {
+            chunkNumber,
+            start,
+            end,
+            error: error.message
+          });
+          // Clean up partial temp file on error
+          await tempFileManager.delete(tempPath);
+          throw new Error(`Failed to download chunk ${chunkNumber}/${totalChunks}: ${error.message}`);
+        }
+      }
+
+      StreamLogger.log(`[DrpbxFetcher] Chunked download to disk complete`, {
+        filePath,
+        totalBytes: downloadedBytes,
+        totalChunks,
+        tempPath,
+        tempFileSize: await tempFileManager.getSize(tempPath)
+      });
+
+      return tempPath;
+    } catch (error) {
+      // Ensure cleanup on any error
+      await tempFileManager.delete(tempPath);
+      throw error;
+    }
   }
 
   // Sync files from Dropbox to Obsidian vault
@@ -591,6 +704,10 @@ export default class DrpbxFetcherPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
 
+    // Initialize temp file manager
+    this.tempFileManager = new TempFileManager(this.app.vault);
+    await this.tempFileManager.ensureTempDir();
+
     // Initialize stream logger
     const manifest = (this.app as any).plugins?.manifests?.["drpbx-fetcher"];
     const version = manifest?.version || "unknown";
@@ -654,10 +771,15 @@ export default class DrpbxFetcherPlugin extends Plugin {
     }
   }
 
-  onunload() {
+  async onunload() {
     // Cleanup OAuth manager
     if (this.oauthManager) {
       this.oauthManager.cleanup();
+    }
+
+    // Cleanup temp files
+    if (this.tempFileManager) {
+      await this.tempFileManager.cleanupAll();
     }
   }
 

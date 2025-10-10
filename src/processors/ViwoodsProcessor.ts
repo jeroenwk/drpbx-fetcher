@@ -1,5 +1,5 @@
 import { FileUtils } from "../utils/FileUtils";
-import { ZipUtils } from "../utils/ZipUtils";
+import { StreamingZipUtils } from "../utils/StreamingZipUtils";
 import { TemplateEngine } from "./templates/TemplateEngine";
 import { StreamLogger } from "../utils/StreamLogger";
 import {
@@ -11,7 +11,7 @@ import {
 	ValidationResult,
 	ConfigSchema,
 } from "./types";
-import JSZip from "jszip";
+import { ZipReader } from "@zip.js/zip.js";
 import { files } from "dropbox";
 
 /**
@@ -74,14 +74,23 @@ export class ViwoodsProcessor implements FileProcessor {
 		const errors: string[] = [];
 		const warnings: string[] = [];
 
+		let zipReader: ZipReader<Blob> | null = null;
+
 		try {
 			await StreamLogger.log(`[ViwoodsProcessor] Loading ZIP file...`);
-			// Load ZIP file
-			const zip = await ZipUtils.loadZip(fileData);
+
+			// Create Blob from Uint8Array for streaming ZIP extraction
+			// Note: The data is already in memory, so we just wrap it in a Blob
+			// This allows zip.js to use streaming extraction instead of loading entire ZIP
+			await StreamLogger.log(`[ViwoodsProcessor] Creating Blob for streaming ZIP extraction`);
+			const blob = new Blob([fileData]);
+
+			// Load ZIP file using streaming
+			zipReader = await StreamingZipUtils.loadZipFromBlob(blob);
 			await StreamLogger.log(`[ViwoodsProcessor] ZIP file loaded successfully`);
 
 			// Check which format this is by looking at file names
-			const allFiles = ZipUtils.listFiles(zip);
+			const allFiles = await StreamingZipUtils.listFiles(zipReader);
 			await StreamLogger.log(`[ViwoodsProcessor] Files in ZIP:`, { count: allFiles.length, files: allFiles });
 
 			const hasEpubFormat = allFiles.some(f => f.includes("_BookBean.json") || f.includes("_ReadNoteBean.json"));
@@ -90,14 +99,19 @@ export class ViwoodsProcessor implements FileProcessor {
 			if (hasEpubFormat) {
 				await StreamLogger.log(`[ViwoodsProcessor] Processing as EPUB format...`);
 				// EPUB reader format - use different processing
-				return await this.processEpubFormat(zip, fileData, originalPath, metadata, viwoodsConfig, context);
+				const result = await this.processEpubFormat(zipReader, fileData, originalPath, metadata, viwoodsConfig, context);
+
+				// Close ZIP reader
+				await StreamingZipUtils.close(zipReader);
+
+				return result;
 			}
 
 			// Original handwritten notes format
 			// Parse JSON files
-			const notesBean = await ZipUtils.extractJson<NotesBean>(zip, "NotesBean.json");
-			const layoutText = await ZipUtils.extractJson<LayoutText>(zip, "LayoutText.json");
-			const layoutImage = await ZipUtils.extractJson<LayoutImage>(zip, "LayoutImage.json");
+			const notesBean = await StreamingZipUtils.extractJson<NotesBean>(zipReader, "NotesBean.json");
+			const layoutText = await StreamingZipUtils.extractJson<LayoutText>(zipReader, "LayoutText.json");
+			const layoutImage = await StreamingZipUtils.extractJson<LayoutImage>(zipReader, "LayoutImage.json");
 
 			if (!notesBean) {
 				errors.push("Failed to parse NotesBean.json - file may be corrupt. This might be a different .note format.");
@@ -127,7 +141,7 @@ export class ViwoodsProcessor implements FileProcessor {
 
 			// Extract thumbnail if requested
 			if (viwoodsConfig.includeThumbnail) {
-				const thumbnail = await ZipUtils.extractFile(zip, "thumbnai.png"); // Note: misspelling in spec
+				const thumbnail = await StreamingZipUtils.extractFile(zipReader, "thumbnai.png"); // Note: misspelling in spec
 				if (thumbnail) {
 					const thumbPath = FileUtils.joinPath(
 						viwoodsConfig.pagesFolder,
@@ -146,8 +160,8 @@ export class ViwoodsProcessor implements FileProcessor {
 					const pageImageFile = `${pageNum}.png`;
 					let pageImagePath = "";
 
-					if (ZipUtils.fileExists(zip, pageImageFile)) {
-						const imageData = await ZipUtils.extractFile(zip, pageImageFile);
+					if (await StreamingZipUtils.fileExists(zipReader, pageImageFile)) {
+						const imageData = await StreamingZipUtils.extractFile(zipReader, pageImageFile);
 						if (imageData && viwoodsConfig.extractImages) {
 							pageImagePath = FileUtils.joinPath(
 								viwoodsConfig.pagesFolder,
@@ -160,12 +174,12 @@ export class ViwoodsProcessor implements FileProcessor {
 
 					// Check for handwriting data
 					const pathFile = `PATH_${pageNum}.json`;
-					const hasHandwriting = ZipUtils.fileExists(zip, pathFile);
+					const hasHandwriting = await StreamingZipUtils.fileExists(zipReader, pathFile);
 					let strokeCount = 0;
 					let pointCount = 0;
 
 					if (hasHandwriting) {
-						const pathData = await ZipUtils.extractJson<unknown[]>(zip, pathFile);
+						const pathData = await StreamingZipUtils.extractJson<unknown[]>(zipReader, pathFile);
 						if (pathData && Array.isArray(pathData)) {
 							strokeCount = pathData.length;
 							pointCount = pathData.reduce((sum, stroke) => {
@@ -274,6 +288,11 @@ export class ViwoodsProcessor implements FileProcessor {
 				}
 			}
 
+			// Close ZIP reader
+			if (zipReader) {
+				await StreamingZipUtils.close(zipReader);
+			}
+
 			return {
 				success: errors.length === 0,
 				createdFiles,
@@ -281,6 +300,15 @@ export class ViwoodsProcessor implements FileProcessor {
 				warnings: warnings.length > 0 ? warnings : undefined,
 			};
 		} catch (error: any) {
+			// Ensure cleanup even on error
+			if (zipReader) {
+				try {
+					await StreamingZipUtils.close(zipReader);
+				} catch (cleanupError) {
+					// Ignore cleanup errors
+				}
+			}
+
 			return {
 				success: false,
 				createdFiles,
@@ -290,7 +318,7 @@ export class ViwoodsProcessor implements FileProcessor {
 	}
 
 	private async processEpubFormat(
-		zip: JSZip,
+		zipReader: ZipReader<Blob>,
 		fileData: Uint8Array,
 		originalPath: string,
 		metadata: files.FileMetadata,
@@ -304,7 +332,7 @@ export class ViwoodsProcessor implements FileProcessor {
 		try {
 			// Find the JSON files (they have prefix based on book name)
 			await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] Looking for JSON files in ZIP...`);
-			const allFiles = ZipUtils.listFiles(zip);
+			const allFiles = await StreamingZipUtils.listFiles(zipReader);
 			const pageTextAnnotationFile = allFiles.find(f => f.endsWith("_PageTextAnnotation.json"));
 			const bookBeanFile = allFiles.find(f => f.endsWith("_BookBean.json"));
 			const epubFile = allFiles.find(f => f.endsWith(".epub"));
@@ -323,7 +351,7 @@ export class ViwoodsProcessor implements FileProcessor {
 
 			// Extract highlights
 			await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] Extracting highlights from ${pageTextAnnotationFile}...`);
-			const highlights = await ZipUtils.extractJson<Array<{
+			const highlights = await StreamingZipUtils.extractJson<Array<{
 				bookName: string;
 				chapterName: string;
 				rootChapterName: string;
@@ -332,7 +360,7 @@ export class ViwoodsProcessor implements FileProcessor {
 				pageIndex: number;
 				pageCount: number;
 				createTime: number;
-			}>>(zip, pageTextAnnotationFile);
+			}>>(zipReader, pageTextAnnotationFile);
 
 			await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] Extracted highlights:`, {
 				count: highlights?.length || 0
@@ -358,7 +386,7 @@ export class ViwoodsProcessor implements FileProcessor {
 			let epubPath = "";
 			if (epubFile && config.sourcesFolder) {
 				await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] Extracting EPUB file: ${epubFile}`);
-				const epubData = await ZipUtils.extractFile(zip, epubFile);
+				const epubData = await StreamingZipUtils.extractFile(zipReader, epubFile);
 				if (epubData) {
 					epubPath = FileUtils.joinPath(config.sourcesFolder, `${bookSlug}.epub`);
 					await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] Creating folder: ${config.sourcesFolder}`);
