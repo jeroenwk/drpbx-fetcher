@@ -178,14 +178,23 @@ export default class DrpbxFetcherPlugin extends Plugin {
         // We need to bypass the Dropbox SDK and use direct API calls for Range support
         const accessToken = this.settings.accessToken;
 
+        // Android fix: Dropbox API requires specific Content-Type headers
+        // Android's requestUrl automatically adds "application/x-www-form-urlencoded" for POST
+        // but Dropbox expects "application/octet-stream" or "text/plain"
+        const headers: Record<string, string> = {
+          "Authorization": `Bearer ${accessToken}`,
+          "Dropbox-API-Arg": JSON.stringify({ path: filePath }),
+          "Range": `bytes=${start}-${end}`,
+        };
+
+        if (PlatformHelper.isAndroid()) {
+          headers["Content-Type"] = "application/octet-stream";
+        }
+
         const response = await requestUrl({
           url: "https://content.dropboxapi.com/2/files/download",
           method: "POST",
-          headers: {
-            "Authorization": `Bearer ${accessToken}`,
-            "Dropbox-API-Arg": JSON.stringify({ path: filePath }),
-            "Range": `bytes=${start}-${end}`,
-          },
+          headers,
         });
 
         if (response.status !== 206 && response.status !== 200) {
