@@ -189,6 +189,20 @@ If you encounter any issues or have feature requests:
 
 ## Changelog
 
+### 0.2.35 - 2025-01-10
+- 🎉 **Android Large File Support** - Process large .note files (35+ MB) without crashes
+- 🚀 **Streaming ZIP extraction** - Memory-efficient ZIP processing using zip.js
+- 🔧 **Android compatibility** - JavaScript decompression fallback for platforms without native support
+- 🐛 **Fixed DecompressionStream error** - "Unsupported compression format: 'deflate-raw'" on Android
+- 🛠️ **TempFileManager utility** - Infrastructure for future chunked download features
+
+### 0.2.32 - 2025-01-09
+- 🐛 **Fixed Android chunked downloads** - Resolved 400 status error with explicit Content-Type header
+
+### 0.2.31 - 2025-01-09
+- 🔄 **HTTP Range requests** - Chunked file downloads for better performance
+- 📱 **Mobile file size protection** - 10 MB default limit on mobile platforms
+
 ### 0.2.6
 - ✨ **File Processors** - Intelligent file type processing system
 - 📝 **viwoods Notes support** - Extract text highlights from EPUB reader .note files
@@ -196,7 +210,6 @@ If you encounter any issues or have feature requests:
 - 🎨 **Custom templates** - Use Obsidian-style templates for output formatting
 - 🔧 **Modular architecture** - Extensible processor system for future file types
 - 📚 **Comprehensive documentation** - Setup guides and API documentation
-- 🔜 **Coming soon**: Handwriting and annotation extraction from .note files
 
 ### 0.2.1
 - ✨ **Mobile support** for iOS and Android
@@ -214,6 +227,8 @@ If you encounter any issues or have feature requests:
 - Multiple folder mapping support
 - Automatic sync on startup
 - Manual sync via ribbon icon and command
+
+For detailed version history, see [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
