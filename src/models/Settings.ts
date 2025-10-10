@@ -42,6 +42,9 @@ export interface DrpbxFetcherSettings {
 	streamLogPort: number; // Port for stream logger (default: 3000)
 	// Mobile file size limit
 	maxFileSizeMobile: number; // Maximum file size in bytes for mobile platforms (default: 10MB)
+	// Chunked download settings
+	chunkSizeBytes: number; // Chunk size for large file downloads (default: 2MB)
+	chunkedDownloadThreshold: number; // File size threshold to use chunked download (default: 10MB)
 }
 
 /**
@@ -63,4 +66,6 @@ export const DEFAULT_SETTINGS: DrpbxFetcherSettings = {
 	streamLogHost: 'localhost', // Default host
 	streamLogPort: 3000, // Default port
 	maxFileSizeMobile: 10 * 1024 * 1024, // 10 MB default for mobile
+	chunkSizeBytes: 2 * 1024 * 1024, // 2 MB chunks
+	chunkedDownloadThreshold: 10 * 1024 * 1024, // Use chunked download for files >10 MB
 };

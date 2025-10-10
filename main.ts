@@ -135,6 +135,105 @@ export default class DrpbxFetcherPlugin extends Plugin {
     return allFiles;
   }
 
+  /**
+   * Download a file from Dropbox in chunks using Range requests
+   * This approach uses much less memory than downloading the entire file at once
+   * @param filePath Dropbox file path
+   * @param fileSize Total file size in bytes
+   * @param chunkSize Size of each chunk in bytes
+   * @returns Uint8Array containing the complete file data
+   */
+  private async downloadFileInChunks(
+    filePath: string,
+    fileSize: number,
+    chunkSize: number
+  ): Promise<Uint8Array> {
+    StreamLogger.log(`[DrpbxFetcher] Starting chunked download`, {
+      filePath,
+      fileSize,
+      chunkSize,
+      totalChunks: Math.ceil(fileSize / chunkSize)
+    });
+
+    // Create array to hold the complete file
+    const completeFile = new Uint8Array(fileSize);
+    let downloadedBytes = 0;
+    let chunkNumber = 0;
+    const totalChunks = Math.ceil(fileSize / chunkSize);
+
+    while (downloadedBytes < fileSize) {
+      const start = downloadedBytes;
+      const end = Math.min(start + chunkSize - 1, fileSize - 1);
+      chunkNumber++;
+
+      StreamLogger.log(`[DrpbxFetcher] Downloading chunk ${chunkNumber}/${totalChunks}`, {
+        start,
+        end,
+        chunkBytes: end - start + 1,
+        progress: `${((downloadedBytes / fileSize) * 100).toFixed(1)}%`
+      });
+
+      try {
+        // Make direct HTTP request with Range header
+        // We need to bypass the Dropbox SDK and use direct API calls for Range support
+        const accessToken = this.settings.accessToken;
+
+        const response = await requestUrl({
+          url: "https://content.dropboxapi.com/2/files/download",
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "Dropbox-API-Arg": JSON.stringify({ path: filePath }),
+            "Range": `bytes=${start}-${end}`,
+          },
+        });
+
+        if (response.status !== 206 && response.status !== 200) {
+          throw new Error(`Chunk download failed with status ${response.status}`);
+        }
+
+        // Get chunk data from response
+        const chunkData = new Uint8Array(response.arrayBuffer);
+
+        // Verify chunk size
+        const expectedSize = end - start + 1;
+        if (chunkData.length !== expectedSize) {
+          StreamLogger.warn(`[DrpbxFetcher] Chunk size mismatch`, {
+            expected: expectedSize,
+            received: chunkData.length
+          });
+        }
+
+        // Copy chunk into complete file array
+        completeFile.set(chunkData, start);
+        downloadedBytes += chunkData.length;
+
+        StreamLogger.log(`[DrpbxFetcher] Chunk ${chunkNumber}/${totalChunks} complete`, {
+          downloadedBytes,
+          totalBytes: fileSize,
+          progress: `${((downloadedBytes / fileSize) * 100).toFixed(1)}%`
+        });
+
+      } catch (error: any) {
+        StreamLogger.error(`[DrpbxFetcher] Chunk download failed`, {
+          chunkNumber,
+          start,
+          end,
+          error: error.message
+        });
+        throw new Error(`Failed to download chunk ${chunkNumber}/${totalChunks}: ${error.message}`);
+      }
+    }
+
+    StreamLogger.log(`[DrpbxFetcher] Chunked download complete`, {
+      filePath,
+      totalBytes: downloadedBytes,
+      totalChunks
+    });
+
+    return completeFile;
+  }
+
   // Sync files from Dropbox to Obsidian vault
   async syncFiles(): Promise<void> {
     if (this.isSyncing) {
@@ -251,18 +350,36 @@ export default class DrpbxFetcherPlugin extends Plugin {
                 }
               }
 
-              // Download file from Dropbox
+              // Download file from Dropbox - use chunked download for large files
               console.log(`Downloading: ${file.path_display}`);
-              StreamLogger.log(`[DrpbxFetcher] Downloading file...`, {
-                fileName: file.name,
-                size: file.size
-              });
-              const response = await dbx.filesDownload({ path: file.path_lower! });
-              StreamLogger.log(`[DrpbxFetcher] Download complete, converting to buffer...`);
-              const fileBlob = (response.result as any).fileBlob as Blob;
-              const arrayBuffer = await fileBlob.arrayBuffer();
-              const uint8Array = new Uint8Array(arrayBuffer);
-              StreamLogger.log(`[DrpbxFetcher] Buffer ready`, { bytes: uint8Array.length });
+
+              let uint8Array: Uint8Array;
+              const useChunkedDownload = file.size >= this.settings.chunkedDownloadThreshold;
+
+              if (useChunkedDownload) {
+                StreamLogger.log(`[DrpbxFetcher] Using chunked download for large file`, {
+                  fileName: file.name,
+                  size: file.size,
+                  sizeMB: (file.size / (1024 * 1024)).toFixed(2),
+                  chunkSizeMB: (this.settings.chunkSizeBytes / (1024 * 1024)).toFixed(2)
+                });
+                uint8Array = await this.downloadFileInChunks(
+                  file.path_lower!,
+                  file.size,
+                  this.settings.chunkSizeBytes
+                );
+              } else {
+                StreamLogger.log(`[DrpbxFetcher] Downloading file...`, {
+                  fileName: file.name,
+                  size: file.size
+                });
+                const response = await dbx.filesDownload({ path: file.path_lower! });
+                StreamLogger.log(`[DrpbxFetcher] Download complete, converting to buffer...`);
+                const fileBlob = (response.result as any).fileBlob as Blob;
+                const arrayBuffer = await fileBlob.arrayBuffer();
+                uint8Array = new Uint8Array(arrayBuffer);
+                StreamLogger.log(`[DrpbxFetcher] Buffer ready`, { bytes: uint8Array.length });
+              }
 
               // Check if file should be processed by a processor
               const registry = ProcessorRegistry.getInstance();
@@ -615,6 +732,48 @@ class DrpbxFetcherSettingTab extends PluginSettingTab {
             }
           })
       );
+
+    // Chunked download settings
+    containerEl.createEl("h3", { text: "Large File Download Settings" });
+    containerEl.createEl("p", {
+      text: "Configure chunked download for large files to reduce memory usage. Files above the threshold will be downloaded in smaller chunks.",
+      cls: "setting-item-description"
+    });
+
+    new Setting(containerEl)
+      .setName("Chunked download threshold (MB)")
+      .setDesc("Files larger than this size will be downloaded in chunks (default: 10 MB)")
+      .addText((text) =>
+        text
+          .setPlaceholder("10")
+          .setValue(String(Math.round(this.plugin.settings.chunkedDownloadThreshold / (1024 * 1024))))
+          .onChange(async (value) => {
+            const sizeMB = parseInt(value);
+            if (!isNaN(sizeMB) && sizeMB > 0) {
+              this.plugin.settings.chunkedDownloadThreshold = sizeMB * 1024 * 1024;
+              await this.plugin.saveSettings();
+            }
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Chunk size (MB)")
+      .setDesc("Size of each download chunk. Smaller chunks use less memory but require more requests (default: 2 MB)")
+      .addText((text) =>
+        text
+          .setPlaceholder("2")
+          .setValue(String(Math.round(this.plugin.settings.chunkSizeBytes / (1024 * 1024))))
+          .onChange(async (value) => {
+            const sizeMB = parseInt(value);
+            if (!isNaN(sizeMB) && sizeMB > 0 && sizeMB <= 10) {
+              this.plugin.settings.chunkSizeBytes = sizeMB * 1024 * 1024;
+              await this.plugin.saveSettings();
+            }
+          })
+      );
+
+    // Logging settings
+    containerEl.createEl("h3", { text: "Logging Settings" });
 
     new Setting(containerEl)
       .setName("Logger type")
