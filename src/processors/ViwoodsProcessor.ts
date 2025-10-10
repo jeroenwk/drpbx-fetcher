@@ -519,6 +519,7 @@ export class ViwoodsProcessor implements FileProcessor {
 							const files = await this.processAnnotation(
 								zipReader,
 								annotation,
+								bookName,  // Use bookName from highlights instead of annotation.bookName
 								bookSlug,
 								totalPages,
 								epubPath,
@@ -659,6 +660,7 @@ ${(data.createdFiles as string[]).map((f) => `- [[${f}]]`).join("\n")}
 	private async processAnnotation(
 		zipReader: ZipReader<Blob>,
 		annotation: ReadNoteBean,
+		bookName: string,
 		bookSlug: string,
 		totalPages: number,
 		epubPath: string,
@@ -714,6 +716,7 @@ ${(data.createdFiles as string[]).map((f) => `- [[${f}]]`).join("\n")}
 			// 5. Generate markdown file
 			const mdPath = await this.generateAnnotationMarkdownFromBean(
 				annotation,
+				bookName,
 				bookSlug,
 				totalPages,
 				epubPath,
@@ -809,6 +812,7 @@ ${(data.createdFiles as string[]).map((f) => `- [[${f}]]`).join("\n")}
 	 */
 	private async generateAnnotationMarkdownFromBean(
 		annotation: ReadNoteBean,
+		bookName: string,
 		bookSlug: string,
 		totalPages: number,
 		epubPath: string,
@@ -829,9 +833,9 @@ ${(data.createdFiles as string[]).map((f) => `- [[${f}]]`).join("\n")}
 				? `${epubPath}#${annotation.rootChapterLinkUri}`
 				: annotation.rootChapterLinkUri;
 
-			// Build template data
+			// Build template data (use passed bookName from PageTextAnnotation, not annotation.bookName)
 			const templateData = {
-				bookName: annotation.bookName,
+				bookName: bookName,
 				bookSlug,
 				location,
 				chapterName: annotation.title,
@@ -840,9 +844,6 @@ ${(data.createdFiles as string[]).map((f) => `- [[${f}]]`).join("\n")}
 				totalPages,
 				sourceLink,
 				annotationImagePath: imagePath,
-				annotationSummary: config.includeSummaryInAnnotation !== false
-					? annotation.sumary
-					: '',
 				dateAnnotated: TemplateEngine.formatDate(dateAnnotated, "YYYY-MM-DD"),
 				annotationId: annotation.id,
 			};
@@ -855,7 +856,16 @@ ${(data.createdFiles as string[]).map((f) => `- [[${f}]]`).join("\n")}
 			);
 
 			// Render markdown
-			const content = TemplateEngine.render(template, templateData, dateAnnotated);
+			let content = TemplateEngine.render(template, templateData, dateAnnotated);
+
+			// Add summary section if enabled and summary exists
+			if (config.includeSummaryInAnnotation !== false && annotation.sumary) {
+				// Insert summary as blockquote before "### Notes" section
+				content = content.replace(
+					'### Notes',
+					`### Summary\n\n> ${annotation.sumary}\n\n### Notes`
+				);
+			}
 
 			// Generate filename
 			const pageStr = String(annotation.pageIndex).padStart(3, '0');
@@ -921,7 +931,7 @@ Points: {{pointCount}}
 
 ---
 #annotation #viwoods/{{noteSlug}}`,
-			"viwoods-epub-annotation.md": `## {{bookName}} - Annotation
+			"viwoods-epub-annotation.md": `## {{bookName}}
 
 **Location:** {{location}}
 **Page:** {{pageNumber}}/{{totalPages}}
@@ -931,12 +941,6 @@ Points: {{pointCount}}
 ---
 
 ![[{{annotationImagePath}}]]
-
-{{#if annotationSummary}}
-### Summary
-
-{{annotationSummary}}
-{{/if}}
 
 ### Notes
 
@@ -999,7 +1003,7 @@ Points: {{pointCount}}
 			extractImages: true,
 			createIndex: true,
 			processAnnotations: true,
-			annotationImagesFolder: "",
+			annotationImagesFolder: "viwoods/Annotations/resources",
 			includeSummaryInAnnotation: true,
 			createCompositeImages: true,
 		};
@@ -1110,10 +1114,10 @@ Points: {{pointCount}}
 				{
 					key: "annotationImagesFolder",
 					label: "Annotation Images Folder",
-					description: "Folder for annotation images. Leave empty to use same as Annotations Folder.",
+					description: "Folder for annotation images.",
 					type: "folder",
 					required: false,
-					placeholder: "Example: viwoods/Annotation-Images",
+					defaultValue: "viwoods/Annotations/resources",
 				},
 				{
 					key: "includeSummaryInAnnotation",
