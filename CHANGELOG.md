@@ -5,6 +5,25 @@ All notable changes to the Dropbox Fetcher plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.39] - 2025-01-10
+
+### Added
+- Annotation support for Viwoods .note files
+- Composite image generation from JPG page backgrounds + PNG handwriting overlays
+- Canvas API-based image composition for transparent annotation rendering
+- Markdown file generation per annotation with embedded images
+- Annotation summary extraction and formatting as blockquotes
+- Default annotation images folder at `viwoods/Annotations/resources`
+
+### Changed
+- Use accurate book names from PageTextAnnotation for annotations
+- Format annotation summaries with blockquote prefix for consistency with highlights
+- Updated ViwoodsProcessor default config to enable annotation processing
+
+### Fixed
+- Template conditional syntax not supported - replaced with dynamic content insertion
+- Annotation images now correctly saved to resources subfolder by default
+
 ## [0.2.35] - 2025-01-10
 
 ### Added

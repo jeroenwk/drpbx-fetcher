@@ -83,10 +83,11 @@ The plugin can intelligently process different file types during sync:
 
 **viwoods Notes (.note files)**
 - Extract text highlights from EPUB reader format
+- Extract handwritten annotations with composite images
 - Extract EPUB files from .note archives
-- Generate organized highlight markdown files
+- Generate organized highlight and annotation markdown files
+- Composite JPG page backgrounds with PNG handwriting overlays
 - Use custom templates for output formatting
-- **Coming soon**: Handwriting and annotation extraction
 - **[Quick Start Guide](docs/viwoods-setup.md)**
 
 **Coming Soon**
@@ -188,6 +189,13 @@ If you encounter any issues or have feature requests:
 3. Include your Obsidian version and operating system details
 
 ## Changelog
+
+### 0.2.39 - 2025-01-10
+- ✨ **Annotation support** - Extract handwritten notes from Viwoods .note files
+- 🖼️ **Composite images** - Combine JPG page backgrounds with PNG handwriting overlays
+- 📝 **Annotation markdown** - Generate one file per annotation with embedded images
+- 🎯 **Accurate book names** - Use PageTextAnnotation data for better metadata
+- 📁 **Organized structure** - Default annotation images in `viwoods/Annotations/resources`
 
 ### 0.2.35 - 2025-01-10
 - 🎉 **Android Large File Support** - Process large .note files (35+ MB) without crashes
