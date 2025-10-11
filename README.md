@@ -190,6 +190,14 @@ If you encounter any issues or have feature requests:
 
 ## Changelog
 
+### 0.2.52 - 2025-01-11
+- ⚙️ **Source file configuration** - Enable/disable downloading source files (.epub, .note) to save space
+- 🚀 **Performance boost** - 20-50% faster sync on slow devices when source downloads disabled
+- 🔗 **BookPath linking** - File:// links to original book locations when sources disabled
+- 📝 **Better source info** - Shows file extension links (e.g., `[epub](file://...)`) instead of broken links
+- 🎨 **Settings reorganization** - Dropbox authentication moved to top of General Settings
+- 📊 **Enhanced logging** - Better tracking of file creation and processing
+
 ### 0.2.39 - 2025-01-10
 - ✨ **Annotation support** - Extract handwritten notes from Viwoods .note files
 - 🖼️ **Composite images** - Combine JPG page backgrounds with PNG handwriting overlays

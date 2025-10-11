@@ -5,6 +5,25 @@ All notable changes to the Dropbox Fetcher plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.52] - 2025-01-11
+
+### Added
+- Configuration option to enable/disable source file downloads (default: enabled)
+- BookPath extraction from BookBean.json for EPUB notes
+- File protocol links (file://) to original book locations when source downloads disabled
+- Link text shows file extension (epub, pdf, etc.) for external file links
+
+### Changed
+- Moved Dropbox Client ID and Authentication settings to top of General Settings
+- Simplified "Download source files" setting description
+- Source info now shows clickable file:// links instead of broken links when downloads disabled
+- Settings UI reorganized for better user experience
+
+### Improved
+- Sync speed can be 20-50% faster when source file downloads disabled
+- Better source information display for disabled source downloads
+- Enhanced logging for file creation tracking
+
 ## [0.2.39] - 2025-01-10
 
 ### Added
