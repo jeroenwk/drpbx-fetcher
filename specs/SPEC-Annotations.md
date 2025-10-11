@@ -277,11 +277,11 @@ interface AnnotationTemplateData {
 **Location:** EERSTE DEEL De opdracht → De ridders van koning Dagonaut
 **Page:** 4/445
 **Date:** 2025-10-06
-**Source:** [Open in EPUB](viwoods/Sources/de-brief-voor-de-koning.epub#OEBPS/Text/index_split_003.html)
+**Source:** [Open in EPUB](Viwoods/Sources/de-brief-voor-de-koning.epub#OEBPS/Text/index_split_003.html)
 
 ---
 
-![[viwoods/Annotations/de-brief-voor-de-koning-p004-annotation-2.png]]
+![[Viwoods/Annotations/de-brief-voor-de-koning-p004-annotation-2.png]]
 
 ### Summary
 
@@ -304,7 +304,7 @@ Ristridin van het Zuiden, om er maar enkelen te noemen? De meeste van zijn ridde
 **Config:**
 ```json
 {
-  "annotationsFolder": "viwoods/Annotations",
+  "annotationsFolder": "Viwoods/Annotations",
   "annotationImagesFolder": "",
   "processAnnotations": true
 }
@@ -312,7 +312,7 @@ Ristridin van het Zuiden, om er maar enkelen te noemen? De meeste van zijn ridde
 
 **Result:**
 ```
-viwoods/
+Viwoods/
 ├── Highlights/
 │   ├── de-brief-voor-de-koning-highlight-1.md
 │   └── de-brief-voor-de-koning-highlight-2.md
@@ -333,14 +333,14 @@ viwoods/
 **Config:**
 ```json
 {
-  "annotationsFolder": "viwoods/Annotations",
-  "annotationImagesFolder": "viwoods/Annotation-Images"
+  "annotationsFolder": "Viwoods/Annotations",
+  "annotationImagesFolder": "Viwoods/Annotation-Images"
 }
 ```
 
 **Result:**
 ```
-viwoods/
+Viwoods/
 ├── Annotations/
 │   ├── de-brief-voor-de-koning-p004-annotation-2.md
 │   └── de-brief-voor-de-koning-p005-annotation-3.md
@@ -702,7 +702,7 @@ getConfigSchema(): ConfigSchema {
         description: "Folder for annotation images. Leave empty to use same as Annotations Folder.",
         type: "folder",
         required: false,
-        placeholder: "Example: viwoods/Annotation-Images",
+        placeholder: "Example: Viwoods/Annotation-Images",
       },
       {
         key: "includeSummaryInAnnotation",
@@ -873,10 +873,10 @@ getConfigSchema(): ConfigSchema {
       "processorType": "viwoods",
       "enabled": true,
       "config": {
-        "highlightsFolder": "viwoods/Highlights",
-        "annotationsFolder": "viwoods/Annotations",
-        "sourcesFolder": "viwoods/Sources",
-        "pagesFolder": "viwoods/Pages",
+        "highlightsFolder": "Viwoods/Highlights",
+        "annotationsFolder": "Viwoods/Annotations",
+        "sourcesFolder": "Viwoods/Library",
+        "pagesFolder": "Viwoods/Pages",
 
         "highlightTemplate": "",
         "annotationTemplate": "",

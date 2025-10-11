@@ -55,6 +55,17 @@ interface LayoutImage {
 }
 
 /**
+ * BookBean structure for EPUB metadata
+ */
+interface BookBean {
+	bookId: string;
+	bookName: string;
+	bookPath: string;
+	// Add other fields as needed
+	[key: string]: unknown;
+}
+
+/**
  * ReadNoteBean structure for EPUB annotations
  */
 interface ReadNoteBean {
@@ -160,9 +171,9 @@ export class ViwoodsProcessor implements FileProcessor {
 			// Ensure output folders exist
 			await this.ensureFolders(context, viwoodsConfig);
 
-			// Extract source file if requested
+			// Extract source file if requested and enabled in settings
 			let sourceLink = "";
-			if (viwoodsConfig.sourcesFolder) {
+			if (viwoodsConfig.sourcesFolder && context.pluginSettings.downloadSourceFiles) {
 				const sourcePath = FileUtils.joinPath(
 					viwoodsConfig.sourcesFolder,
 					`${noteSlug}.note`
@@ -409,15 +420,27 @@ export class ViwoodsProcessor implements FileProcessor {
 			const bookSlug = FileUtils.slugify(bookName);
 			const totalPages = highlights[0].pageCount;
 
+			// Extract bookPath from BookBean.json if available
+			let bookPath = "";
+			if (bookBeanFile) {
+				await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] Extracting BookBean: ${bookBeanFile}`);
+				const bookBean = await StreamingZipUtils.extractJson<BookBean>(zipReader, bookBeanFile);
+				if (bookBean && bookBean.bookPath) {
+					bookPath = bookBean.bookPath;
+					await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] Found bookPath: ${bookPath}`);
+				}
+			}
+
 			await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] Book info:`, {
 				bookName,
 				bookSlug,
-				totalPages
+				totalPages,
+				bookPath
 			});
 
-			// Extract EPUB file if configured
+			// Extract EPUB file if configured and enabled in settings
 			let epubPath = "";
-			if (epubFile && config.sourcesFolder) {
+			if (epubFile && config.sourcesFolder && context.pluginSettings.downloadSourceFiles) {
 				await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] Extracting EPUB file: ${epubFile}`);
 				const epubData = await StreamingZipUtils.extractFile(zipReader, epubFile);
 				if (epubData) {
@@ -444,10 +467,22 @@ export class ViwoodsProcessor implements FileProcessor {
 					? `${highlight.rootChapterName} → ${highlight.chapterName}`
 					: highlight.chapterName;
 
-				// Build EPUB link
+				// Build EPUB link or info text
 				const epubLink = epubPath
 					? `${epubPath}#${highlight.chapterLinkUri}`
 					: highlight.chapterLinkUri;
+
+				// Build source info - either link to downloaded EPUB or link to original bookPath
+				let sourceInfo: string;
+				if (epubPath) {
+					sourceInfo = `[Open in EPUB](${epubLink})`;
+				} else if (bookPath) {
+					// Extract file extension from bookPath and create file:// link
+					const extension = bookPath.split('.').pop()?.toLowerCase() || 'file';
+					sourceInfo = `[${extension}](file://${bookPath})`;
+				} else {
+					sourceInfo = `${metadata.name}`;
+				}
 
 				const highlightData = {
 					bookName: highlight.bookName,
@@ -460,6 +495,7 @@ export class ViwoodsProcessor implements FileProcessor {
 					totalPages,
 					dateHighlighted: TemplateEngine.formatDate(dateHighlighted, "YYYY-MM-DD"),
 					sourceLink: epubLink,
+					sourceInfo: sourceInfo,
 					highlightText: highlight.rawText,
 				};
 
@@ -468,7 +504,7 @@ export class ViwoodsProcessor implements FileProcessor {
 **Location:** {{location}}
 **Page:** {{pageNumber}}/{{totalPages}}
 **Date highlighted:** {{dateHighlighted}}
-**Source:** [Open in EPUB]({{sourceLink}})
+**Source:** {{sourceInfo}}
 
 ---
 
@@ -494,10 +530,18 @@ export class ViwoodsProcessor implements FileProcessor {
 				// Only write if file doesn't exist (preserve user edits to existing highlights)
 				const existingFile = context.vault.getAbstractFileByPath(filepath);
 				if (!existingFile) {
+					await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] Creating EPUB highlight file`, {
+						highlightsFolder: config.highlightsFolder,
+						filename,
+						fullPath: filepath,
+						contentLength: content.length
+					});
 					await context.vault.adapter.write(filepath, content);
 					createdFiles.push(filepath);
+					await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] EPUB highlight file created: ${filepath}`);
 				} else {
 					console.log(`Preserving existing highlight: ${filename}`);
+					await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] Preserving existing highlight: ${filepath}`);
 				}
 			}
 
@@ -523,6 +567,7 @@ export class ViwoodsProcessor implements FileProcessor {
 								bookSlug,
 								totalPages,
 								epubPath,
+								bookPath || metadata.name,  // Use bookPath from BookBean, fallback to metadata.name
 								config,
 								context
 							);
@@ -574,7 +619,14 @@ export class ViwoodsProcessor implements FileProcessor {
 			const filename = `${data.noteSlug}-page-${data.pageNumber}-highlight.md`;
 			const filepath = FileUtils.joinPath(config.highlightsFolder, filename);
 
+			await StreamLogger.log(`[ViwoodsProcessor.generateHighlight] Creating highlight file`, {
+				highlightsFolder: config.highlightsFolder,
+				filename,
+				fullPath: filepath,
+				contentLength: content.length
+			});
 			await context.vault.adapter.write(filepath, content);
+			await StreamLogger.log(`[ViwoodsProcessor.generateHighlight] Highlight file created successfully: ${filepath}`);
 			return filepath;
 		} catch (error) {
 			console.error("Failed to generate highlight:", error);
@@ -595,7 +647,14 @@ export class ViwoodsProcessor implements FileProcessor {
 			const filename = `${data.noteSlug}-page-${data.pageNumber}-annotation.md`;
 			const filepath = FileUtils.joinPath(config.annotationsFolder, filename);
 
+			await StreamLogger.log(`[ViwoodsProcessor.generateAnnotation] Creating annotation file`, {
+				annotationsFolder: config.annotationsFolder,
+				filename,
+				fullPath: filepath,
+				contentLength: content.length
+			});
 			await context.vault.adapter.write(filepath, content);
+			await StreamLogger.log(`[ViwoodsProcessor.generateAnnotation] Annotation file created successfully: ${filepath}`);
 			return filepath;
 		} catch (error) {
 			console.error("Failed to generate annotation:", error);
@@ -616,7 +675,14 @@ export class ViwoodsProcessor implements FileProcessor {
 			const filename = `${data.noteSlug}-page-${data.pageNumber}.md`;
 			const filepath = FileUtils.joinPath(config.pagesFolder, filename);
 
+			await StreamLogger.log(`[ViwoodsProcessor.generatePage] Creating page file`, {
+				pagesFolder: config.pagesFolder,
+				filename,
+				fullPath: filepath,
+				contentLength: content.length
+			});
 			await context.vault.adapter.write(filepath, content);
+			await StreamLogger.log(`[ViwoodsProcessor.generatePage] Page file created successfully: ${filepath}`);
 			return filepath;
 		} catch (error) {
 			console.error("Failed to generate page:", error);
@@ -640,7 +706,7 @@ export class ViwoodsProcessor implements FileProcessor {
 ${(data.createdFiles as string[]).map((f) => `- [[${f}]]`).join("\n")}
 
 ---
-#viwoods/${data.noteSlug} #index
+#Viwoods/${data.noteSlug} #index
 `;
 
 			const filename = `${data.noteSlug}-index.md`;
@@ -664,6 +730,7 @@ ${(data.createdFiles as string[]).map((f) => `- [[${f}]]`).join("\n")}
 		bookSlug: string,
 		totalPages: number,
 		epubPath: string,
+		originalFilename: string,
 		config: ViwoodsProcessorConfig,
 		context: ProcessorContext
 	): Promise<string[]> {
@@ -720,6 +787,7 @@ ${(data.createdFiles as string[]).map((f) => `- [[${f}]]`).join("\n")}
 				bookSlug,
 				totalPages,
 				epubPath,
+				originalFilename,
 				imagePath,
 				config,
 				context
@@ -816,6 +884,7 @@ ${(data.createdFiles as string[]).map((f) => `- [[${f}]]`).join("\n")}
 		bookSlug: string,
 		totalPages: number,
 		epubPath: string,
+		originalFilename: string,
 		imagePath: string,
 		config: ViwoodsProcessorConfig,
 		context: ProcessorContext
@@ -833,6 +902,16 @@ ${(data.createdFiles as string[]).map((f) => `- [[${f}]]`).join("\n")}
 				? `${epubPath}#${annotation.rootChapterLinkUri}`
 				: annotation.rootChapterLinkUri;
 
+			// Build source info - either link to downloaded EPUB or link to original bookPath
+			let sourceInfo: string;
+			if (epubPath) {
+				sourceInfo = `[Open in EPUB](${sourceLink})`;
+			} else {
+				// originalFilename contains bookPath from BookBean, extract file extension and create file:// link
+				const extension = originalFilename.split('.').pop()?.toLowerCase() || 'file';
+				sourceInfo = `[${extension}](file://${originalFilename})`;
+			}
+
 			// Build template data (use passed bookName from PageTextAnnotation, not annotation.bookName)
 			const templateData = {
 				bookName: bookName,
@@ -843,6 +922,7 @@ ${(data.createdFiles as string[]).map((f) => `- [[${f}]]`).join("\n")}
 				pageNumber: annotation.pageIndex,
 				totalPages,
 				sourceLink,
+				sourceInfo: sourceInfo,
 				annotationImagePath: imagePath,
 				dateAnnotated: TemplateEngine.formatDate(dateAnnotated, "YYYY-MM-DD"),
 				annotationId: annotation.id,
@@ -875,11 +955,18 @@ ${(data.createdFiles as string[]).map((f) => `- [[${f}]]`).join("\n")}
 			// Only write if file doesn't exist (preserve user edits)
 			const existingFile = context.vault.getAbstractFileByPath(filepath);
 			if (!existingFile) {
+				await StreamLogger.log(`[ViwoodsProcessor.generateAnnotationMarkdownFromBean] Creating EPUB annotation file`, {
+					annotationsFolder: config.annotationsFolder,
+					filename,
+					fullPath: filepath,
+					contentLength: content.length
+				});
 				await FileUtils.ensurePath(context.vault, config.annotationsFolder);
 				await context.vault.adapter.write(filepath, content);
+				await StreamLogger.log(`[ViwoodsProcessor.generateAnnotationMarkdownFromBean] EPUB annotation file created: ${filepath}`);
 				return filepath;
 			} else {
-				await StreamLogger.log(`Preserving existing annotation: ${filename}`);
+				await StreamLogger.log(`[ViwoodsProcessor.generateAnnotationMarkdownFromBean] Preserving existing annotation: ${filepath}`);
 				return null;
 			}
 		} catch (error: any) {
@@ -912,7 +999,7 @@ Points: {{pointCount}}
 *Add your thoughts here*
 
 ---
-#highlight #viwoods/{{noteSlug}}`,
+#highlight #Viwoods/{{noteSlug}}`,
 			"viwoods-annotation.md": `## {{noteTitle}} - Annotation
 
 **Page:** {{pageNumber}}/{{totalPages}}
@@ -930,13 +1017,13 @@ Points: {{pointCount}}
 *Add your thoughts here*
 
 ---
-#annotation #viwoods/{{noteSlug}}`,
+#annotation #Viwoods/{{noteSlug}}`,
 			"viwoods-epub-annotation.md": `## {{bookName}}
 
 **Location:** {{location}}
 **Page:** {{pageNumber}}/{{totalPages}}
 **Date:** {{dateAnnotated}}
-**Source:** [Open in EPUB]({{sourceLink}})
+**Source:** {{sourceInfo}}
 
 ---
 
@@ -966,7 +1053,7 @@ Points: {{pointCount}}
 
 ---
 
-#viwoods/{{noteSlug}} #page-{{pageNumber}}`,
+#Viwoods/{{noteSlug}} #page-{{pageNumber}}`,
 		};
 
 		return templates[name] || "";
@@ -994,16 +1081,16 @@ Points: {{pointCount}}
 
 	getDefaultConfig(): ViwoodsProcessorConfig {
 		return {
-			highlightsFolder: "viwoods/Highlights",
-			annotationsFolder: "viwoods/Annotations",
-			sourcesFolder: "viwoods/Sources",
-			pagesFolder: "viwoods/Pages",
+			highlightsFolder: "Viwoods/Highlights",
+			annotationsFolder: "Viwoods/Annotations",
+			sourcesFolder: "Viwoods/Library",
+			pagesFolder: "Viwoods/Pages",
 			includeMetadata: true,
 			includeThumbnail: true,
 			extractImages: true,
 			createIndex: true,
 			processAnnotations: true,
-			annotationImagesFolder: "viwoods/Annotations/resources",
+			annotationImagesFolder: "Viwoods/Annotations/resources",
 			includeSummaryInAnnotation: true,
 			createCompositeImages: true,
 		};
@@ -1026,7 +1113,7 @@ Points: {{pointCount}}
 					description: "Folder for highlight markdown files",
 					type: "folder",
 					required: false,
-					defaultValue: "viwoods/Highlights",
+					defaultValue: "Viwoods/Highlights",
 				},
 				{
 					key: "annotationsFolder",
@@ -1034,7 +1121,7 @@ Points: {{pointCount}}
 					description: "Folder for annotation markdown files",
 					type: "folder",
 					required: false,
-					defaultValue: "viwoods/Annotations",
+					defaultValue: "Viwoods/Annotations",
 				},
 				{
 					key: "sourcesFolder",
@@ -1042,7 +1129,7 @@ Points: {{pointCount}}
 					description: "Folder for original .note files",
 					type: "folder",
 					required: false,
-					defaultValue: "viwoods/Sources",
+					defaultValue: "Viwoods/Library",
 				},
 				{
 					key: "pagesFolder",
@@ -1050,7 +1137,7 @@ Points: {{pointCount}}
 					description: "Folder for page images and markdown",
 					type: "folder",
 					required: false,
-					defaultValue: "viwoods/Pages",
+					defaultValue: "Viwoods/Pages",
 				},
 				{
 					key: "highlightTemplate",
@@ -1117,7 +1204,7 @@ Points: {{pointCount}}
 					description: "Folder for annotation images.",
 					type: "folder",
 					required: false,
-					defaultValue: "viwoods/Annotations/resources",
+					defaultValue: "Viwoods/Annotations/resources",
 				},
 				{
 					key: "includeSummaryInAnnotation",

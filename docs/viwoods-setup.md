@@ -42,11 +42,11 @@ When you sync a `.note` file, the processor will create:
 The processor will create files in these folders (all relative to your vault root):
 
 ```
-viwoods/
+Viwoods/
 ├── Highlights/      # Highlight markdown files
 ├── Annotations/     # Annotation markdown files
 ├── Pages/           # Page images and comprehensive notes
-└── Sources/         # Original .note files
+└── Library/         # Original .note files
 ```
 
 To customize these folders, edit your `data.json`:
@@ -112,7 +112,7 @@ Points: {{pointCount}}
 *Add your thoughts here*
 
 ---
-#highlight #viwoods/{{noteSlug}}
+#highlight #Viwoods/{{noteSlug}}
 ```
 
 ### Creating a Custom Template
@@ -134,7 +134,7 @@ Points: {{pointCount}}
 - **Strokes:** {{strokeCount}}
 - **Page:** {{pageNumber}}/{{totalPages}}
 
-#review #viwoods/{{noteSlug}}
+#review #Viwoods/{{noteSlug}}
 ```
 
 2. Update your processor config in `data.json`:
@@ -195,10 +195,10 @@ Points: {{pointCount}}
 ```json
 {
   "config": {
-    "highlightsFolder": "viwoods/Highlights",
-    "annotationsFolder": "viwoods/Annotations",
-    "sourcesFolder": "viwoods/Sources",
-    "pagesFolder": "viwoods/Pages",
+    "highlightsFolder": "Viwoods/Highlights",
+    "annotationsFolder": "Viwoods/Annotations",
+    "sourcesFolder": "Viwoods/Library",
+    "pagesFolder": "Viwoods/Pages",
     "highlightTemplate": "Templates/Highlight.md",
     "annotationTemplate": "Templates/Annotation.md",
     "pageTemplate": "Templates/Page.md",
@@ -236,7 +236,7 @@ Example:
 1. Take notes in viwoods app
 2. Save to Dropbox
 3. Sync to Obsidian
-4. Review highlights in `viwoods/Highlights/`
+4. Review highlights in `Viwoods/Highlights/`
 5. Add your thoughts in the "Notes" section
 6. Link to other notes in your vault
 7. Use tags for organization

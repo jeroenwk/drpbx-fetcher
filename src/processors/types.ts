@@ -1,5 +1,6 @@
 import { App, Vault } from "obsidian";
 import { files } from "dropbox";
+import type { DrpbxFetcherSettings } from "../models/Settings";
 
 /**
  * Base configuration interface for all processors
@@ -24,6 +25,7 @@ export interface ProcessorContext {
 	vault: Vault;
 	app: App;
 	templateResolver: TemplateResolver;
+	pluginSettings: DrpbxFetcherSettings;
 }
 
 /**

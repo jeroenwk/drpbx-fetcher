@@ -195,7 +195,7 @@ If you encounter any issues or have feature requests:
 - 🖼️ **Composite images** - Combine JPG page backgrounds with PNG handwriting overlays
 - 📝 **Annotation markdown** - Generate one file per annotation with embedded images
 - 🎯 **Accurate book names** - Use PageTextAnnotation data for better metadata
-- 📁 **Organized structure** - Default annotation images in `viwoods/Annotations/resources`
+- 📁 **Organized structure** - Default annotation images in `Viwoods/Annotations/resources`
 
 ### 0.2.35 - 2025-01-10
 - 🎉 **Android Large File Support** - Process large .note files (35+ MB) without crashes

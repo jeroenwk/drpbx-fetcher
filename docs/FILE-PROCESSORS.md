@@ -21,7 +21,7 @@ The File Processor system allows the Dropbox Fetcher plugin to intelligently pro
 ### viwoods Notes Processor
 - **Type:** `viwoods`
 - **Extensions:** `.note`
-- **Description:** Processes viwoods/AIPaper `.note` files (ZIP archives containing handwriting data)
+- **Description:** Processes Viwoods/AIPaper `.note` files (ZIP archives containing handwriting data)
 - **What it extracts:**
   - Handwriting strokes (PATH_*.json files)
   - Page images (*.png files)
@@ -47,10 +47,10 @@ This creates a new file type mapping with default configuration.
 
 ```json
 {
-  "highlightsFolder": "viwoods/Highlights",
-  "annotationsFolder": "viwoods/Annotations",
-  "sourcesFolder": "viwoods/Sources",
-  "pagesFolder": "viwoods/Pages",
+  "highlightsFolder": "Viwoods/Highlights",
+  "annotationsFolder": "Viwoods/Annotations",
+  "sourcesFolder": "Viwoods/Library",
+  "pagesFolder": "Viwoods/Pages",
   "highlightTemplate": "",
   "annotationTemplate": "",
   "pageTemplate": "",

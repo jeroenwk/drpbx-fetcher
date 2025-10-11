@@ -45,6 +45,8 @@ export interface DrpbxFetcherSettings {
 	// Chunked download settings
 	chunkSizeBytes: number; // Chunk size for large file downloads (default: 2MB)
 	chunkedDownloadThreshold: number; // File size threshold to use chunked download (default: 10MB)
+	// Source file download
+	downloadSourceFiles: boolean; // Whether to download source files (.epub, .note) to Sources folder (default: true)
 }
 
 /**
@@ -68,4 +70,5 @@ export const DEFAULT_SETTINGS: DrpbxFetcherSettings = {
 	maxFileSizeMobile: 10 * 1024 * 1024, // 10 MB default for mobile
 	chunkSizeBytes: 2 * 1024 * 1024, // 2 MB chunks
 	chunkedDownloadThreshold: 10 * 1024 * 1024, // Use chunked download for files >10 MB
+	downloadSourceFiles: true, // Default to downloading source files
 };

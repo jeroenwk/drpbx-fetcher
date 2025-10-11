@@ -553,6 +553,7 @@ export default class DrpbxFetcherPlugin extends Plugin {
                           vault: this.app.vault,
                           app: this.app,
                           templateResolver,
+                          pluginSettings: this.settings,
                         }
                       );
                       StreamLogger.log(`[DrpbxFetcher] Processor completed`, {
@@ -721,6 +722,7 @@ export default class DrpbxFetcherPlugin extends Plugin {
       platform,
     });
     StreamLogger.log("[DrpbxFetcher] Plugin loading...");
+    StreamLogger.log("[DrpbxFetcher] User Agent", { userAgent: navigator.userAgent });
 
     // Register file processors
     const registry = ProcessorRegistry.getInstance();
@@ -822,6 +824,64 @@ class DrpbxFetcherSettingTab extends PluginSettingTab {
     // General Settings section
     containerEl.createEl("h3", { text: "General Settings" });
 
+    // Dropbox Authentication Settings (moved to top)
+    new Setting(containerEl)
+      .setName("Dropbox client ID")
+      .setDesc("Enter your Dropbox app client ID")
+      .addText((text) =>
+        text
+          .setPlaceholder("Enter your client ID")
+          .setValue(this.plugin.settings.clientId)
+          .onChange(async (value) => {
+            this.plugin.settings.clientId = value;
+            await this.plugin.saveSettings();
+            // Reinitialize OAuth manager with new clientId
+            if (this.plugin.oauthManager) {
+              this.plugin.oauthManager = new OAuthManager(this.plugin, value);
+            }
+          })
+      );
+
+    // Platform indicator
+    new Setting(containerEl)
+      .setName("Platform")
+      .setDesc(`Running on: ${PlatformHelper.getPlatformName()}${PlatformHelper.isMobile() ? " (Mobile)" : ""}`);
+
+    // Authentication
+    new Setting(containerEl)
+      .setName("Authenticate with Dropbox")
+      .setDesc(
+        this.plugin.settings.refreshToken
+          ? "✓ Connected to Dropbox"
+          : PlatformHelper.isMobile()
+          ? "Click to authenticate. You'll be redirected to Dropbox in your browser, then back to Obsidian."
+          : "Click to start OAuth flow"
+      )
+      .addButton((button) =>
+        button
+          .setButtonText(this.plugin.settings.refreshToken ? "Re-authenticate" : "Authenticate")
+          .onClick(async () => {
+            if (this.plugin.oauthManager) {
+              await this.plugin.oauthManager.authenticate();
+            }
+          })
+      );
+
+    if (this.plugin.settings.refreshToken) {
+      new Setting(containerEl)
+        .setName("Clear Authentication")
+        .setDesc("Disconnect from Dropbox")
+        .addButton((button) =>
+          button.setButtonText("Clear Authentication").onClick(async () => {
+            this.plugin.settings.accessToken = "";
+            this.plugin.settings.refreshToken = "";
+            this.plugin.settings.authInProgress = false;
+            await this.plugin.saveSettings();
+            this.display();
+          })
+        );
+    }
+
     new Setting(containerEl)
       .setName("Sync on startup")
       .setDesc("Automatically sync when Obsidian starts")
@@ -862,6 +922,16 @@ class DrpbxFetcherSettingTab extends PluginSettingTab {
               await this.plugin.saveSettings();
             }
           })
+      );
+
+    new Setting(containerEl)
+      .setName("Download source files")
+      .setDesc("Download source files (.epub, .note) to Sources folder.")
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.downloadSourceFiles).onChange(async (value) => {
+          this.plugin.settings.downloadSourceFiles = value;
+          await this.plugin.saveSettings();
+        })
       );
 
     // Chunked download settings
@@ -983,63 +1053,6 @@ class DrpbxFetcherSettingTab extends PluginSettingTab {
                 });
               }
             })
-        );
-    }
-
-    new Setting(containerEl)
-      .setName("Dropbox client ID")
-      .setDesc("Enter your Dropbox app client ID")
-      .addText((text) =>
-        text
-          .setPlaceholder("Enter your client ID")
-          .setValue(this.plugin.settings.clientId)
-          .onChange(async (value) => {
-            this.plugin.settings.clientId = value;
-            await this.plugin.saveSettings();
-            // Reinitialize OAuth manager with new clientId
-            if (this.plugin.oauthManager) {
-              this.plugin.oauthManager = new OAuthManager(this.plugin, value);
-            }
-          })
-      );
-
-    // Platform indicator
-    new Setting(containerEl)
-      .setName("Platform")
-      .setDesc(`Running on: ${PlatformHelper.getPlatformName()}${PlatformHelper.isMobile() ? " (Mobile)" : ""}`);
-
-    // Authentication
-    new Setting(containerEl)
-      .setName("Authenticate with Dropbox")
-      .setDesc(
-        this.plugin.settings.refreshToken
-          ? "✓ Connected to Dropbox"
-          : PlatformHelper.isMobile()
-          ? "Click to authenticate. You'll be redirected to Dropbox in your browser, then back to Obsidian."
-          : "Click to start OAuth flow"
-      )
-      .addButton((button) =>
-        button
-          .setButtonText(this.plugin.settings.refreshToken ? "Re-authenticate" : "Authenticate")
-          .onClick(async () => {
-            if (this.plugin.oauthManager) {
-              await this.plugin.oauthManager.authenticate();
-            }
-          })
-      );
-
-    if (this.plugin.settings.refreshToken) {
-      new Setting(containerEl)
-        .setName("Clear Authentication")
-        .setDesc("Disconnect from Dropbox")
-        .addButton((button) =>
-          button.setButtonText("Clear Authentication").onClick(async () => {
-            this.plugin.settings.accessToken = "";
-            this.plugin.settings.refreshToken = "";
-            this.plugin.settings.authInProgress = false;
-            await this.plugin.saveSettings();
-            this.display();
-          })
         );
     }
 

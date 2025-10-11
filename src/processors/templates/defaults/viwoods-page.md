@@ -16,4 +16,4 @@
 
 ---
 
-#viwoods/{{noteSlug}} #page-{{pageNumber}}
+#Viwoods/{{noteSlug}} #page-{{pageNumber}}

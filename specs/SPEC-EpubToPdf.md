@@ -493,7 +493,7 @@ Add to `package.json`:
 
 ### Before (EPUB only)
 ```
-viwoods/
+Viwoods/
 ├── Sources/
 │   ├── book-name.note
 │   └── book-name.epub          ← Current
@@ -505,7 +505,7 @@ viwoods/
 
 ### After (PDF default)
 ```
-viwoods/
+Viwoods/
 ├── Sources/
 │   ├── book-name.note
 │   └── book-name.pdf           ← New (converted from EPUB)
@@ -517,7 +517,7 @@ viwoods/
 
 ### With keepOriginalEpub=true
 ```
-viwoods/
+Viwoods/
 ├── Sources/
 │   ├── book-name.note
 │   ├── book-name.pdf           ← Primary (linked in markdown)

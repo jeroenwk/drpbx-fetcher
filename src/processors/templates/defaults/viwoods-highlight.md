@@ -18,4 +18,4 @@ Points: {{pointCount}}
 *Add your thoughts here*
 
 ---
-#highlight #viwoods/{{noteSlug}}
+#highlight #Viwoods/{{noteSlug}}

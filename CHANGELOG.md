@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Canvas API-based image composition for transparent annotation rendering
 - Markdown file generation per annotation with embedded images
 - Annotation summary extraction and formatting as blockquotes
-- Default annotation images folder at `viwoods/Annotations/resources`
+- Default annotation images folder at `Viwoods/Annotations/resources`
 
 ### Changed
 - Use accurate book names from PageTextAnnotation for annotations

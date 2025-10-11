@@ -102,7 +102,7 @@ interface ProcessorResult {
 **Default Templates Structure:**
 ```
 src/processors/templates/defaults/
-├── viwoods/
+├── Viwoods/
 │   ├── highlight.md
 │   ├── annotation.md
 │   └── page.md
@@ -185,7 +185,7 @@ Simple passthrough processor for unmatched files:
 
 #### 3.2 viwoods Processor (`src/processors/viwoodsProcessor.ts`)
 
-Processes .note files (viwoods/AIPaper format):
+Processes .note files (Viwoods/AIPaper format):
 
 **Processing Flow:**
 1. Unzip .note file (ZIP archive)
@@ -254,7 +254,7 @@ Strokes: {{handwritingData.length}}
 *Add your thoughts here*
 
 ---
-#highlight #viwoods/{{noteName}}
+#highlight #Viwoods/{{noteName}}
 ```
 
 ### 4. UI Components
@@ -470,7 +470,7 @@ Total strokes: {{handwritingData.length}}
 {{#each tags}}
 #{{this}}
 {{/each}}
-#viwoods/{{noteName | slugify}}
+#Viwoods/{{noteName | slugify}}
 ```
 
 ### 11. Configuration Example
