@@ -410,25 +410,66 @@ export class ViwoodsProcessor implements FileProcessor {
 				count: highlights?.length || 0
 			});
 
-			if (!highlights || highlights.length === 0) {
-				await StreamLogger.error("No highlights found in note file");
-				errors.push("No highlights found in note file");
-				return { success: false, createdFiles, errors };
+			// Get book metadata - try highlights first, then BookBean, then ReadNoteBean
+			let bookName = "";
+			let bookSlug = "";
+			let totalPages = 0;
+			let bookPath = "";
+
+			if (highlights && highlights.length > 0) {
+				// Get metadata from highlights
+				bookName = highlights[0].bookName;
+				bookSlug = FileUtils.slugify(bookName);
+				totalPages = highlights[0].pageCount;
+				await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] Got book metadata from highlights:`, {
+					bookName,
+					totalPages
+				});
 			}
 
-			const bookName = highlights[0].bookName;
-			const bookSlug = FileUtils.slugify(bookName);
-			const totalPages = highlights[0].pageCount;
-
 			// Extract bookPath from BookBean.json if available
-			let bookPath = "";
 			if (bookBeanFile) {
 				await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] Extracting BookBean: ${bookBeanFile}`);
 				const bookBean = await StreamingZipUtils.extractJson<BookBean>(zipReader, bookBeanFile);
 				if (bookBean && bookBean.bookPath) {
 					bookPath = bookBean.bookPath;
 					await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] Found bookPath: ${bookPath}`);
+					// If we don't have bookName yet, try to get it from BookBean
+					if (!bookName && bookBean.bookName) {
+						bookName = bookBean.bookName;
+						bookSlug = FileUtils.slugify(bookName);
+						await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] Got book name from BookBean: ${bookName}`);
+					}
 				}
+			}
+
+			// If we still don't have book metadata, try ReadNoteBean
+			if (!bookName) {
+				const readNoteBeanFile = allFiles.find(f => f.endsWith('_ReadNoteBean.json'));
+				if (readNoteBeanFile) {
+					await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] Getting metadata from ReadNoteBean...`);
+					const annotations = await StreamingZipUtils.extractJson<ReadNoteBean[]>(
+						zipReader,
+						readNoteBeanFile
+					);
+					if (annotations && annotations.length > 0) {
+						bookName = annotations[0].bookName;
+						bookSlug = FileUtils.slugify(bookName);
+						// ReadNoteBean doesn't have pageCount, use 0 as fallback
+						totalPages = 0;
+						await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] Got book metadata from ReadNoteBean:`, {
+							bookName,
+							totalPages
+						});
+					}
+				}
+			}
+
+			// If we still don't have metadata, fail
+			if (!bookName) {
+				await StreamLogger.error("No book metadata found - no highlights, BookBean, or ReadNoteBean data available");
+				errors.push("No book metadata found in note file");
+				return { success: false, createdFiles, errors };
 			}
 
 			await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] Book info:`, {
@@ -452,12 +493,13 @@ export class ViwoodsProcessor implements FileProcessor {
 				}
 			}
 
-			// Generate highlight for each annotation
-			await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] Creating highlights folder: ${config.highlightsFolder}`);
-			await FileUtils.ensurePath(context.vault, config.highlightsFolder);
+			// Generate highlight for each annotation (only if highlights exist)
+			if (highlights && highlights.length > 0) {
+				await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] Creating highlights folder: ${config.highlightsFolder}`);
+				await FileUtils.ensurePath(context.vault, config.highlightsFolder);
 
-			await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] Processing ${highlights.length} highlights...`);
-			for (let i = 0; i < highlights.length; i++) {
+				await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] Processing ${highlights.length} highlights...`);
+				for (let i = 0; i < highlights.length; i++) {
 				const highlight = highlights[i];
 				await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] Processing highlight ${i + 1}/${highlights.length}`);
 				const dateHighlighted = new Date(highlight.createTime * 1000);
@@ -544,6 +586,7 @@ export class ViwoodsProcessor implements FileProcessor {
 					await StreamLogger.log(`[ViwoodsProcessor.processEpubFormat] Preserving existing highlight: ${filepath}`);
 				}
 			}
+			} // Close highlights processing if statement
 
 			// Process annotations from ReadNoteBean
 			if (config.processAnnotations !== false) {

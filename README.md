@@ -1,13 +1,13 @@
 # Dropbox Fetcher for Obsidian
 
-This plugin automatically syncs files from your Dropbox folders to your Obsidian vault. Configure folder mappings to keep your vault in sync with specific Dropbox directories.
+This plugin automatically fetches and processes files from your Dropbox folders to your Obsidian vault. Configure folder mappings to keep your vault updated with specific Dropbox directories.
 
 ## Features
 
-- **Automatic sync** on Obsidian startup
-- **Manual sync** via ribbon icon or command palette
+- **Automatic fetch** on Obsidian startup
+- **Manual fetch** via ribbon icon or command palette
 - **Multiple folder mappings** (Dropbox folder → Vault folder)
-- **Recursive folder syncing** with subdirectories
+- **Recursive folder fetching** with subdirectories
 - **Smart file processing** - Extract and transform different file types
 - **viwoods Notes support** - Extract text highlights from EPUB reader .note files
 - **Custom templates** - Customize markdown output with Obsidian-style templates
@@ -58,19 +58,19 @@ This plugin automatically syncs files from your Dropbox folders to your Obsidian
 - Remote path: `/home/Viwoods-PDF/AiPaper/S3AA2303M02672/Picking`
 - Local path: `Picking`
 
-This will sync all files from the Dropbox folder to `YourVault/Picking/`
+This will fetch all files from the Dropbox folder to `YourVault/Picking/`
 
 ## Usage
 
-### Automatic Sync
-The plugin automatically syncs all configured folders when Obsidian starts (with a 3-second delay to allow Obsidian to fully load).
+### Automatic Fetch
+The plugin automatically fetches all configured folders when Obsidian starts (with a 3-second delay to allow Obsidian to fully load).
 
-### Manual Sync
-- **Ribbon Icon**: Click the sync icon in the left sidebar
-- **Command Palette**: Use the "Sync Dropbox files" command (Ctrl/Cmd+P)
-- **Settings**: Click the "Sync" button in the plugin settings
+### Manual Fetch
+- **Ribbon Icon**: Click the download icon in the left sidebar
+- **Command Palette**: Use the "Fetch Dropbox files" command (Ctrl/Cmd+P)
+- **Settings**: Click the "Fetch" button in the plugin settings
 
-### Sync Behavior
+### Fetch Behavior
 - Files are downloaded from Dropbox and processed based on file type
 - File processors can extract content and generate markdown files
 - Subdirectories are created automatically
@@ -79,7 +79,7 @@ The plugin automatically syncs all configured folders when Obsidian starts (with
 
 ### File Processors (New!)
 
-The plugin can intelligently process different file types during sync:
+The plugin can intelligently process different file types during fetch:
 
 **viwoods Notes (.note files)**
 - Extract text highlights from EPUB reader format
@@ -142,14 +142,14 @@ The compiled plugin will be in the `dist` directory.
 4. Tap "Authenticate"
 5. You'll be redirected to Dropbox in your external browser (Safari/Chrome)
 6. After authorizing, you'll automatically return to Obsidian
-7. Configure your folder mappings and sync!
+7. Configure your folder mappings and fetch!
 
 ### Mobile Considerations
 
 - **OAuth Flow**: Opens your default browser for authentication
 - **Large Files**: May take longer to download on mobile networks
-- **Background Sync**: Not supported on mobile - use manual sync
-- **Auto-sync**: Works on app startup (after 3-second delay)
+- **Background Fetch**: Not supported on mobile - use manual fetch
+- **Auto-fetch**: Works on app startup (after 3-second delay)
 
 ### Platform Differences
 
@@ -174,11 +174,11 @@ This means another process is using the OAuth callback port. Wait a few moments 
 ### "No valid Dropbox access token"
 Click "Authenticate" in the plugin settings to reconnect to Dropbox.
 
-### Files not syncing
+### Files not fetching
 1. Check that your folder mappings are correct
 2. Verify your Dropbox app has the correct permissions
 3. Check the console (Ctrl/Cmd+Shift+I) for error messages
-4. Try manually syncing from the settings page
+4. Try manually fetching from the settings page
 
 ## Support
 
@@ -190,9 +190,20 @@ If you encounter any issues or have feature requests:
 
 ## Changelog
 
+### 0.2.55 - 2025-01-12
+- 🐛 **Fixed annotations without highlights** - Viwoods .note files with only annotations now process correctly
+- 📖 **Smart metadata fallback** - Three-tier book metadata extraction: highlights → BookBean.json → ReadNoteBean.json
+- ✨ **Conditional highlights processing** - Highlights only processed when present, annotations always attempted
+
+### 0.2.54 - 2025-01-12
+- 📊 **Status bar progress** - Persistent status bar indicator shows fetch progress throughout entire operation
+- 🎯 **No more popups** - All notifications moved to status bar for cleaner UX
+- 📝 **Fetch terminology** - Updated all "sync" references to "fetch" for clarity
+- ⬇️ **Download icon** - Changed ribbon icon from sync to download
+
 ### 0.2.52 - 2025-01-11
 - ⚙️ **Source file configuration** - Enable/disable downloading source files (.epub, .note) to save space
-- 🚀 **Performance boost** - 20-50% faster sync on slow devices when source downloads disabled
+- 🚀 **Performance boost** - 20-50% faster fetch on slow devices when source downloads disabled
 - 🔗 **BookPath linking** - File:// links to original book locations when sources disabled
 - 📝 **Better source info** - Shows file extension links (e.g., `[epub](file://...)`) instead of broken links
 - 🎨 **Settings reorganization** - Dropbox authentication moved to top of General Settings
@@ -238,11 +249,11 @@ If you encounter any issues or have feature requests:
 
 ### 0.1.0
 - Initial release
-- Basic Dropbox folder syncing
+- Basic Dropbox folder fetching
 - OAuth 2.0 authentication with PKCE
 - Multiple folder mapping support
-- Automatic sync on startup
-- Manual sync via ribbon icon and command
+- Automatic fetch on startup
+- Manual fetch via ribbon icon and command
 
 For detailed version history, see [CHANGELOG.md](CHANGELOG.md).
 

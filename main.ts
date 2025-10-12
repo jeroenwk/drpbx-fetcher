@@ -20,6 +20,7 @@ export default class DrpbxFetcherPlugin extends Plugin {
   oauthManager: OAuthManager | null = null;
   settingsTab: DrpbxFetcherSettingTab | null = null;
   tempFileManager: TempFileManager | null = null;
+  private statusBarItem: HTMLElement | null = null;
 
   // Pure function to create a fetch-compatible response from Obsidian's RequestUrlResponse
   private static createFetchResponse(response: RequestUrlResponse): Response {
@@ -356,21 +357,30 @@ export default class DrpbxFetcherPlugin extends Plugin {
     }
   }
 
-  // Sync files from Dropbox to Obsidian vault
+  // Fetch files from Dropbox to Obsidian vault
   async syncFiles(): Promise<void> {
     if (this.isSyncing) {
-      new Notice("Sync already in progress");
+      if (this.statusBarItem) {
+        this.statusBarItem.setText("⏳ Fetch already in progress");
+      }
       return;
     }
 
     if (this.settings.folderMappings.length === 0) {
-      new Notice("No folder mappings configured. Please add mappings in settings.");
+      if (this.statusBarItem) {
+        this.statusBarItem.setText("❌ No folder mappings configured");
+        setTimeout(() => {
+          if (this.statusBarItem) this.statusBarItem.setText("");
+        }, 5000);
+      }
       return;
     }
 
     this.isSyncing = true;
-    new Notice("Starting Dropbox sync...");
-    StreamLogger.log("[DrpbxFetcher] Starting sync...", {
+    if (this.statusBarItem) {
+      this.statusBarItem.setText("⏳ Fetching from Dropbox...");
+    }
+    StreamLogger.log("[DrpbxFetcher] Starting fetch...", {
       folderMappings: this.settings.folderMappings.length
     });
 
@@ -423,6 +433,11 @@ export default class DrpbxFetcherPlugin extends Plugin {
           for (let i = 0; i < files.length; i++) {
             const file = files[i];
             try {
+              // Update status bar with progress
+              if (this.statusBarItem) {
+                this.statusBarItem.setText(`⏳ Fetching... ${i + 1}/${files.length} files`);
+              }
+
               StreamLogger.log(`[DrpbxFetcher] Processing file ${i + 1}/${files.length}`, {
                 fileName: file.name,
                 size: file.size,
@@ -656,13 +671,18 @@ export default class DrpbxFetcherPlugin extends Plugin {
             errorMsg = `Permission denied. Check app permissions in Dropbox settings.`;
           }
 
-          new Notice(`Error syncing ${mapping.remotePath}: ${errorMsg}`);
+          if (this.statusBarItem) {
+            this.statusBarItem.setText(`❌ Error: ${errorMsg}`);
+            setTimeout(() => {
+              if (this.statusBarItem) this.statusBarItem.setText("");
+            }, 8000);
+          }
         }
       }
 
       // Build summary message
       const totalOutputFiles = createdFiles + regularFiles;
-      let summary = `Sync complete: ${totalSourceFiles} source files`;
+      let summary = `✓ Fetch complete: ${totalSourceFiles} source files`;
 
       if (processedSourceFiles > 0 && regularFiles > 0) {
         // Mixed: some processed, some regular
@@ -683,8 +703,15 @@ export default class DrpbxFetcherPlugin extends Plugin {
         summary += ` (${skippedProcessors} already processed)`;
       }
 
-      new Notice(summary);
-      StreamLogger.log("[DrpbxFetcher] Sync completed successfully", {
+      if (this.statusBarItem) {
+        this.statusBarItem.setText(summary);
+        // Clear after 10 seconds
+        setTimeout(() => {
+          if (this.statusBarItem) this.statusBarItem.setText("");
+        }, 10000);
+      }
+
+      StreamLogger.log("[DrpbxFetcher] Fetch completed successfully", {
         totalSourceFiles,
         processedSourceFiles,
         createdFiles,
@@ -694,9 +721,14 @@ export default class DrpbxFetcherPlugin extends Plugin {
         summary
       });
     } catch (error) {
-      console.error("Sync error:", error);
-      StreamLogger.error("[DrpbxFetcher] Sync failed", error);
-      new Notice(`Sync failed: ${error.message}`);
+      console.error("Fetch error:", error);
+      StreamLogger.error("[DrpbxFetcher] Fetch failed", error);
+      if (this.statusBarItem) {
+        this.statusBarItem.setText(`❌ Fetch failed: ${error.message}`);
+        setTimeout(() => {
+          if (this.statusBarItem) this.statusBarItem.setText("");
+        }, 10000);
+      }
     } finally {
       this.isSyncing = false;
     }
@@ -704,6 +736,10 @@ export default class DrpbxFetcherPlugin extends Plugin {
 
   async onload() {
     await this.loadSettings();
+
+    // Initialize status bar item
+    this.statusBarItem = this.addStatusBarItem();
+    this.statusBarItem.setText("");
 
     // Initialize temp file manager
     this.tempFileManager = new TempFileManager(this.app.vault);
@@ -746,30 +782,30 @@ export default class DrpbxFetcherPlugin extends Plugin {
     this.addSettingTab(this.settingsTab);
 
     // Add ribbon icon
-    this.addRibbonIcon("sync", "Synchronize Dropbox files", async () => {
+    this.addRibbonIcon("download", "Fetch Dropbox files", async () => {
       await this.syncFiles();
     });
 
     // Add command
     this.addCommand({
       id: "sync-dropbox-files",
-      name: "Synchronize Dropbox files",
+      name: "Fetch Dropbox files",
       callback: async () => {
         await this.syncFiles();
       },
     });
 
-    // Sync on startup if configured
+    // Fetch on startup if configured
     if (this.settings.syncOnStartup && this.settings.folderMappings.length > 0 && this.settings.accessToken) {
-      // Delay initial sync to allow Obsidian to fully load
-      StreamLogger.log(`[DrpbxFetcher] Scheduling startup sync with ${this.settings.syncStartupDelay}ms delay...`);
+      // Delay initial fetch to allow Obsidian to fully load
+      StreamLogger.log(`[DrpbxFetcher] Scheduling startup fetch with ${this.settings.syncStartupDelay}ms delay...`);
       setTimeout(async () => {
-        console.log("Running initial Dropbox sync...");
-        StreamLogger.log("[DrpbxFetcher] Running startup sync...");
+        console.log("Running initial Dropbox fetch...");
+        StreamLogger.log("[DrpbxFetcher] Running startup fetch...");
         await this.syncFiles();
       }, this.settings.syncStartupDelay);
     } else {
-      StreamLogger.log("[DrpbxFetcher] Startup sync disabled or not configured");
+      StreamLogger.log("[DrpbxFetcher] Startup fetch disabled or not configured");
     }
   }
 
@@ -811,10 +847,10 @@ class DrpbxFetcherSettingTab extends PluginSettingTab {
     titleEl.style.fontWeight = "bold";
     titleEl.style.marginBottom = "1em";
 
-    // Synchronize section
+    // Fetch section
     new Setting(containerEl)
       .setName("Fetch now")
-      .setDesc("Manually trigger fetching")
+      .setDesc("Manually fetch files from Dropbox")
       .addButton((button) =>
         button.setButtonText("Fetch").onClick(async () => {
           await this.plugin.syncFiles();
@@ -883,8 +919,8 @@ class DrpbxFetcherSettingTab extends PluginSettingTab {
     }
 
     new Setting(containerEl)
-      .setName("Sync on startup")
-      .setDesc("Automatically sync when Obsidian starts")
+      .setName("Fetch on startup")
+      .setDesc("Automatically fetch files when Obsidian starts")
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.syncOnStartup).onChange(async (value) => {
           this.plugin.settings.syncOnStartup = value;
@@ -893,8 +929,8 @@ class DrpbxFetcherSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Startup sync delay")
-      .setDesc("Delay in milliseconds before starting sync on startup (default: 3000)")
+      .setName("Startup fetch delay")
+      .setDesc("Delay in milliseconds before fetching on startup (default: 3000)")
       .addText((text) =>
         text
           .setPlaceholder("3000")

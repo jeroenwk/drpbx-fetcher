@@ -33,9 +33,9 @@ export interface DrpbxFetcherSettings {
 	processedFiles: Record<string, number>; // Dropbox file.id -> file.size (tracks processed files)
 	// Mobile auth state
 	authInProgress: boolean;
-	// Sync settings
-	syncOnStartup: boolean; // Whether to sync automatically on startup
-	syncStartupDelay: number; // Delay in milliseconds before starting sync (default 3000)
+	// Fetch settings
+	syncOnStartup: boolean; // Whether to fetch automatically on startup
+	syncStartupDelay: number; // Delay in milliseconds before starting fetch (default 3000)
 	// Logging settings
 	loggerType: 'console' | 'stream'; // Logger type: console or network stream
 	streamLogHost: string; // Host for stream logger (default: "localhost")

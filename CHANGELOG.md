@@ -5,6 +5,34 @@ All notable changes to the Dropbox Fetcher plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.55] - 2025-01-12
+
+### Fixed
+- ViwoodsProcessor now handles .note files with annotations but no highlights
+- Book metadata extraction uses three-tier fallback: highlights → BookBean.json → ReadNoteBean.json
+- Annotations can be processed even when highlights are absent
+
+### Changed
+- Highlights processing is now conditional - only runs when highlights exist
+- Improved error messages to indicate when no book metadata is available from any source
+
+## [0.2.54] - 2025-01-12
+
+### Added
+- Status bar progress indicator that persists throughout entire fetch operation
+- File count progress display (e.g., "⏳ Fetching... 5/10 files")
+
+### Changed
+- All popup notices replaced with status bar notifications for cleaner UX
+- Updated all "sync/synchronize" terminology to "fetch" throughout codebase
+- Changed ribbon icon from "sync" to "download" icon
+- Status bar shows completion summary for 10 seconds before clearing
+- Error messages display in status bar for 8-10 seconds
+
+### Improved
+- Better visibility of fetch progress - users can always see if fetching is ongoing
+- Cleaner user experience with no intrusive popups
+
 ## [0.2.52] - 2025-01-11
 
 ### Added

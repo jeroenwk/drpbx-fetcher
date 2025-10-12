@@ -1,7 +1,7 @@
 {
   "name": "drpbx-fetcher",
-  "version": "0.2.52",
-  "description": "Sync files from Dropbox folders to your Obsidian vault",
+  "version": "0.2.55",
+  "description": "Fetch and process files from Dropbox folders to your Obsidian vault",
   "main": "dist/main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
@@ -18,9 +18,9 @@
     "obsidian",
     "obsidian-plugin",
     "dropbox",
-    "sync",
+    "fetch",
     "files",
-    "fetcher"
+    "processor"
   ],
   "author": "Jeroen de Zwart",
   "license": "MIT",

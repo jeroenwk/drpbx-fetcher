@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is an Obsidian plugin that syncs files from Dropbox folders to the Obsidian vault. Users configure folder mappings (remote Dropbox path → local vault path) in the settings, and the plugin automatically downloads files on startup and via manual sync.
+This is an Obsidian plugin that fetches and processes files from Dropbox folders to the Obsidian vault. Users configure folder mappings (remote Dropbox path → local vault path) in the settings, and the plugin automatically downloads files on startup and via manual fetch.
 
 ## Build and Development Commands
 
@@ -22,23 +22,34 @@ The build uses esbuild with configuration in `esbuild.config.mjs`. Output goes t
 
 1. **On plugin load** (`onload` method):
    - Loads settings from disk
+   - Initializes status bar item for progress display
    - Adds settings tab to Obsidian settings
-   - Adds ribbon icon (sync button)
-   - Adds command palette command for manual sync
-   - Schedules initial sync (3 second delay) if folder mappings are configured
+   - Adds ribbon icon (download button)
+   - Adds command palette command for manual fetch
+   - Schedules initial fetch (3 second delay) if folder mappings are configured
 
-2. **Sync process** (`syncFiles` method):
-   - Checks if sync is already in progress (prevents concurrent syncs)
+2. **Fetch process** (`syncFiles` method - note: method name kept for backward compatibility):
+   - Checks if fetch is already in progress (prevents concurrent fetches)
    - Validates that folder mappings exist
+   - Updates status bar with "⏳ Fetching from Dropbox..."
    - Gets Dropbox client with fresh access token
    - For each folder mapping:
      - Fetches all files recursively from Dropbox folder (`getAllFiles`)
      - Filters to only file entries (not folders)
      - Creates local folder structure
      - Downloads each file from Dropbox
+     - Updates status bar with progress: "⏳ Fetching... X/Y files"
      - Writes to vault using Obsidian Vault API
      - Skips files that already exist with same size (optimization)
-   - Shows notice with sync results
+   - Shows completion summary in status bar for 10 seconds
+
+### Status Bar Progress
+
+- **Persistent visibility** - Status bar shows fetch progress throughout entire operation
+- **Progress updates** - Displays current file count (e.g., "⏳ Fetching... 5/10 files")
+- **Completion summary** - Shows results for 10 seconds before clearing
+- **Error handling** - Error messages displayed in status bar for 8-10 seconds
+- **No popups** - All notifications use status bar instead of intrusive popups
 
 ### Dropbox Authentication
 
@@ -52,12 +63,13 @@ The build uses esbuild with configuration in `esbuild.config.mjs`. Output goes t
 - **Pure functions** for creating fetch-compatible responses (see `createFetchResponse`)
 - **Obsidian's requestUrl wrapper** used instead of native fetch to handle CORS/network restrictions (see `obsidianFetch`)
 - **Pagination support** when fetching large folders via `getAllFiles` using Dropbox API cursors
-- **Sync flag** (`isSyncing`) prevents concurrent sync operations
+- **Fetch flag** (`isSyncing`) prevents concurrent fetch operations
 - **File size comparison** to skip re-downloading unchanged files
+- **Status bar integration** for persistent user feedback
 
 ### File Structure
 
-- `main.ts` - Single-file plugin containing all logic (Plugin class, Settings tab, OAuth handling, sync logic)
+- `main.ts` - Single-file plugin containing all logic (Plugin class, Settings tab, OAuth handling, fetch logic)
 - `esbuild.config.mjs` - Build configuration that bundles to `dist/main.js`
 - `auto-version-bump.mjs` - Automatic version bumping during build
 - `version-bump.mjs` - Manual version bump script
@@ -78,9 +90,9 @@ The settings tab includes:
 3. **Authentication status** - Shows if connected, with clear auth button
 4. **Folder mappings list** - Shows existing mappings with delete buttons
 5. **Add new mapping** - Two text inputs (remote + local) with add button
-6. **Sync now button** - Manual trigger for sync
+6. **Fetch now button** - Manual trigger for fetch
 
-### File Sync Details
+### File Fetch Details
 
 - Uses `filesListFolder` with `recursive: true` to get all files in a folder tree
 - Uses `filesDownload` to get file content as Blob

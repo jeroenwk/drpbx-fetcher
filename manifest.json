@@ -2,9 +2,9 @@
   "id": "drpbx-fetcher",
   "name": "Dropbox Fetcher",
   "minAppVersion": "0.15.0",
-  "description": "Sync files from Dropbox folders to your vault",
+  "description": "Fetch and process files from Dropbox folders to your vault",
   "author": "Jeroen de Zwart",
   "authorUrl": "https://github.com/jeroendezwart",
   "isDesktopOnly": false,
-  "version": "0.2.52"
+  "version": "0.2.55"
 }
