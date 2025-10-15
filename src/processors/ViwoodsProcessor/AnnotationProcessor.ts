@@ -58,7 +58,7 @@ export class AnnotationProcessor {
 				config.createCompositeImages !== false
 			);
 
-			// 4. Save composite image
+			// 4. Save composite image (preserve if exists to allow user modifications)
 			const imageFolder = config.annotationImagesFolder || config.annotationsFolder;
 			await FileUtils.ensurePath(context.vault, imageFolder);
 
@@ -66,11 +66,16 @@ export class AnnotationProcessor {
 			const imageName = `${bookSlug}-p${pageStr}-annotation-${annotation.id}.png`;
 			const imagePath = FileUtils.joinPath(imageFolder, imageName);
 
-			const imageBuffer = await compositeImage.arrayBuffer();
-			await context.vault.adapter.writeBinary(imagePath, imageBuffer);
-			createdFiles.push(imagePath);
-
-			await StreamLogger.log(`[processAnnotation] Saved composite image: ${imagePath}`);
+			// Only write if file doesn't exist (preserve user modifications)
+			const existingImage = context.vault.getAbstractFileByPath(imagePath);
+			if (!existingImage) {
+				const imageBuffer = await compositeImage.arrayBuffer();
+				await context.vault.adapter.writeBinary(imagePath, imageBuffer);
+				createdFiles.push(imagePath);
+				await StreamLogger.log(`[processAnnotation] Saved composite image: ${imagePath}`);
+			} else {
+				await StreamLogger.log(`[processAnnotation] Preserving existing image: ${imagePath}`);
+			}
 
 			// 5. Generate markdown file
 			const mdPath = await this.generateAnnotationMarkdown(

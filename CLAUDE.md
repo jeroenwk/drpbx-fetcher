@@ -114,3 +114,6 @@ The settings tab includes:
 9. Close HTTP server
 10. Update UI to show authenticated status
 - on this pc the vault is in /Users/jeroendezwart/2th Brain
+- when pushing to github always update readme and changelog
+- remember to run the tests before to build a new version and fix issues if needed
+- typescript checking and eslinting must always be proceeded before to create a new version or release

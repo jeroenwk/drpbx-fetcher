@@ -5,6 +5,42 @@ All notable changes to the Dropbox Fetcher plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.61] - 2025-10-15
+
+### Added
+- Jest testing framework with TypeScript support
+- Comprehensive test suite with 115 tests covering core functionality:
+  - FileUtils tests (path manipulation, sanitization, slugification)
+  - Crypto tests (PKCE OAuth flow)
+  - TemplateEngine tests (variable replacement, date formatting, markdown escaping)
+  - ProcessorRegistry tests (processor registration and management)
+  - ViwoodsProcessor tests (configuration validation, schema structure)
+  - Dropbox API response conversion tests
+- Test scripts: `npm test`, `npm run test:watch`, `npm run test:coverage`
+- Obsidian API mocks for testing
+
+### Technical
+- All tests pass TypeScript compilation and ESLint checks
+- Tests focus on pure functions and configuration logic
+- Proper test isolation with mocking support
+
+## [0.2.60] - 2025-10-15
+
+### Added
+- "Clear processed files tracking" button in settings with confirmation dialog
+- File existence checks before writing resource files (images, EPUBs)
+- Preservation logging for images and EPUBs
+
+### Changed
+- Composite images (PNG) are now preserved if they exist (not overwritten)
+- Extracted EPUB files are now preserved if they exist (not overwritten)
+- Clear tracking button shows detailed description about preservation behavior
+
+### Improved
+- User modifications to any output file (markdown, images, EPUBs) are now preserved during re-fetch
+- Only missing output files are regenerated during reprocessing
+- Better transparency with logging for preserved vs created files
+
 ## [0.2.59] - 2025-10-15
 
 ### Fixed

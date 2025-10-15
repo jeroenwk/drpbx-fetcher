@@ -75,7 +75,8 @@ The plugin automatically fetches all configured folders when Obsidian starts (wi
 - File processors can extract content and generate markdown files
 - Subdirectories are created automatically
 - Files with the same size are skipped (assumed to be up-to-date)
-- Existing files with different sizes are overwritten
+- **User modifications are preserved** - The plugin will NOT overwrite modified output files (markdown, images, EPUBs) during re-fetch
+- **Clear tracking option** - Settings include a button to clear processed files tracking, allowing re-fetch of deleted files
 
 ### File Processors (New!)
 
@@ -119,6 +120,29 @@ npm run build
 
 The compiled plugin will be in the `dist` directory.
 
+### Testing
+
+The plugin includes comprehensive test coverage:
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage report
+npm run test:coverage
+```
+
+**Test Suite (115 tests)**
+- FileUtils: Path manipulation, sanitization, slugification
+- Crypto: PKCE OAuth flow
+- TemplateEngine: Variable replacement, date formatting, markdown escaping
+- ProcessorRegistry: Processor registration and management
+- ViwoodsProcessor: Configuration validation, schema structure
+- Dropbox API: Response conversion
+
 ### Development workflow
 
 1. Clone the repository to your vault's plugins folder:
@@ -128,7 +152,10 @@ The compiled plugin will be in the `dist` directory.
 2. Run `npm install`
 3. Run `npm run dev` to start the development build with watch mode
 4. Make changes to the code
-5. Reload Obsidian (Ctrl/Cmd+R) to test your changes
+5. Run `npm test` to verify tests pass
+6. Run `npx tsc -noEmit -skipLibCheck` to check TypeScript
+7. Run `npm run lint` to check ESLint
+8. Reload Obsidian (Ctrl/Cmd+R) to test your changes
 
 ## Mobile Support (iOS/Android)
 
@@ -189,6 +216,18 @@ If you encounter any issues or have feature requests:
 3. Include your Obsidian version and operating system details
 
 ## Changelog
+
+### 0.2.61 - 2025-10-15
+- 🧪 **Comprehensive test suite** - Added Jest testing framework with 115 tests covering core functionality
+- ✅ **Quality assurance** - All tests pass TypeScript compilation and ESLint checks
+- 📦 **Test utilities** - Obsidian API mocks and test isolation support
+- 📝 **Test scripts** - `npm test`, `npm run test:watch`, `npm run test:coverage`
+
+### 0.2.60 - 2025-10-15
+- 🛡️ **Resource file preservation** - User-modified images and EPUB files are no longer overwritten during re-fetch
+- 🔄 **Clear tracking button** - New settings option to reset processed files tracking for re-fetching deleted files
+- 📝 **Better preservation logging** - Transparent logs show which files are preserved vs re-created
+- ⚡ **Smart re-processing** - Only missing output files are regenerated, preserving all user customizations
 
 ### 0.2.59 - 2025-10-15
 - 🐛 **Fixed all TypeScript errors** - Resolved 37 problems (5 errors + 32 warnings → 0)

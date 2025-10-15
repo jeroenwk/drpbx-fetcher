@@ -124,7 +124,7 @@ export class EpubFormatProcessor {
 				bookPath
 			});
 
-			// Extract EPUB file if configured and enabled in settings
+			// Extract EPUB file if configured and enabled in settings (preserve if exists to allow user modifications)
 			let epubPath = "";
 			if (epubFile && config.sourcesFolder && context.pluginSettings.downloadSourceFiles) {
 				await StreamLogger.log(`[EpubFormatProcessor.process] Extracting EPUB file: ${epubFile}`);
@@ -133,8 +133,16 @@ export class EpubFormatProcessor {
 					epubPath = FileUtils.joinPath(config.sourcesFolder, `${bookSlug}.epub`);
 					await StreamLogger.log(`[EpubFormatProcessor.process] Creating folder: ${config.sourcesFolder}`);
 					await FileUtils.ensurePath(context.vault, config.sourcesFolder);
-					await context.vault.adapter.writeBinary(epubPath, epubData.buffer);
-					createdFiles.push(epubPath);
+
+					// Only write if file doesn't exist (preserve user modifications)
+					const existingEpub = context.vault.getAbstractFileByPath(epubPath);
+					if (!existingEpub) {
+						await context.vault.adapter.writeBinary(epubPath, epubData.buffer);
+						createdFiles.push(epubPath);
+						await StreamLogger.log(`[EpubFormatProcessor.process] Saved EPUB file: ${epubPath}`);
+					} else {
+						await StreamLogger.log(`[EpubFormatProcessor.process] Preserving existing EPUB: ${epubPath}`);
+					}
 				}
 			}
 

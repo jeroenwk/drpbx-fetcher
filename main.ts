@@ -986,6 +986,29 @@ class DrpbxFetcherSettingTab extends PluginSettingTab {
         })
       );
 
+    new Setting(containerEl)
+      .setName("Clear processed files tracking")
+      .setDesc("Clears the internal tracking of processed files. Use this after deleting fetched files to allow re-fetching. Note: Modified files (markdown, images, EPUBs) will NOT be overwritten - only files that don't exist will be re-created.")
+      .addButton((button) =>
+        button
+          .setButtonText("Clear tracking")
+          .setWarning()
+          .onClick(async () => {
+            // Show confirmation dialog
+            const confirmed = await this.showConfirmDialog(
+              "Clear Processed Files Tracking",
+              "This will clear the internal tracking of processed files. The next fetch will attempt to reprocess all files, but modified output files (markdown, images, EPUBs) will be preserved.\n\nAre you sure you want to continue?"
+            );
+
+            if (confirmed) {
+              this.plugin.settings.processedFiles = {};
+              await this.plugin.saveSettings();
+              new Notice("✓ Processed files tracking cleared");
+              console.log("Processed files tracking cleared");
+            }
+          })
+      );
+
     // Chunked download settings
     containerEl.createEl("h3", { text: "Large File Download Settings" });
     containerEl.createEl("p", {
@@ -1436,6 +1459,21 @@ class DrpbxFetcherSettingTab extends PluginSettingTab {
     modal.open();
   }
 
+  /**
+   * Show a confirmation dialog
+   * @param title Dialog title
+   * @param message Dialog message
+   * @returns Promise that resolves to true if confirmed, false if cancelled
+   */
+  private showConfirmDialog(title: string, message: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      const modal = new ConfirmModal(this.app, title, message, (confirmed) => {
+        resolve(confirmed);
+      });
+      modal.open();
+    });
+  }
+
 }
 
 /**
@@ -1494,6 +1532,54 @@ class ExtensionEditModal extends Modal {
         button.setButtonText("Cancel").onClick(() => {
           this.close();
         })
+      );
+  }
+
+  onClose() {
+    const { contentEl } = this;
+    contentEl.empty();
+  }
+}
+
+/**
+ * Modal for confirmation dialogs
+ */
+class ConfirmModal extends Modal {
+  private title: string;
+  private message: string;
+  private onConfirm: (confirmed: boolean) => void;
+
+  constructor(app: App, title: string, message: string, onConfirm: (confirmed: boolean) => void) {
+    super(app);
+    this.title = title;
+    this.message = message;
+    this.onConfirm = onConfirm;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+
+    contentEl.createEl("h2", { text: this.title });
+    contentEl.createEl("p", { text: this.message });
+
+    new Setting(contentEl)
+      .addButton((button) =>
+        button
+          .setButtonText("Continue")
+          .setWarning()
+          .onClick(() => {
+            this.onConfirm(true);
+            this.close();
+          })
+      )
+      .addButton((button) =>
+        button
+          .setButtonText("Cancel")
+          .onClick(() => {
+            this.onConfirm(false);
+            this.close();
+          })
       );
   }
 
