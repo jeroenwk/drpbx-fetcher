@@ -6,7 +6,7 @@ interface LogMessage {
   timestamp: string;
   level: LogLevel;
   message: string;
-  data?: any;
+  data?: unknown;
   meta: {
     version: string;
     platform: string;
@@ -30,9 +30,9 @@ interface StreamLoggerConfig {
 export class StreamLogger {
   private static instance: StreamLogger | null = null;
   private config: StreamLoggerConfig;
-  private failureCount: number = 0;
-  private maxFailures: number = 5;
-  private disabled: boolean = false;
+  private failureCount = 0;
+  private maxFailures = 5;
+  private disabled = false;
 
   private constructor(config: StreamLoggerConfig) {
     this.config = config;
@@ -59,26 +59,26 @@ export class StreamLogger {
   /**
    * Log an info message
    */
-  static log(message: string, data?: any): void {
+  static log(message: string, data?: unknown): void {
     this.getInstance().send("info", message, data);
   }
 
   /**
    * Log a warning message
    */
-  static warn(message: string, data?: any): void {
+  static warn(message: string, data?: unknown): void {
     this.getInstance().send("warn", message, data);
   }
 
   /**
    * Log an error message
    */
-  static error(message: string, error?: any): void {
-    const errorData = error ? {
+  static error(message: string, error?: unknown): void {
+    const errorData = error instanceof Error ? {
       message: error.message,
-      status: error.status,
-      stack: error.stack,
-      ...error
+      stack: error.stack
+    } : error ? {
+      value: String(error)
     } : undefined;
 
     this.getInstance().send("error", message, errorData);
@@ -87,14 +87,14 @@ export class StreamLogger {
   /**
    * Log a debug message
    */
-  static debug(message: string, data?: any): void {
+  static debug(message: string, data?: unknown): void {
     this.getInstance().send("debug", message, data);
   }
 
   /**
    * Send log message to server or console
    */
-  private send(level: LogLevel, message: string, data?: any): void {
+  private send(level: LogLevel, message: string, data?: unknown): void {
     // Always log to console as fallback
     const consoleMessage = data ? `${message}` : message;
     switch (level) {
@@ -132,7 +132,7 @@ export class StreamLogger {
   /**
    * Send log message to remote server
    */
-  private async sendToServer(level: LogLevel, message: string, data?: any): Promise<void> {
+  private async sendToServer(level: LogLevel, message: string, data?: unknown): Promise<void> {
     const logMessage: LogMessage = {
       timestamp: new Date().toISOString(),
       level,
@@ -158,9 +158,10 @@ export class StreamLogger {
 
       // Reset failure count on success
       this.failureCount = 0;
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       // Rethrow to be caught by send() method
-      throw new Error(`Failed to send log to ${url}: ${error.message}`);
+      throw new Error(`Failed to send log to ${url}: ${errorMessage}`);
     }
   }
 

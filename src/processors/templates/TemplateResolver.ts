@@ -28,6 +28,8 @@ export class TemplateResolver implements ITemplateResolver {
 
 		// Check cache first
 		if (this.cache.has(customPath)) {
+			// Safe: Map.get() is guaranteed to return a value after Map.has() check confirms key exists
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 			return this.cache.get(customPath)!;
 		}
 

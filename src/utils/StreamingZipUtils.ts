@@ -124,10 +124,11 @@ export class StreamingZipUtils {
 		try {
 			const text = new TextDecoder().decode(data);
 			return JSON.parse(text) as T;
-		} catch (error: any) {
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
 			StreamLogger.error(`[StreamingZipUtils] Failed to parse JSON`, {
 				filename,
-				error: error.message
+				error: errorMessage
 			});
 			return null;
 		}

@@ -49,7 +49,7 @@ export class ZipUtils {
 	 * @param path File path within ZIP
 	 * @returns Parsed JSON object, or null if not found or invalid JSON
 	 */
-	static async extractJson<T = any>(zip: JSZip, path: string): Promise<T | null> {
+	static async extractJson<T = unknown>(zip: JSZip, path: string): Promise<T | null> {
 		const text = await this.extractText(zip, path);
 		if (!text) {
 			return null;

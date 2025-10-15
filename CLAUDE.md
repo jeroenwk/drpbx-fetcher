@@ -113,3 +113,4 @@ The settings tab includes:
 8. Store tokens in settings
 9. Close HTTP server
 10. Update UI to show authenticated status
+- on this pc the vault is in /Users/jeroendezwart/2th Brain

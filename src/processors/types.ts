@@ -6,7 +6,7 @@ import type { DrpbxFetcherSettings } from "../models/Settings";
  * Base configuration interface for all processors
  */
 export interface ProcessorConfig {
-	[key: string]: any;
+	[key: string]: unknown;
 }
 
 /**
@@ -57,7 +57,7 @@ export interface ConfigField {
 	description?: string;
 	type: ConfigFieldType;
 	required?: boolean;
-	defaultValue?: any;
+	defaultValue?: unknown;
 	placeholder?: string;
 	options?: { value: string; label: string }[]; // For select type
 }

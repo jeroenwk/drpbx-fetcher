@@ -17,7 +17,7 @@ export class TemplateEngine {
 	 */
 	static render(
 		template: string,
-		variables: Record<string, any>,
+		variables: Record<string, unknown>,
 		date?: Date
 	): string {
 		const renderDate = date || new Date();

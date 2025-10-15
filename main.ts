@@ -5,7 +5,7 @@ import { PlatformHelper } from "./src/utils/platform";
 import { DrpbxFetcherSettings, DEFAULT_SETTINGS } from "./src/models/Settings";
 import { ProcessorRegistry } from "./src/processors/ProcessorRegistry";
 import { DefaultProcessor } from "./src/processors/DefaultProcessor";
-import { ViwoodsProcessor } from "./src/processors/ViwoodsProcessor";
+import { ViwoodsProcessor } from "./src/processors/ViwoodsProcessor/index";
 import { FileUtils } from "./src/utils/FileUtils";
 import { TemplateResolver } from "./src/processors/templates/TemplateResolver";
 import { ProcessorConfigModal } from "./src/ui/ProcessorConfigModal";
@@ -226,14 +226,15 @@ export default class DrpbxFetcherPlugin extends Plugin {
           progress: `${((downloadedBytes / fileSize) * 100).toFixed(1)}%`
         });
 
-      } catch (error: any) {
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
         StreamLogger.error(`[DrpbxFetcher] Chunk download failed`, {
           chunkNumber,
           start,
           end,
-          error: error.message
+          error: errorMessage
         });
-        throw new Error(`Failed to download chunk ${chunkNumber}/${totalChunks}: ${error.message}`);
+        throw new Error(`Failed to download chunk ${chunkNumber}/${totalChunks}: ${errorMessage}`);
       }
     }
 
@@ -328,16 +329,17 @@ export default class DrpbxFetcherPlugin extends Plugin {
             tempFileSize: await tempFileManager.getSize(tempPath)
           });
 
-        } catch (error: any) {
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
           StreamLogger.error(`[DrpbxFetcher] Chunk download failed`, {
             chunkNumber,
             start,
             end,
-            error: error.message
+            error: errorMessage
           });
           // Clean up partial temp file on error
           await tempFileManager.delete(tempPath);
-          throw new Error(`Failed to download chunk ${chunkNumber}/${totalChunks}: ${error.message}`);
+          throw new Error(`Failed to download chunk ${chunkNumber}/${totalChunks}: ${errorMessage}`);
         }
       }
 
@@ -474,6 +476,8 @@ export default class DrpbxFetcherPlugin extends Plugin {
               // Get relative path from the remote folder, preserving case
               // Use path_display to keep original capitalization
               const remoteFolderRegex = new RegExp("^" + mapping.remotePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "i");
+              // Safe: path_display is always defined for FileMetadata after filtering entries by .tag === "file"
+              // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
               const relativePath = file.path_display!.replace(remoteFolderRegex, "");
               const localFilePath = localFolder + relativePath;
 
@@ -500,8 +504,9 @@ export default class DrpbxFetcherPlugin extends Plugin {
                   sizeMB: (file.size / (1024 * 1024)).toFixed(2),
                   chunkSizeMB: (this.settings.chunkSizeBytes / (1024 * 1024)).toFixed(2)
                 });
+                // Safe: path_lower is always defined for FileMetadata after filtering entries by .tag === "file"
                 uint8Array = await this.downloadFileInChunks(
-                  file.path_lower!,
+                  file.path_lower!, // eslint-disable-line @typescript-eslint/no-non-null-assertion
                   file.size,
                   this.settings.chunkSizeBytes
                 );
@@ -510,10 +515,12 @@ export default class DrpbxFetcherPlugin extends Plugin {
                   fileName: file.name,
                   size: file.size
                 });
+                // Safe: path_lower is always defined for FileMetadata after filtering entries by .tag === "file"
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                 const response = await dbx.filesDownload({ path: file.path_lower! });
                 StreamLogger.log(`[DrpbxFetcher] Download complete, converting to buffer...`);
-                const fileBlob = (response.result as any).fileBlob as Blob;
-                const arrayBuffer = await fileBlob.arrayBuffer();
+                const result = response.result as unknown as { fileBlob: Blob };
+                const arrayBuffer = await result.fileBlob.arrayBuffer();
                 uint8Array = new Uint8Array(arrayBuffer);
                 StreamLogger.log(`[DrpbxFetcher] Buffer ready`, { bytes: uint8Array.length });
               }
@@ -559,9 +566,10 @@ export default class DrpbxFetcherPlugin extends Plugin {
                         processor: processor.name
                       });
                       const templateResolver = new TemplateResolver(this.app.vault);
+                      // Safe: path_display is always defined for FileMetadata after filtering entries by .tag === "file"
                       const result = await processor.process(
                         uint8Array,
-                        file.path_display!,
+                        file.path_display!, // eslint-disable-line @typescript-eslint/no-non-null-assertion
                         file,
                         mapping.config,
                         {
@@ -597,13 +605,13 @@ export default class DrpbxFetcherPlugin extends Plugin {
                           errors: result.errors
                         });
                       }
-                    } catch (procError: any) {
+                    } catch (procError) {
                       console.error(`Error processing file with ${processor.name}:`, procError);
                       StreamLogger.error(`[DrpbxFetcher] Processor exception`, {
                         fileName: file.name,
                         processor: processor.name,
-                        error: procError.message,
-                        stack: procError.stack
+                        error: procError instanceof Error ? procError.message : String(procError),
+                        stack: procError instanceof Error ? procError.stack : undefined
                       });
                     }
                   }
@@ -642,32 +650,39 @@ export default class DrpbxFetcherPlugin extends Plugin {
                 regularFiles++;
                 console.log(`✓ Synced: ${localFilePath} (${file.size} bytes)`);
               }
-            } catch (error: any) {
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : String(error);
+              const errorStatus = (error as { status?: number }).status;
+              const errorStack = error instanceof Error ? error.stack : undefined;
+              const dropboxError = (error as { error?: unknown }).error;
+
               console.error(`Error syncing file ${file.path_display}:`, error);
-              console.error(`  - Status: ${error.status}`);
-              console.error(`  - Message: ${error.message}`);
-              if (error.error) {
-                console.error(`  - Dropbox error:`, error.error);
+              console.error(`  - Status: ${errorStatus}`);
+              console.error(`  - Message: ${errorMessage}`);
+              if (dropboxError) {
+                console.error(`  - Dropbox error:`, dropboxError);
               }
               StreamLogger.error(`[DrpbxFetcher] File sync error`, {
                 fileName: file.name,
                 path: file.path_display,
-                error: error.message,
-                status: error.status,
-                stack: error.stack
+                error: errorMessage,
+                status: errorStatus,
+                stack: errorStack
               });
             }
           }
-        } catch (error: any) {
+        } catch (error) {
           console.error(`Error syncing folder ${mapping.remotePath}:`, error);
 
           // Provide more helpful error messages for common issues
-          let errorMsg = error.message;
-          if (error.status === 409) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          const errorStatus = (error as { status?: number }).status;
+          let errorMsg = errorMessage;
+          if (errorStatus === 409) {
             errorMsg = `Path not found or inaccessible: ${mapping.remotePath}. Please verify the path exists in your Dropbox and check spelling/case.`;
-          } else if (error.status === 401) {
+          } else if (errorStatus === 401) {
             errorMsg = `Authentication failed. Please re-authenticate in plugin settings.`;
-          } else if (error.status === 403) {
+          } else if (errorStatus === 403) {
             errorMsg = `Permission denied. Check app permissions in Dropbox settings.`;
           }
 
@@ -721,10 +736,11 @@ export default class DrpbxFetcherPlugin extends Plugin {
         summary
       });
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("Fetch error:", error);
       StreamLogger.error("[DrpbxFetcher] Fetch failed", error);
       if (this.statusBarItem) {
-        this.statusBarItem.setText(`❌ Fetch failed: ${error.message}`);
+        this.statusBarItem.setText(`❌ Fetch failed: ${errorMessage}`);
         setTimeout(() => {
           if (this.statusBarItem) this.statusBarItem.setText("");
         }, 10000);
@@ -746,7 +762,7 @@ export default class DrpbxFetcherPlugin extends Plugin {
     await this.tempFileManager.ensureTempDir();
 
     // Initialize stream logger
-    const manifest = (this.app as any).plugins?.manifests?.["drpbx-fetcher"];
+    const manifest = (this.app as { plugins?: { manifests?: Record<string, { version?: string }> } }).plugins?.manifests?.["drpbx-fetcher"];
     const version = manifest?.version || "unknown";
     const platform = PlatformHelper.getPlatformName();
 
@@ -1024,7 +1040,7 @@ class DrpbxFetcherSettingTab extends PluginSettingTab {
             this.plugin.settings.loggerType = value;
             await this.plugin.saveSettings();
             // Reinitialize logger with new settings
-            const manifest = (this.plugin.app as any).plugins?.manifests?.["drpbx-fetcher"];
+            const manifest = (this.plugin.app as { plugins?: { manifests?: Record<string, { version?: string }> } }).plugins?.manifests?.["drpbx-fetcher"];
             const version = manifest?.version || "unknown";
             const platform = PlatformHelper.getPlatformName();
             StreamLogger.initialize({
@@ -1051,7 +1067,7 @@ class DrpbxFetcherSettingTab extends PluginSettingTab {
               this.plugin.settings.streamLogHost = value || "localhost";
               await this.plugin.saveSettings();
               // Reinitialize logger with new host
-              const manifest = (this.plugin.app as any).plugins?.manifests?.["drpbx-fetcher"];
+              const manifest = (this.plugin.app as { plugins?: { manifests?: Record<string, { version?: string }> } }).plugins?.manifests?.["drpbx-fetcher"];
               const version = manifest?.version || "unknown";
               const platform = PlatformHelper.getPlatformName();
               StreamLogger.initialize({
@@ -1077,7 +1093,7 @@ class DrpbxFetcherSettingTab extends PluginSettingTab {
                 this.plugin.settings.streamLogPort = port;
                 await this.plugin.saveSettings();
                 // Reinitialize logger with new port
-                const manifest = (this.plugin.app as any).plugins?.manifests?.["drpbx-fetcher"];
+                const manifest = (this.plugin.app as { plugins?: { manifests?: Record<string, { version?: string }> } }).plugins?.manifests?.["drpbx-fetcher"];
                 const version = manifest?.version || "unknown";
                 const platform = PlatformHelper.getPlatformName();
                 StreamLogger.initialize({

@@ -76,7 +76,7 @@ export class OAuthManager {
     return `https://www.dropbox.com/oauth2/authorize?${params.toString()}`;
   }
 
-  async handleMobileCallback(params: any): Promise<void> {
+  async handleMobileCallback(params: Record<string, string>): Promise<void> {
     if (!this.plugin.settings.authInProgress) {
       new Notice("No authentication in progress");
       return;
@@ -145,8 +145,9 @@ export class OAuthManager {
         throw new Error(`Token exchange failed: ${response.status}`);
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("Token exchange error:", error);
-      new Notice(`Authentication failed: ${error.message}`);
+      new Notice(`Authentication failed: ${errorMessage}`);
 
       this.plugin.settings.authInProgress = false;
       await this.plugin.saveSettings();
@@ -184,12 +185,13 @@ export class OAuthManager {
             new Notice("Error during authentication");
             console.error("Authentication error:", error);
 
+            const errorMessage = error instanceof Error ? error.message : String(error);
             res.writeHead(500, { "Content-Type": "text/html" });
             res.end(`
               <html>
                 <body>
                   <h1>Authentication Failed</h1>
-                  <p>Error: ${error.message}</p>
+                  <p>Error: ${errorMessage}</p>
                   <p>You can close this window and try again.</p>
                 </body>
               </html>

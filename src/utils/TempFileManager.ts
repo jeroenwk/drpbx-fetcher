@@ -32,7 +32,7 @@ export class TempFileManager {
 	 * @param prefix Optional prefix for the temp file
 	 * @param extension Optional file extension
 	 */
-	getTempFilePath(prefix: string = "temp", extension: string = "tmp"): string {
+	getTempFilePath(prefix = "temp", extension = "tmp"): string {
 		const timestamp = Date.now();
 		const random = Math.random().toString(36).substring(2, 8);
 		const filename = `${prefix}-${timestamp}-${random}.${extension}`;
@@ -73,10 +73,11 @@ export class TempFileManager {
 				combined.set(data, existingData.byteLength);
 				await this.vault.adapter.writeBinary(tempPath, combined);
 			}
-		} catch (error: any) {
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
 			StreamLogger.error(`[TempFileManager] Failed to append to temp file`, {
 				path: tempPath,
-				error: error.message
+				error: errorMessage
 			});
 			throw error;
 		}
@@ -113,10 +114,11 @@ export class TempFileManager {
 					path: tempPath
 				});
 			}
-		} catch (error: any) {
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
 			StreamLogger.error(`[TempFileManager] Failed to delete temp file`, {
 				path: tempPath,
-				error: error.message
+				error: errorMessage
 			});
 		}
 	}
@@ -146,9 +148,10 @@ export class TempFileManager {
 			StreamLogger.log(`[TempFileManager] Cleaned up temp files`, {
 				deletedCount
 			});
-		} catch (error: any) {
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
 			StreamLogger.error(`[TempFileManager] Cleanup failed`, {
-				error: error.message
+				error: errorMessage
 			});
 		}
 	}

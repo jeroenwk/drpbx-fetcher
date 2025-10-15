@@ -201,7 +201,7 @@ export class ProcessorConfigModal extends Modal {
 				});
 			}
 
-			dropdown.setValue(currentValue || field.defaultValue || "");
+			dropdown.setValue(currentValue || String(field.defaultValue || ""));
 			dropdown.onChange((value) => {
 				this.formValues[field.key] = value;
 			});
