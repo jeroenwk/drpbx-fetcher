@@ -5,6 +5,24 @@ All notable changes to the Dropbox Fetcher plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.59] - 2025-10-15
+
+### Fixed
+- All TypeScript compilation errors (37 problems → 0: 5 errors + 32 warnings)
+- Removed all `any` types from the codebase
+- Type assertion for Dropbox response handling
+- ProcessorConfigModal defaultValue type handling
+
+### Changed
+- Replaced all `any` types with proper TypeScript types (`unknown`, specific types, or error handling)
+- Added ESLint suppression comments with safety explanations for intentional non-null assertions
+- Improved type safety throughout the codebase
+
+### Technical
+- All non-null assertions are now safe and documented
+- Fixed type conversion using `unknown` intermediate type
+- Enhanced type guards and error handling
+
 ## [0.2.55] - 2025-01-12
 
 ### Fixed

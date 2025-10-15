@@ -190,6 +190,12 @@ If you encounter any issues or have feature requests:
 
 ## Changelog
 
+### 0.2.59 - 2025-10-15
+- 🐛 **Fixed all TypeScript errors** - Resolved 37 problems (5 errors + 32 warnings → 0)
+- 🔒 **Type safety improvements** - Removed all `any` types, replaced with proper TypeScript types
+- 📝 **Better code documentation** - Added explanatory comments for all intentional type assertions
+- ✨ **Enhanced error handling** - Improved type guards and error type handling throughout
+
 ### 0.2.55 - 2025-01-12
 - 🐛 **Fixed annotations without highlights** - Viwoods .note files with only annotations now process correctly
 - 📖 **Smart metadata fallback** - Three-tier book metadata extraction: highlights → BookBean.json → ReadNoteBean.json
