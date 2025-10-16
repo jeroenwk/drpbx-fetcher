@@ -21,6 +21,42 @@ export default class DrpbxFetcherPlugin extends Plugin {
   settingsTab: DrpbxFetcherSettingTab | null = null;
   tempFileManager: TempFileManager | null = null;
   private statusBarItem: HTMLElement | null = null;
+  private ribbonIconEl: HTMLElement | null = null;
+  private animationInterval: number | null = null;
+
+  // Animation frames for rotating icon
+  private readonly animationFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+  private animationFrameIndex = 0;
+
+  private startAnimation(baseText: string = "Fetching") {
+    this.stopAnimation();
+    this.animationFrameIndex = 0;
+
+    // Add CSS animation to ribbon icon
+    if (this.ribbonIconEl) {
+      this.ribbonIconEl.addClass("is-rotating");
+    }
+
+    this.animationInterval = window.setInterval(() => {
+      if (this.statusBarItem) {
+        const frame = this.animationFrames[this.animationFrameIndex];
+        this.statusBarItem.setText(`${frame} ${baseText}...`);
+        this.animationFrameIndex = (this.animationFrameIndex + 1) % this.animationFrames.length;
+      }
+    }, 80);
+  }
+
+  private stopAnimation() {
+    if (this.animationInterval !== null) {
+      window.clearInterval(this.animationInterval);
+      this.animationInterval = null;
+    }
+
+    // Remove CSS animation from ribbon icon
+    if (this.ribbonIconEl) {
+      this.ribbonIconEl.removeClass("is-rotating");
+    }
+  }
 
   // Pure function to create a fetch-compatible response from Obsidian's RequestUrlResponse
   private static createFetchResponse(response: RequestUrlResponse): Response {
@@ -377,9 +413,7 @@ export default class DrpbxFetcherPlugin extends Plugin {
     }
 
     this.isSyncing = true;
-    if (this.statusBarItem) {
-      this.statusBarItem.setText("⏳ Fetching from Dropbox...");
-    }
+    this.startAnimation("Fetching from Dropbox");
     StreamLogger.log("[DrpbxFetcher] Starting fetch...", {
       folderMappings: this.settings.folderMappings.length
     });
@@ -433,10 +467,9 @@ export default class DrpbxFetcherPlugin extends Plugin {
           for (let i = 0; i < files.length; i++) {
             const file = files[i];
             try {
-              // Update status bar with progress
-              if (this.statusBarItem) {
-                this.statusBarItem.setText(`⏳ Fetching... ${i + 1}/${files.length} files`);
-              }
+              // Update animation text with progress
+              this.stopAnimation();
+              this.startAnimation(`Fetching ${i + 1}/${files.length} files`);
 
               StreamLogger.log(`[DrpbxFetcher] Processing file ${i + 1}/${files.length}`, {
                 fileName: file.name,
@@ -703,6 +736,7 @@ export default class DrpbxFetcherPlugin extends Plugin {
         summary += ` (${skippedProcessors} already processed)`;
       }
 
+      this.stopAnimation();
       if (this.statusBarItem) {
         this.statusBarItem.setText(summary);
         // Clear after 10 seconds
@@ -723,6 +757,7 @@ export default class DrpbxFetcherPlugin extends Plugin {
     } catch (error) {
       console.error("Fetch error:", error);
       StreamLogger.error("[DrpbxFetcher] Fetch failed", error);
+      this.stopAnimation();
       if (this.statusBarItem) {
         this.statusBarItem.setText(`❌ Fetch failed: ${error.message}`);
         setTimeout(() => {
@@ -781,10 +816,23 @@ export default class DrpbxFetcherPlugin extends Plugin {
     this.settingsTab = new DrpbxFetcherSettingTab(this.app, this);
     this.addSettingTab(this.settingsTab);
 
-    // Add ribbon icon
-    this.addRibbonIcon("download", "Fetch Dropbox files", async () => {
+    // Add ribbon icon and store reference for animation
+    this.ribbonIconEl = this.addRibbonIcon("download", "Fetch Dropbox files", async () => {
       await this.syncFiles();
     });
+
+    // Add CSS for rotation animation
+    const style = document.createElement("style");
+    style.textContent = `
+      .side-dock-ribbon-action.is-rotating svg {
+        animation: drpbx-rotate 1s linear infinite;
+      }
+      @keyframes drpbx-rotate {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+    `;
+    document.head.appendChild(style);
 
     // Add command
     this.addCommand({
@@ -810,6 +858,9 @@ export default class DrpbxFetcherPlugin extends Plugin {
   }
 
   async onunload() {
+    // Stop any running animation
+    this.stopAnimation();
+
     // Cleanup OAuth manager
     if (this.oauthManager) {
       this.oauthManager.cleanup();
