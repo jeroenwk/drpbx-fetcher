@@ -23,8 +23,8 @@ export class ProcessorConfigModal extends Modal {
 		this.currentConfig = currentConfig;
 		this.onSave = onSave;
 
-		// Initialize form values with current config
-		this.formValues = { ...currentConfig };
+		// Initialize form values with deep copy of current config to preserve nested structure
+		this.formValues = JSON.parse(JSON.stringify(currentConfig));
 	}
 
 	onOpen(): void {
@@ -90,6 +90,40 @@ export class ProcessorConfigModal extends Modal {
 		});
 	}
 
+	/**
+	 * Get nested value from object using dot notation path
+	 */
+	private getNestedValue(obj: Record<string, unknown>, path: string): unknown {
+		const keys = path.split('.');
+		let value: unknown = obj;
+		for (const key of keys) {
+			if (value && typeof value === 'object') {
+				value = (value as Record<string, unknown>)[key];
+			} else {
+				return undefined;
+			}
+		}
+		return value;
+	}
+
+	/**
+	 * Set nested value in object using dot notation path
+	 */
+	private setNestedValue(obj: Record<string, unknown>, path: string, value: unknown): void {
+		const keys = path.split('.');
+		let current: Record<string, unknown> = obj;
+
+		for (let i = 0; i < keys.length - 1; i++) {
+			const key = keys[i];
+			if (!(key in current) || typeof current[key] !== 'object') {
+				current[key] = {};
+			}
+			current = current[key] as Record<string, unknown>;
+		}
+
+		current[keys[keys.length - 1]] = value;
+	}
+
 	private groupFields(fields: ConfigField[]): Map<string, ConfigField[]> {
 		const groups = new Map<string, ConfigField[]>();
 
@@ -109,59 +143,22 @@ export class ProcessorConfigModal extends Modal {
 	}
 
 	private renderGroup(container: HTMLElement, groupName: string, fields: ConfigField[]): void {
-		// Get the toggle key from the first field (they should all have the same for a group)
-		const groupToggleKey = fields[0]?.groupToggleKey;
-
 		// Create group container
 		const groupContainer = container.createDiv("config-group");
 		groupContainer.style.marginBottom = "1.5em";
 
-		// Create group header (collapsible)
+		// Create simple group header (non-collapsible)
 		const groupHeader = groupContainer.createDiv("config-group-header");
-		groupHeader.style.cursor = "pointer";
-		groupHeader.style.display = "flex";
-		groupHeader.style.alignItems = "center";
-		groupHeader.style.padding = "0.75em";
-		groupHeader.style.backgroundColor = "var(--background-secondary)";
-		groupHeader.style.borderRadius = "4px";
+		groupHeader.style.padding = "0.5em 0";
 		groupHeader.style.marginBottom = "0.5em";
 		groupHeader.style.fontWeight = "600";
+		groupHeader.style.fontSize = "1.1em";
+		groupHeader.style.borderBottom = "1px solid var(--background-modifier-border)";
+		groupHeader.textContent = groupName;
 
-		// Add collapse indicator
-		const collapseIndicator = groupHeader.createSpan({ text: "▼ " });
-		collapseIndicator.style.marginRight = "0.5em";
-		collapseIndicator.style.transition = "transform 0.2s";
-
-		// Add group title
-		groupHeader.createSpan({ text: groupName });
-
-		// Create content container (initially visible if module is enabled)
-		const groupContent = groupContainer.createDiv("config-group-content");
-		const isEnabled = groupToggleKey ? this.formValues[groupToggleKey] : true;
-		groupContent.style.display = isEnabled ? "block" : "none";
-		groupContent.style.paddingLeft = "1em";
-
-		// Make header clickable to toggle content
-		groupHeader.addEventListener("click", () => {
-			const isCurrentlyHidden = groupContent.style.display === "none";
-			groupContent.style.display = isCurrentlyHidden ? "block" : "none";
-			collapseIndicator.style.transform = isCurrentlyHidden ? "rotate(0deg)" : "rotate(-90deg)";
-		});
-
-		// Set initial collapse indicator rotation
-		if (!isEnabled) {
-			collapseIndicator.style.transform = "rotate(-90deg)";
-		}
-
-		// Render fields in the group
+		// Render all fields in the group
 		for (const field of fields) {
-			this.renderField(groupContent, field);
-		}
-
-		// If this group has a toggle key, watch for changes to show/hide the group content
-		if (groupToggleKey) {
-			// Note: We could add dynamic visibility updates here, but for now
-			// the modal will be reopened when saved anyway, which refreshes the visibility
+			this.renderField(groupContainer, field);
 		}
 	}
 
@@ -172,11 +169,8 @@ export class ProcessorConfigModal extends Modal {
 			setting.setDesc(field.description);
 		}
 
-		// Get current value or default
-		const currentValue =
-			this.formValues[field.key] !== undefined
-				? this.formValues[field.key]
-				: field.defaultValue;
+		// Get current value or default (using nested path)
+		const currentValue = this.getNestedValue(this.formValues, field.key) ?? field.defaultValue;
 
 		switch (field.type) {
 			case "folder":
@@ -222,7 +216,7 @@ export class ProcessorConfigModal extends Modal {
 				.setPlaceholder(field.placeholder || "Folder path")
 				.setValue(currentValue || "")
 				.onChange((value) => {
-					this.formValues[field.key] = value;
+					this.setNestedValue(this.formValues, field.key, value);
 				});
 
 			// Add folder icon
@@ -240,7 +234,7 @@ export class ProcessorConfigModal extends Modal {
 				.setPlaceholder(field.placeholder || "File path")
 				.setValue(currentValue || "")
 				.onChange((value) => {
-					this.formValues[field.key] = value;
+					this.setNestedValue(this.formValues, field.key, value);
 				});
 		});
 	}
@@ -253,7 +247,7 @@ export class ProcessorConfigModal extends Modal {
 		setting.addToggle((toggle) => {
 			toggle.setValue(currentValue !== undefined ? currentValue : false);
 			toggle.onChange((value) => {
-				this.formValues[field.key] = value;
+				this.setNestedValue(this.formValues, field.key, value);
 			});
 		});
 	}
@@ -269,7 +263,7 @@ export class ProcessorConfigModal extends Modal {
 				.setValue(currentValue !== undefined ? String(currentValue) : "")
 				.onChange((value) => {
 					const numValue = parseFloat(value);
-					this.formValues[field.key] = isNaN(numValue) ? undefined : numValue;
+					this.setNestedValue(this.formValues, field.key, isNaN(numValue) ? undefined : numValue);
 				});
 			text.inputEl.type = "number";
 		});
@@ -289,7 +283,7 @@ export class ProcessorConfigModal extends Modal {
 
 			dropdown.setValue(currentValue || String(field.defaultValue || ""));
 			dropdown.onChange((value) => {
-				this.formValues[field.key] = value;
+				this.setNestedValue(this.formValues, field.key, value);
 			});
 		});
 	}
@@ -304,7 +298,7 @@ export class ProcessorConfigModal extends Modal {
 				.setPlaceholder(field.placeholder || "Enter text")
 				.setValue(currentValue || "")
 				.onChange((value) => {
-					this.formValues[field.key] = value;
+					this.setNestedValue(this.formValues, field.key, value);
 				});
 		});
 	}

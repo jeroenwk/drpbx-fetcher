@@ -5,6 +5,37 @@ All notable changes to the Dropbox Fetcher plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.85] - 2025-01-17
+
+### Fixed
+- **Module Configuration**: Fixed nested module configuration (e.g., `learning.enabled`) not saving to data.json
+- Module enable/disable toggles now properly update and persist configuration
+
+### Changed
+- **Settings UI Simplification**: Removed collapsible sections from processor configuration modal
+- Configuration modal now uses simple section headers for better clarity
+- All module settings are always visible (no collapse/expand behavior)
+
+### Improved
+- Better configuration persistence - nested config properties are now handled correctly
+- Cleaner configuration UI with straightforward section headers
+- Deep copy of config ensures proper handling of nested objects
+
+### Technical
+- Added `getNestedValue()` and `setNestedValue()` helper methods for dot-notation path handling
+- Fixed shallow copy issue in ProcessorConfigModal that prevented nested config updates
+- Added version field to package.json for automatic version bumping
+
+## [0.2.82] - 2025-01-17
+
+### Changed
+- **Settings Reorganization**: Moved "Download source files" setting from global settings to Learning module configuration
+- Source file download option is now specific to the Learning module, where it applies
+
+### Improved
+- Better configuration organization - module-specific settings are now grouped with their respective modules
+- Clearer settings UI - users configure source file downloads where they configure other Learning module settings
+
 ## [0.2.81] - 2025-10-17
 
 ### Changed
