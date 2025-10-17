@@ -217,6 +217,13 @@ If you encounter any issues or have feature requests:
 
 ## Changelog
 
+### 0.2.80 - 2025-10-17
+- 🚀 **Performance optimization** - Viwoods module filtering now happens before file download, not after
+- ⚡ **Faster syncs** - Eliminates unnecessary Dropbox API calls for disabled module files
+- 💾 **Reduced memory usage** - Files from disabled modules never downloaded or processed
+- 📊 **Better logging** - Shows exactly how many files were filtered and why
+- 🛠️ **Dev improvements** - Added log file support (`log.txt`) and `npm run install-plugin` script
+
 ### 0.2.61 - 2025-10-15
 - 🧪 **Comprehensive test suite** - Added Jest testing framework with 115 tests covering core functionality
 - ✅ **Quality assurance** - All tests pass TypeScript compilation and ESLint checks

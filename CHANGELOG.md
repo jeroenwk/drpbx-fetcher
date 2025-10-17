@@ -5,6 +5,30 @@ All notable changes to the Dropbox Fetcher plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.80] - 2025-10-17
+
+### Changed
+- **Performance Optimization**: Viwoods module filtering now happens before file download instead of after
+- Module filtering moved to occur immediately after fetching file list from Dropbox
+- Removed duplicate module checks that occurred after file download
+
+### Added
+- `shouldSkipViwoodsModule()` helper method for centralized module filtering logic
+- Enhanced logging to show how many files were filtered by module settings
+- Log file support in log-server.js for easier debugging (writes to `log.txt`)
+- `npm run install-plugin` script for streamlined development workflow
+
+### Improved
+- Eliminates unnecessary Dropbox API calls for files in disabled module folders
+- Reduces memory usage and CPU time during sync operations
+- Faster sync times, especially noticeable when many files exist in disabled modules
+- Clearer feedback in logs about filtering activity with early-exit messages
+
+### Technical
+- Early-exit optimization prevents processing of files that will be skipped
+- Moved file processing check to occur before download to avoid unnecessary work
+- Updated CLAUDE.md with plugin installation instructions and debugging notes
+
 ## [0.2.61] - 2025-10-15
 
 ### Added
