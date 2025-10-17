@@ -501,6 +501,66 @@ export class ViwoodsProcessor implements FileProcessor {
 		};
 	}
 
+	shouldSkipFile(
+		filePath: string,
+		metadata: FileMetadata,
+		config: ProcessorConfig
+	): { shouldSkip: boolean; reason?: string } {
+		const viwoodsConfig = config as ViwoodsProcessorConfig;
+		const pathLower = filePath.toLowerCase();
+
+		// Check template folders
+		if (pathLower.includes("/image template/") || pathLower.includes("/pdf template/")) {
+			return { shouldSkip: true, reason: "File in template folder" };
+		}
+
+		// Check each module folder
+		if (pathLower.includes("/learning/") && !viwoodsConfig.learning.enabled) {
+			return { shouldSkip: true, reason: "Learning module disabled" };
+		}
+		if (pathLower.includes("/paper/") && !viwoodsConfig.paper.enabled) {
+			return { shouldSkip: true, reason: "Paper module disabled" };
+		}
+		if (pathLower.includes("/daily/") && !viwoodsConfig.daily.enabled) {
+			return { shouldSkip: true, reason: "Daily module disabled" };
+		}
+		if (pathLower.includes("/meeting/") && !viwoodsConfig.meeting.enabled) {
+			return { shouldSkip: true, reason: "Meeting module disabled" };
+		}
+		if (pathLower.includes("/picking/") && !viwoodsConfig.picking.enabled) {
+			return { shouldSkip: true, reason: "Picking module disabled" };
+		}
+		if (pathLower.includes("/memo/") && !viwoodsConfig.memo.enabled) {
+			return { shouldSkip: true, reason: "Memo module disabled" };
+		}
+
+		return { shouldSkip: false };
+	}
+
+	canHandleFile(
+		filePath: string,
+		fileExtension: string,
+		config: ProcessorConfig
+	): boolean {
+		const pathLower = filePath.toLowerCase();
+
+		// Check if file is in any Viwoods module folder
+		const isInModuleFolder =
+			pathLower.includes("/learning/") ||
+			pathLower.includes("/paper/") ||
+			pathLower.includes("/daily/") ||
+			pathLower.includes("/meeting/") ||
+			pathLower.includes("/picking/") ||
+			pathLower.includes("/memo/");
+
+		if (!isInModuleFolder) {
+			return false;
+		}
+
+		// Check if extension is supported
+		return this.supportedExtensions.includes(fileExtension.toLowerCase());
+	}
+
 	getConfigSchema(): ConfigSchema {
 		return {
 			fields: [

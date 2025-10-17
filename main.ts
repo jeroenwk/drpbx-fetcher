@@ -358,47 +358,6 @@ export default class DrpbxFetcherPlugin extends Plugin {
     }
   }
 
-  /**
-   * Check if a Dropbox file path should be skipped based on Viwoods module configuration
-   * @param filePath Dropbox file path (lowercase)
-   * @returns Object with shouldSkip boolean and optional reason string
-   */
-  private shouldSkipViwoodsModule(filePath: string): { shouldSkip: boolean; reason?: string } {
-    const pathLower = filePath.toLowerCase();
-
-    // Find enabled Viwoods mapping
-    const viwoodsMapping = this.settings.fileTypeMappings.find(
-      (m) => m.processorType === "viwoods" && m.enabled
-    );
-
-    if (!viwoodsMapping) {
-      return { shouldSkip: false };
-    }
-
-    const viwoodsConfig = viwoodsMapping.config as import("./src/processors/ViwoodsProcessor/ViwoodsTypes").ViwoodsProcessorConfig;
-
-    // Check each module folder
-    if (pathLower.includes("/learning/") && viwoodsConfig.learning?.enabled === false) {
-      return { shouldSkip: true, reason: "Learning module disabled" };
-    }
-    if (pathLower.includes("/paper/") && viwoodsConfig.paper?.enabled === false) {
-      return { shouldSkip: true, reason: "Paper module disabled" };
-    }
-    if (pathLower.includes("/daily/") && viwoodsConfig.daily?.enabled === false) {
-      return { shouldSkip: true, reason: "Daily module disabled" };
-    }
-    if (pathLower.includes("/meeting/") && viwoodsConfig.meeting?.enabled === false) {
-      return { shouldSkip: true, reason: "Meeting module disabled" };
-    }
-    if (pathLower.includes("/picking/") && viwoodsConfig.picking?.enabled === false) {
-      return { shouldSkip: true, reason: "Picking module disabled" };
-    }
-    if (pathLower.includes("/memo/") && viwoodsConfig.memo?.enabled === false) {
-      return { shouldSkip: true, reason: "Memo module disabled" };
-    }
-
-    return { shouldSkip: false };
-  }
 
   // Fetch files from Dropbox to Obsidian vault
   async syncFiles(): Promise<void> {
@@ -460,33 +419,45 @@ export default class DrpbxFetcherPlugin extends Plugin {
             fileCount: files.length
           });
 
-          // Early filtering: Skip files in disabled Viwoods module folders
+          // Early filtering: Let processors decide if files should be skipped
           // This prevents unnecessary downloads and processing
-          const filesBeforeModuleFilter = files.length;
+          const registry = ProcessorRegistry.getInstance();
+          const filesBeforeFilter = files.length;
           files = files.filter((file) => {
-            const skipCheck = this.shouldSkipViwoodsModule(file.path_display || "");
-            if (skipCheck.shouldSkip) {
-              StreamLogger.log(`[DrpbxFetcher] Skipping file (Viwoods module filtering - early)`, {
-                fileName: file.name,
-                path: file.path_display,
-                reason: skipCheck.reason
-              });
-              skippedFiles++;
-              return false;
+            const filePath = file.path_display || "";
+
+            // Ask all enabled processors if this file should be skipped
+            for (const mapping of this.settings.fileTypeMappings) {
+              if (!mapping.enabled) continue;
+
+              const processor = registry.getByType(mapping.processorType);
+              if (!processor || !processor.shouldSkipFile) continue;
+
+              const skipCheck = processor.shouldSkipFile(filePath, file, mapping.config);
+              if (skipCheck.shouldSkip) {
+                StreamLogger.log(`[DrpbxFetcher] Skipping file (processor filter)`, {
+                  fileName: file.name,
+                  processor: processor.name,
+                  reason: skipCheck.reason
+                });
+                skippedFiles++;
+                return false;
+              }
             }
+
             return true;
           });
 
-          const filteredByModule = filesBeforeModuleFilter - files.length;
-          if (filteredByModule > 0) {
-            StreamLogger.log(`[DrpbxFetcher] Filtered out ${filteredByModule} files from disabled modules`);
+          const filteredByProcessors = filesBeforeFilter - files.length;
+          if (filteredByProcessors > 0) {
+            StreamLogger.log(`[DrpbxFetcher] Filtered out ${filteredByProcessors} files by processor rules`);
           }
 
           totalSourceFiles += files.length;
           StreamLogger.log(`[DrpbxFetcher] Processing ${files.length} files after filtering`, {
             remotePath: mapping.remotePath,
             fileCount: files.length,
-            skippedByModuleFilter: filteredByModule
+            skippedByProcessorFilter: filteredByProcessors
           });
 
           // Ensure local folder exists
@@ -516,26 +487,11 @@ export default class DrpbxFetcherPlugin extends Plugin {
                 path: file.path_display
               });
 
-              // Check if this file is in a template folder (Image template, PDF template, etc.)
-              const pathLower = file.path_display?.toLowerCase() || "";
-              if (pathLower.includes("/image template/") || pathLower.includes("/pdf template/")) {
-                console.log(`Skipping ${file.name} - file is in a template folder`);
-                StreamLogger.log(`[DrpbxFetcher] Skipping file (in template folder)`, {
-                  fileName: file.name,
-                  path: file.path_display
-                });
-                skippedFiles++;
-                continue;
-              }
-
-              // Note: Viwoods module filtering already done earlier (before loop)
+              // Note: Processor-specific filtering already done earlier (before loop)
               // to avoid unnecessary file processing and downloads
 
-              // Get viwoods mapping for later use in processor routing
               const fileExtension = FileUtils.getExtension(file.name);
-              const viwoodsMapping = this.settings.fileTypeMappings.find(
-                (m) => m.processorType === "viwoods" && m.enabled
-              );
+              const pathLower = file.path_display?.toLowerCase() || "";
 
               // Check if this file extension should be skipped
               if (this.settings.skippedExtensions.includes(fileExtension.toLowerCase())) {
@@ -564,28 +520,15 @@ export default class DrpbxFetcherPlugin extends Plugin {
               }
 
               // Check early if file will be processed by a processor
-              const registry = ProcessorRegistry.getInstance();
-              let processor = registry.getByExtension(fileExtension, this.settings.fileTypeMappings);
+              // Uses extension-based routing first, then path-based routing via canHandleFile hook
+              const processorResult = registry.findProcessorForFile(
+                pathLower,
+                fileExtension,
+                this.settings.fileTypeMappings
+              );
 
-              // Special handling: If file is in a Viwoods module folder, route to ViwoodsProcessor
-              // even if extension doesn't match (e.g., JPG screenshots in Picking folder)
-              if (!processor && viwoodsMapping) {
-                const isInModuleFolder = pathLower.includes("/learning/") ||
-                                         pathLower.includes("/paper/") ||
-                                         pathLower.includes("/daily/") ||
-                                         pathLower.includes("/meeting/") ||
-                                         pathLower.includes("/picking/") ||
-                                         pathLower.includes("/memo/");
-
-                if (isInModuleFolder) {
-                  // Check if ViwoodsProcessor supports this extension
-                  const viwoodsProcessor = registry.getByType("viwoods");
-                  if (viwoodsProcessor && viwoodsProcessor.supportedExtensions.includes(fileExtension.toLowerCase())) {
-                    processor = viwoodsProcessor;
-                  }
-                }
-              }
-
+              const processor = processorResult?.processor || null;
+              const processorMapping = processorResult?.mapping || null;
               const willBeProcessed = processor !== null;
 
               // Check if file was already processed (for files that will be processed)
@@ -671,7 +614,7 @@ export default class DrpbxFetcherPlugin extends Plugin {
               }
 
               // Process file with processor if one was found
-              if (processor) {
+              if (processor && processorMapping) {
                 // Use processor
                 console.log(`Processing ${file.name} with ${processor.name}`);
                 StreamLogger.log(`[DrpbxFetcher] Found processor for file`, {
@@ -680,17 +623,7 @@ export default class DrpbxFetcherPlugin extends Plugin {
                   extension: fileExtension
                 });
 
-                // Find the mapping - either by extension or by processor type (for Viwoods multi-extension support)
-                let mapping = this.settings.fileTypeMappings.find(
-                  (m) => m.extension.toLowerCase() === fileExtension.toLowerCase() && m.enabled
-                );
-
-                // If no extension match but processor is viwoods, use the viwoods mapping
-                if (!mapping && processor.type === "viwoods" && viwoodsMapping) {
-                  mapping = viwoodsMapping;
-                }
-
-                if (mapping) {
+                {
                   // File will be processed (already passed the early check above)
                   const fileId = file.id;
 
@@ -705,7 +638,7 @@ export default class DrpbxFetcherPlugin extends Plugin {
                         uint8Array,
                         file.path_display!, // eslint-disable-line @typescript-eslint/no-non-null-assertion
                         file,
-                        mapping.config,
+                        processorMapping.config,
                         {
                           vault: this.app.vault,
                           app: this.app,

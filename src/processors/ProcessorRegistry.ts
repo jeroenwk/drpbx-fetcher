@@ -63,6 +63,44 @@ export class ProcessorRegistry {
 	}
 
 	/**
+	 * Find a processor that can handle a file by path/extension
+	 * First tries extension-based routing, then path-based routing via canHandleFile hook
+	 * @param filePath Original Dropbox path
+	 * @param fileExtension File extension (without dot)
+	 * @param mappings File type mappings from settings
+	 * @returns Processor and its mapping, or null if no processor can handle the file
+	 */
+	findProcessorForFile(
+		filePath: string,
+		fileExtension: string,
+		mappings: FileTypeMapping[]
+	): { processor: FileProcessor; mapping: FileTypeMapping } | null {
+		// First try extension-based routing
+		const mapping = mappings.find(
+			(m) => m.extension.toLowerCase() === fileExtension.toLowerCase() && m.enabled
+		);
+
+		if (mapping) {
+			const processor = this.getByType(mapping.processorType);
+			if (processor) {
+				return { processor, mapping };
+			}
+		}
+
+		// Then try path-based routing via canHandleFile hook
+		for (const candidateMapping of mappings) {
+			if (!candidateMapping.enabled) continue;
+
+			const processor = this.getByType(candidateMapping.processorType);
+			if (processor?.canHandleFile && processor.canHandleFile(filePath, fileExtension, candidateMapping.config)) {
+				return { processor, mapping: candidateMapping };
+			}
+		}
+
+		return null;
+	}
+
+	/**
 	 * Get all registered processors
 	 * @returns Array of all processors
 	 */

@@ -217,6 +217,14 @@ If you encounter any issues or have feature requests:
 
 ## Changelog
 
+### 0.2.81 - 2025-10-17
+- 🏗️ **Architecture Refactoring** - Removed all processor-specific code from main.ts
+- 🔌 **Extensible Design** - Processors now control their own filtering and routing via lifecycle hooks
+- ✨ **New Hooks** - `shouldSkipFile()` and `canHandleFile()` optional hooks for processors
+- 🧹 **Cleaner Code** - Main plugin orchestrator is now processor-agnostic (~40 lines removed)
+- 🧪 **Better Testing** - Processor logic isolated and testable independently
+- 🔧 **Backward Compatible** - All hooks are optional, existing processors work unchanged
+
 ### 0.2.80 - 2025-10-17
 - 🚀 **Performance optimization** - Viwoods module filtering now happens before file download, not after
 - ⚡ **Faster syncs** - Eliminates unnecessary Dropbox API calls for disabled module files

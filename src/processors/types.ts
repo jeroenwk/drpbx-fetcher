@@ -154,4 +154,32 @@ export interface FileProcessor {
 	 * @returns Configuration schema
 	 */
 	getConfigSchema(): ConfigSchema;
+
+	/**
+	 * Optional: Check if a file should be skipped before download
+	 * Allows processors to implement early filtering optimizations
+	 * @param filePath Original Dropbox path
+	 * @param metadata File metadata from Dropbox
+	 * @param config Processor configuration
+	 * @returns Object with shouldSkip boolean and optional reason
+	 */
+	shouldSkipFile?(
+		filePath: string,
+		metadata: FileMetadata,
+		config: ProcessorConfig
+	): { shouldSkip: boolean; reason?: string };
+
+	/**
+	 * Optional: Check if processor should handle this file based on path
+	 * Allows processors to claim files by path patterns (beyond extension matching)
+	 * @param filePath Original Dropbox path
+	 * @param fileExtension File extension (lowercase, without dot)
+	 * @param config Processor configuration
+	 * @returns true if this processor should handle the file
+	 */
+	canHandleFile?(
+		filePath: string,
+		fileExtension: string,
+		config: ProcessorConfig
+	): boolean;
 }

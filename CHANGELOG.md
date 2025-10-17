@@ -5,6 +5,38 @@ All notable changes to the Dropbox Fetcher plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.81] - 2025-10-17
+
+### Changed
+- **Architecture Refactoring**: Removed all processor-specific code from main.ts
+- Processor filtering and routing logic moved to processor implementations via lifecycle hooks
+- Main plugin orchestrator is now processor-agnostic and follows clean architecture principles
+
+### Added
+- `shouldSkipFile()` optional hook in FileProcessor interface for early filtering optimization
+- `canHandleFile()` optional hook in FileProcessor interface for path-based file routing
+- `findProcessorForFile()` helper method in ProcessorRegistry for unified processor detection
+- ViwoodsProcessor now implements both hooks to handle its own filtering logic
+
+### Removed
+- Hardcoded Viwoods-specific code from main.ts (~40 lines)
+- `shouldSkipViwoodsModule()` method that contained processor-specific logic
+- Template folder filtering checks in main sync loop
+- Manual Viwoods path detection and routing logic
+
+### Improved
+- Better separation of concerns - processors control their own behavior
+- More extensible architecture - new processors can implement custom filtering/routing
+- Easier to test - processor logic isolated and testable independently
+- Cleaner codebase - main.ts only orchestrates file sync without processor knowledge
+- Maintains early filtering optimization for performance
+
+### Technical
+- FileProcessor interface extended with optional lifecycle hooks (backward compatible)
+- ViwoodsProcessor handles template folder filtering (`/image template/`, `/pdf template/`)
+- ViwoodsProcessor handles module folder filtering based on enabled/disabled modules
+- ProcessorRegistry provides unified API for processor detection via extension or path
+
 ## [0.2.80] - 2025-10-17
 
 ### Changed
