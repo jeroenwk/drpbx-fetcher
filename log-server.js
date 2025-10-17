@@ -14,6 +14,8 @@
 
 const http = require('http');
 const os = require('os');
+const fs = require('fs');
+const path = require('path');
 
 // ANSI color codes for terminal output
 const colors = {
@@ -30,6 +32,55 @@ const colors = {
   cyan: '\x1b[36m',
   white: '\x1b[37m',
   gray: '\x1b[90m',
+};
+
+// Log file setup
+const LOG_FILE_PATH = path.join(__dirname, 'log.txt');
+let logFileStream = null;
+
+// Initialize log file (create or replace existing)
+function initLogFile() {
+  // Close existing stream if any
+  if (logFileStream) {
+    logFileStream.end();
+  }
+
+  // Create new file (overwrites existing)
+  logFileStream = fs.createWriteStream(LOG_FILE_PATH, { flags: 'w' });
+
+  logFileStream.on('error', (err) => {
+    console.error('Error writing to log file:', err.message);
+  });
+}
+
+// Strip ANSI color codes from string
+function stripColors(str) {
+  // Remove all ANSI escape sequences
+  return str.replace(/\x1b\[[0-9;]*m/g, '');
+}
+
+// Write to log file without colors
+function writeToLogFile(message) {
+  if (logFileStream && !logFileStream.destroyed) {
+    const plainMessage = stripColors(message);
+    logFileStream.write(plainMessage + '\n');
+  }
+}
+
+// Override console methods to also write to file
+const originalLog = console.log;
+const originalError = console.error;
+
+console.log = function(...args) {
+  const message = args.join(' ');
+  originalLog.apply(console, args);
+  writeToLogFile(message);
+};
+
+console.error = function(...args) {
+  const message = args.join(' ');
+  originalError.apply(console, args);
+  writeToLogFile(message);
 };
 
 // Parse command line arguments
@@ -221,6 +272,12 @@ function createServer(port) {
     console.log(`\n${colors.yellow}Shutting down log server...${colors.reset}`);
     server.close(() => {
       console.log(`${colors.green}Server stopped.${colors.reset}`);
+
+      // Close log file stream
+      if (logFileStream && !logFileStream.destroyed) {
+        logFileStream.end();
+      }
+
       process.exit(0);
     });
   });
@@ -230,4 +287,8 @@ function createServer(port) {
 
 // Start server
 const port = parseArgs();
+
+// Initialize log file before starting server
+initLogFile();
+
 createServer(port);

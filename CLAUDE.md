@@ -10,11 +10,22 @@ This is an Obsidian plugin that fetches and processes files from Dropbox folders
 
 - **Development with watch mode**: `npm run dev`
 - **Production build**: `npm run build` (cleans, type checks, builds with esbuild, auto-bumps version, copies assets)
-- **Type checking**: `tsc -noEmit -skipLibCheck`
+- **Install plugin to vault**: `npm run install-plugin` (copies built files to Obsidian plugin folder)
+- **Type checking**: `npx tsc -noEmit -skipLibCheck`
 - **Linting**: `npm run lint`
 - **Clean build artifacts**: `npm run clean`
 
 The build uses esbuild with configuration in `esbuild.config.mjs`. Output goes to `dist/` directory.
+
+### Installing the Plugin to Obsidian
+
+After building (`npm run build`), install the plugin to your vault:
+
+```bash
+npm run install-plugin
+```
+
+Then reload Obsidian or use the "Reload app without saving" command (Ctrl/Cmd + R) to load the new version.
 
 ## Architecture
 
@@ -119,3 +130,5 @@ The settings tab includes:
 - typescript checking and eslinting must always be proceeded before to create a new version or release
 - All specifications will go to the specs folder
 - When coding Viwoods processors always make sure you have read specs/VIWOODS_SPECIFICATION.md
+- data.json is the plugin configuration file in the plugin folder
+- log.txt in the root of the project can be analysed for debugging purposes

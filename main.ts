@@ -358,6 +358,48 @@ export default class DrpbxFetcherPlugin extends Plugin {
     }
   }
 
+  /**
+   * Check if a Dropbox file path should be skipped based on Viwoods module configuration
+   * @param filePath Dropbox file path (lowercase)
+   * @returns Object with shouldSkip boolean and optional reason string
+   */
+  private shouldSkipViwoodsModule(filePath: string): { shouldSkip: boolean; reason?: string } {
+    const pathLower = filePath.toLowerCase();
+
+    // Find enabled Viwoods mapping
+    const viwoodsMapping = this.settings.fileTypeMappings.find(
+      (m) => m.processorType === "viwoods" && m.enabled
+    );
+
+    if (!viwoodsMapping) {
+      return { shouldSkip: false };
+    }
+
+    const viwoodsConfig = viwoodsMapping.config as import("./src/processors/ViwoodsProcessor/ViwoodsTypes").ViwoodsProcessorConfig;
+
+    // Check each module folder
+    if (pathLower.includes("/learning/") && viwoodsConfig.learning?.enabled === false) {
+      return { shouldSkip: true, reason: "Learning module disabled" };
+    }
+    if (pathLower.includes("/paper/") && viwoodsConfig.paper?.enabled === false) {
+      return { shouldSkip: true, reason: "Paper module disabled" };
+    }
+    if (pathLower.includes("/daily/") && viwoodsConfig.daily?.enabled === false) {
+      return { shouldSkip: true, reason: "Daily module disabled" };
+    }
+    if (pathLower.includes("/meeting/") && viwoodsConfig.meeting?.enabled === false) {
+      return { shouldSkip: true, reason: "Meeting module disabled" };
+    }
+    if (pathLower.includes("/picking/") && viwoodsConfig.picking?.enabled === false) {
+      return { shouldSkip: true, reason: "Picking module disabled" };
+    }
+    if (pathLower.includes("/memo/") && viwoodsConfig.memo?.enabled === false) {
+      return { shouldSkip: true, reason: "Memo module disabled" };
+    }
+
+    return { shouldSkip: false };
+  }
+
   // Fetch files from Dropbox to Obsidian vault
   async syncFiles(): Promise<void> {
     if (this.isSyncing) {
@@ -411,11 +453,40 @@ export default class DrpbxFetcherPlugin extends Plugin {
           const entries = await this.getAllFiles(dbx, mapping.remotePath);
 
           // Filter only files (not folders)
-          const files = entries.filter((entry) => entry[".tag"] === "file") as files.FileMetadata[];
-          totalSourceFiles += files.length;
-          StreamLogger.log(`[DrpbxFetcher] Found ${files.length} files in folder`, {
+          let files = entries.filter((entry) => entry[".tag"] === "file") as files.FileMetadata[];
+
+          StreamLogger.log(`[DrpbxFetcher] Found ${files.length} files in folder (before filtering)`, {
             remotePath: mapping.remotePath,
             fileCount: files.length
+          });
+
+          // Early filtering: Skip files in disabled Viwoods module folders
+          // This prevents unnecessary downloads and processing
+          const filesBeforeModuleFilter = files.length;
+          files = files.filter((file) => {
+            const skipCheck = this.shouldSkipViwoodsModule(file.path_display || "");
+            if (skipCheck.shouldSkip) {
+              StreamLogger.log(`[DrpbxFetcher] Skipping file (Viwoods module filtering - early)`, {
+                fileName: file.name,
+                path: file.path_display,
+                reason: skipCheck.reason
+              });
+              skippedFiles++;
+              return false;
+            }
+            return true;
+          });
+
+          const filteredByModule = filesBeforeModuleFilter - files.length;
+          if (filteredByModule > 0) {
+            StreamLogger.log(`[DrpbxFetcher] Filtered out ${filteredByModule} files from disabled modules`);
+          }
+
+          totalSourceFiles += files.length;
+          StreamLogger.log(`[DrpbxFetcher] Processing ${files.length} files after filtering`, {
+            remotePath: mapping.remotePath,
+            fileCount: files.length,
+            skippedByModuleFilter: filteredByModule
           });
 
           // Ensure local folder exists
@@ -457,51 +528,14 @@ export default class DrpbxFetcherPlugin extends Plugin {
                 continue;
               }
 
-              // Check if this file belongs to a Viwoods module
-              // If Viwoods processor is enabled, check if module is disabled
+              // Note: Viwoods module filtering already done earlier (before loop)
+              // to avoid unnecessary file processing and downloads
+
+              // Get viwoods mapping for later use in processor routing
               const fileExtension = FileUtils.getExtension(file.name);
               const viwoodsMapping = this.settings.fileTypeMappings.find(
                 (m) => m.processorType === "viwoods" && m.enabled
               );
-
-              if (viwoodsMapping) {
-                // Viwoods processor is enabled - check if file is in a module folder and module is disabled
-                const viwoodsConfig = viwoodsMapping.config as import("./src/processors/ViwoodsProcessor/ViwoodsTypes").ViwoodsProcessorConfig;
-                let shouldSkip = false;
-                let moduleReason = "";
-
-                // Check if module is disabled
-                if (pathLower.includes("/learning/") && viwoodsConfig.learning?.enabled === false) {
-                  shouldSkip = true;
-                  moduleReason = "Learning module disabled";
-                } else if (pathLower.includes("/paper/") && viwoodsConfig.paper?.enabled === false) {
-                  shouldSkip = true;
-                  moduleReason = "Paper module disabled";
-                } else if (pathLower.includes("/daily/") && viwoodsConfig.daily?.enabled === false) {
-                  shouldSkip = true;
-                  moduleReason = "Daily module disabled";
-                } else if (pathLower.includes("/meeting/") && viwoodsConfig.meeting?.enabled === false) {
-                  shouldSkip = true;
-                  moduleReason = "Meeting module disabled";
-                } else if (pathLower.includes("/picking/") && viwoodsConfig.picking?.enabled === false) {
-                  shouldSkip = true;
-                  moduleReason = "Picking module disabled";
-                } else if (pathLower.includes("/memo/") && viwoodsConfig.memo?.enabled === false) {
-                  shouldSkip = true;
-                  moduleReason = "Memo module disabled";
-                }
-
-                if (shouldSkip) {
-                  console.log(`Skipping ${file.name} - ${moduleReason}`);
-                  StreamLogger.log(`[DrpbxFetcher] Skipping file (Viwoods module filtering)`, {
-                    fileName: file.name,
-                    path: file.path_display,
-                    reason: moduleReason
-                  });
-                  skippedFiles++;
-                  continue;
-                }
-              }
 
               // Check if this file extension should be skipped
               if (this.settings.skippedExtensions.includes(fileExtension.toLowerCase())) {
@@ -553,6 +587,30 @@ export default class DrpbxFetcherPlugin extends Plugin {
               }
 
               const willBeProcessed = processor !== null;
+
+              // Check if file was already processed (for files that will be processed)
+              // This prevents unnecessary downloads
+              if (willBeProcessed && processor) {
+                const fileId = file.id; // Unique Dropbox file ID
+
+                if (this.settings.processedFiles[fileId] === file.size) {
+                  // File already processed with same size - skip to preserve user edits
+                  skippedProcessors++;
+                  console.log(`Skipping ${file.name} - already processed (${file.size} bytes)`);
+                  StreamLogger.log(`[DrpbxFetcher] Skipping file (already processed)`, {
+                    fileName: file.name,
+                    fileId,
+                    size: file.size
+                  });
+                  continue; // Skip both download and processing
+                } else if (this.settings.processedFiles[fileId]) {
+                  // File exists but size changed - will reprocess
+                  console.log(`Will reprocess ${file.name} - changed (old: ${this.settings.processedFiles[fileId]}, new: ${file.size})`);
+                } else {
+                  // New file - will process it
+                  console.log(`Will process new file: ${file.name}`);
+                }
+              }
 
               // Only calculate paths and create folders for non-processed files
               // Processors control their own output paths completely
@@ -633,25 +691,10 @@ export default class DrpbxFetcherPlugin extends Plugin {
                 }
 
                 if (mapping) {
-                  // Check if this file was already processed with same size (skip to preserve user edits)
-                  let shouldProcess = true;
-                  const fileId = file.id; // Unique Dropbox file ID
+                  // File will be processed (already passed the early check above)
+                  const fileId = file.id;
 
-                  if (this.settings.processedFiles[fileId] === file.size) {
-                    // File already processed with same size - skip to preserve user edits
-                    shouldProcess = false;
-                    skippedProcessors++;
-                    console.log(`Skipping ${file.name} - already processed (${file.size} bytes)`);
-                  } else if (this.settings.processedFiles[fileId]) {
-                    // File exists but size changed - reprocess
-                    console.log(`Reprocessing ${file.name} - changed (old: ${this.settings.processedFiles[fileId]}, new: ${file.size})`);
-                  } else {
-                    // New file - process it
-                    console.log(`Processing new file: ${file.name}`);
-                  }
-
-                  if (shouldProcess) {
-                    try {
+                  try {
                       StreamLogger.log(`[DrpbxFetcher] Starting processor...`, {
                         fileName: file.name,
                         processor: processor.name
@@ -705,7 +748,6 @@ export default class DrpbxFetcherPlugin extends Plugin {
                         stack: procError instanceof Error ? procError.stack : undefined
                       });
                     }
-                  }
                   continue; // Skip default file handling
                 }
               }

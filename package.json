@@ -1,6 +1,6 @@
 {
   "name": "drpbx-fetcher",
-  "version": "0.2.78",
+  "version": "0.2.80",
   "description": "Fetch and process files from Dropbox folders to your Obsidian vault",
   "main": "dist/main.js",
   "scripts": {
@@ -8,6 +8,7 @@
     "build": "npm run clean && tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node auto-version-bump.mjs && npm run copy-assets",
     "clean": "rm -rf dist",
     "copy-assets": "cp manifest.json dist/ && cp versions.json dist/",
+    "install-plugin": "cp dist/main.js dist/manifest.json dist/versions.json \"/Users/jeroendezwart/2th Brain/.obsidian/plugins/drpbx-fetcher/\"",
     "cleanup": "rm -f main.js *.js.map",
     "version": "node version-bump.mjs && git add manifest.json versions.json",
     "lint": "eslint . --ext .ts",
