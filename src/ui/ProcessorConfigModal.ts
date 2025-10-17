@@ -46,8 +46,19 @@ export class ProcessorConfigModal extends Modal {
 		const schema = this.processor.getConfigSchema();
 		const formContainer = contentEl.createDiv("processor-config-form");
 
-		for (const field of schema.fields) {
-			this.renderField(formContainer, field);
+		// Group fields by their group property
+		const groupedFields = this.groupFields(schema.fields);
+
+		if (groupedFields.size === 0) {
+			// No grouped fields, render all directly
+			for (const field of schema.fields) {
+				this.renderField(formContainer, field);
+			}
+		} else {
+			// Render grouped fields with collapsible sections
+			for (const [groupName, fields] of groupedFields.entries()) {
+				this.renderGroup(formContainer, groupName, fields);
+			}
 		}
 
 		// Validation errors container
@@ -77,6 +88,81 @@ export class ProcessorConfigModal extends Modal {
 		saveButton.addEventListener("click", async () => {
 			await this.handleSave(errorsContainer);
 		});
+	}
+
+	private groupFields(fields: ConfigField[]): Map<string, ConfigField[]> {
+		const groups = new Map<string, ConfigField[]>();
+
+		for (const field of fields) {
+			if (field.group) {
+				if (!groups.has(field.group)) {
+					groups.set(field.group, []);
+				}
+				const groupFields = groups.get(field.group);
+				if (groupFields) {
+					groupFields.push(field);
+				}
+			}
+		}
+
+		return groups;
+	}
+
+	private renderGroup(container: HTMLElement, groupName: string, fields: ConfigField[]): void {
+		// Get the toggle key from the first field (they should all have the same for a group)
+		const groupToggleKey = fields[0]?.groupToggleKey;
+
+		// Create group container
+		const groupContainer = container.createDiv("config-group");
+		groupContainer.style.marginBottom = "1.5em";
+
+		// Create group header (collapsible)
+		const groupHeader = groupContainer.createDiv("config-group-header");
+		groupHeader.style.cursor = "pointer";
+		groupHeader.style.display = "flex";
+		groupHeader.style.alignItems = "center";
+		groupHeader.style.padding = "0.75em";
+		groupHeader.style.backgroundColor = "var(--background-secondary)";
+		groupHeader.style.borderRadius = "4px";
+		groupHeader.style.marginBottom = "0.5em";
+		groupHeader.style.fontWeight = "600";
+
+		// Add collapse indicator
+		const collapseIndicator = groupHeader.createSpan({ text: "▼ " });
+		collapseIndicator.style.marginRight = "0.5em";
+		collapseIndicator.style.transition = "transform 0.2s";
+
+		// Add group title
+		groupHeader.createSpan({ text: groupName });
+
+		// Create content container (initially visible if module is enabled)
+		const groupContent = groupContainer.createDiv("config-group-content");
+		const isEnabled = groupToggleKey ? this.formValues[groupToggleKey] : true;
+		groupContent.style.display = isEnabled ? "block" : "none";
+		groupContent.style.paddingLeft = "1em";
+
+		// Make header clickable to toggle content
+		groupHeader.addEventListener("click", () => {
+			const isCurrentlyHidden = groupContent.style.display === "none";
+			groupContent.style.display = isCurrentlyHidden ? "block" : "none";
+			collapseIndicator.style.transform = isCurrentlyHidden ? "rotate(0deg)" : "rotate(-90deg)";
+		});
+
+		// Set initial collapse indicator rotation
+		if (!isEnabled) {
+			collapseIndicator.style.transform = "rotate(-90deg)";
+		}
+
+		// Render fields in the group
+		for (const field of fields) {
+			this.renderField(groupContent, field);
+		}
+
+		// If this group has a toggle key, watch for changes to show/hide the group content
+		if (groupToggleKey) {
+			// Note: We could add dynamic visibility updates here, but for now
+			// the modal will be reopened when saved anyway, which refreshes the visibility
+		}
 	}
 
 	private renderField(container: HTMLElement, field: ConfigField): void {

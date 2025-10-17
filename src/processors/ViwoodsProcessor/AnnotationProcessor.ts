@@ -4,7 +4,7 @@ import { StreamingZipUtils } from "../../utils/StreamingZipUtils";
 import { StreamLogger } from "../../utils/StreamLogger";
 import { TemplateEngine } from "../templates/TemplateEngine";
 import { ProcessorContext } from "../types";
-import { ViwoodsProcessorConfig, ReadNoteBean } from "./ViwoodsTypes";
+import { LearningModuleConfig, ReadNoteBean } from "./ViwoodsTypes";
 import { ImageCompositor } from "./ImageCompositor";
 import { TemplateDefaults } from "./TemplateDefaults";
 
@@ -23,7 +23,7 @@ export class AnnotationProcessor {
 		totalPages: number,
 		epubPath: string,
 		originalFilename: string,
-		config: ViwoodsProcessorConfig,
+		config: LearningModuleConfig,
 		context: ProcessorContext
 	): Promise<string[]> {
 		const createdFiles: string[] = [];
@@ -114,7 +114,7 @@ export class AnnotationProcessor {
 		epubPath: string,
 		originalFilename: string,
 		imagePath: string,
-		config: ViwoodsProcessorConfig,
+		config: LearningModuleConfig,
 		context: ProcessorContext
 	): Promise<string | null> {
 		try {

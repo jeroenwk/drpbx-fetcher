@@ -1,41 +1,41 @@
 import { ZipReader } from "@zip.js/zip.js";
 import { files } from "dropbox";
-import { FileUtils } from "../../utils/FileUtils";
-import { StreamingZipUtils } from "../../utils/StreamingZipUtils";
-import { StreamLogger } from "../../utils/StreamLogger";
-import { TemplateEngine } from "../templates/TemplateEngine";
-import { ProcessorContext, ProcessorResult } from "../types";
-import { ViwoodsProcessorConfig, EpubHighlight, BookBean, ReadNoteBean } from "./ViwoodsTypes";
-import { AnnotationProcessor } from "./AnnotationProcessor";
+import { FileUtils } from "../../../utils/FileUtils";
+import { StreamingZipUtils } from "../../../utils/StreamingZipUtils";
+import { StreamLogger } from "../../../utils/StreamLogger";
+import { TemplateEngine } from "../../templates/TemplateEngine";
+import { ProcessorContext, ProcessorResult } from "../../types";
+import { LearningModuleConfig, EpubHighlight, BookBean, ReadNoteBean } from "../ViwoodsTypes";
+import { AnnotationProcessor } from "../AnnotationProcessor";
 
 /**
- * Handles processing of EPUB format notes
+ * Handles processing of Learning module notes (EPUB/PDF annotations)
  */
-export class EpubFormatProcessor {
+export class LearningProcessor {
 	/**
-	 * Process EPUB format notes
+	 * Process Learning module EPUB format notes
 	 */
 	public static async process(
 		zipReader: ZipReader<Blob>,
 		fileData: Uint8Array,
 		originalPath: string,
 		metadata: files.FileMetadata,
-		config: ViwoodsProcessorConfig,
+		config: LearningModuleConfig,
 		context: ProcessorContext
 	): Promise<ProcessorResult> {
-		await StreamLogger.log(`[EpubFormatProcessor.process] Starting EPUB format processing`);
+		await StreamLogger.log(`[LearningProcessor.process] Starting Learning module processing`);
 		const createdFiles: string[] = [];
 		const errors: string[] = [];
 
 		try {
 			// Find the JSON files (they have prefix based on book name)
-			await StreamLogger.log(`[EpubFormatProcessor.process] Looking for JSON files in ZIP...`);
+			await StreamLogger.log(`[LearningProcessor.process] Looking for JSON files in ZIP...`);
 			const allFiles = await StreamingZipUtils.listFiles(zipReader);
 			const pageTextAnnotationFile = allFiles.find(f => f.endsWith("_PageTextAnnotation.json"));
 			const bookBeanFile = allFiles.find(f => f.endsWith("_BookBean.json"));
 			const epubFile = allFiles.find(f => f.endsWith(".epub"));
 
-			await StreamLogger.log(`[EpubFormatProcessor.process] Found files:`, {
+			await StreamLogger.log(`[LearningProcessor.process] Found files:`, {
 				pageTextAnnotationFile,
 				bookBeanFile,
 				epubFile
@@ -48,10 +48,10 @@ export class EpubFormatProcessor {
 			}
 
 			// Extract highlights
-			await StreamLogger.log(`[EpubFormatProcessor.process] Extracting highlights from ${pageTextAnnotationFile}...`);
+			await StreamLogger.log(`[LearningProcessor.process] Extracting highlights from ${pageTextAnnotationFile}...`);
 			const highlights = await StreamingZipUtils.extractJson<EpubHighlight[]>(zipReader, pageTextAnnotationFile);
 
-			await StreamLogger.log(`[EpubFormatProcessor.process] Extracted highlights:`, {
+			await StreamLogger.log(`[LearningProcessor.process] Extracted highlights:`, {
 				count: highlights?.length || 0
 			});
 
@@ -66,7 +66,7 @@ export class EpubFormatProcessor {
 				bookName = highlights[0].bookName;
 				bookSlug = FileUtils.slugify(bookName);
 				totalPages = highlights[0].pageCount;
-				await StreamLogger.log(`[EpubFormatProcessor.process] Got book metadata from highlights:`, {
+				await StreamLogger.log(`[LearningProcessor.process] Got book metadata from highlights:`, {
 					bookName,
 					totalPages
 				});
@@ -74,16 +74,16 @@ export class EpubFormatProcessor {
 
 			// Extract bookPath from BookBean.json if available
 			if (bookBeanFile) {
-				await StreamLogger.log(`[EpubFormatProcessor.process] Extracting BookBean: ${bookBeanFile}`);
+				await StreamLogger.log(`[LearningProcessor.process] Extracting BookBean: ${bookBeanFile}`);
 				const bookBean = await StreamingZipUtils.extractJson<BookBean>(zipReader, bookBeanFile);
 				if (bookBean && bookBean.bookPath) {
 					bookPath = bookBean.bookPath;
-					await StreamLogger.log(`[EpubFormatProcessor.process] Found bookPath: ${bookPath}`);
+					await StreamLogger.log(`[LearningProcessor.process] Found bookPath: ${bookPath}`);
 					// If we don't have bookName yet, try to get it from BookBean
 					if (!bookName && bookBean.bookName) {
 						bookName = bookBean.bookName;
 						bookSlug = FileUtils.slugify(bookName);
-						await StreamLogger.log(`[EpubFormatProcessor.process] Got book name from BookBean: ${bookName}`);
+						await StreamLogger.log(`[LearningProcessor.process] Got book name from BookBean: ${bookName}`);
 					}
 				}
 			}
@@ -92,7 +92,7 @@ export class EpubFormatProcessor {
 			if (!bookName) {
 				const readNoteBeanFile = allFiles.find(f => f.endsWith('_ReadNoteBean.json'));
 				if (readNoteBeanFile) {
-					await StreamLogger.log(`[EpubFormatProcessor.process] Getting metadata from ReadNoteBean...`);
+					await StreamLogger.log(`[LearningProcessor.process] Getting metadata from ReadNoteBean...`);
 					const annotations = await StreamingZipUtils.extractJson<ReadNoteBean[]>(
 						zipReader,
 						readNoteBeanFile
@@ -102,7 +102,7 @@ export class EpubFormatProcessor {
 						bookSlug = FileUtils.slugify(bookName);
 						// ReadNoteBean doesn't have pageCount, use 0 as fallback
 						totalPages = 0;
-						await StreamLogger.log(`[EpubFormatProcessor.process] Got book metadata from ReadNoteBean:`, {
+						await StreamLogger.log(`[LearningProcessor.process] Got book metadata from ReadNoteBean:`, {
 							bookName,
 							totalPages
 						});
@@ -117,7 +117,7 @@ export class EpubFormatProcessor {
 				return { success: false, createdFiles, errors };
 			}
 
-			await StreamLogger.log(`[EpubFormatProcessor.process] Book info:`, {
+			await StreamLogger.log(`[LearningProcessor.process] Book info:`, {
 				bookName,
 				bookSlug,
 				totalPages,
@@ -127,11 +127,11 @@ export class EpubFormatProcessor {
 			// Extract EPUB file if configured and enabled in settings (preserve if exists to allow user modifications)
 			let epubPath = "";
 			if (epubFile && config.sourcesFolder && context.pluginSettings.downloadSourceFiles) {
-				await StreamLogger.log(`[EpubFormatProcessor.process] Extracting EPUB file: ${epubFile}`);
+				await StreamLogger.log(`[LearningProcessor.process] Extracting EPUB file: ${epubFile}`);
 				const epubData = await StreamingZipUtils.extractFile(zipReader, epubFile);
 				if (epubData) {
 					epubPath = FileUtils.joinPath(config.sourcesFolder, `${bookSlug}.epub`);
-					await StreamLogger.log(`[EpubFormatProcessor.process] Creating folder: ${config.sourcesFolder}`);
+					await StreamLogger.log(`[LearningProcessor.process] Creating folder: ${config.sourcesFolder}`);
 					await FileUtils.ensurePath(context.vault, config.sourcesFolder);
 
 					// Only write if file doesn't exist (preserve user modifications)
@@ -139,22 +139,22 @@ export class EpubFormatProcessor {
 					if (!existingEpub) {
 						await context.vault.adapter.writeBinary(epubPath, epubData.buffer);
 						createdFiles.push(epubPath);
-						await StreamLogger.log(`[EpubFormatProcessor.process] Saved EPUB file: ${epubPath}`);
+						await StreamLogger.log(`[LearningProcessor.process] Saved EPUB file: ${epubPath}`);
 					} else {
-						await StreamLogger.log(`[EpubFormatProcessor.process] Preserving existing EPUB: ${epubPath}`);
+						await StreamLogger.log(`[LearningProcessor.process] Preserving existing EPUB: ${epubPath}`);
 					}
 				}
 			}
 
 			// Generate highlight for each annotation (only if highlights exist)
 			if (highlights && highlights.length > 0) {
-				await StreamLogger.log(`[EpubFormatProcessor.process] Creating highlights folder: ${config.highlightsFolder}`);
+				await StreamLogger.log(`[LearningProcessor.process] Creating highlights folder: ${config.highlightsFolder}`);
 				await FileUtils.ensurePath(context.vault, config.highlightsFolder);
 
-				await StreamLogger.log(`[EpubFormatProcessor.process] Processing ${highlights.length} highlights...`);
+				await StreamLogger.log(`[LearningProcessor.process] Processing ${highlights.length} highlights...`);
 				for (let i = 0; i < highlights.length; i++) {
 					const highlight = highlights[i];
-					await StreamLogger.log(`[EpubFormatProcessor.process] Processing highlight ${i + 1}/${highlights.length}`);
+					await StreamLogger.log(`[LearningProcessor.process] Processing highlight ${i + 1}/${highlights.length}`);
 					const dateHighlighted = new Date(highlight.createTime * 1000);
 
 					// Build location string
@@ -225,7 +225,7 @@ export class EpubFormatProcessor {
 					// Only write if file doesn't exist (preserve user edits to existing highlights)
 					const existingFile = context.vault.getAbstractFileByPath(filepath);
 					if (!existingFile) {
-						await StreamLogger.log(`[EpubFormatProcessor.process] Creating EPUB highlight file`, {
+						await StreamLogger.log(`[LearningProcessor.process] Creating EPUB highlight file`, {
 							highlightsFolder: config.highlightsFolder,
 							filename,
 							fullPath: filepath,
@@ -233,10 +233,10 @@ export class EpubFormatProcessor {
 						});
 						await context.vault.adapter.write(filepath, content);
 						createdFiles.push(filepath);
-						await StreamLogger.log(`[EpubFormatProcessor.process] EPUB highlight file created: ${filepath}`);
+						await StreamLogger.log(`[LearningProcessor.process] EPUB highlight file created: ${filepath}`);
 					} else {
 						console.log(`Preserving existing highlight: ${filename}`);
-						await StreamLogger.log(`[EpubFormatProcessor.process] Preserving existing highlight: ${filepath}`);
+						await StreamLogger.log(`[LearningProcessor.process] Preserving existing highlight: ${filepath}`);
 					}
 				}
 			}
@@ -246,14 +246,14 @@ export class EpubFormatProcessor {
 				const readNoteBeanFile = allFiles.find(f => f.endsWith('_ReadNoteBean.json'));
 
 				if (readNoteBeanFile) {
-					await StreamLogger.log(`[EpubFormatProcessor.process] Found ReadNoteBean file: ${readNoteBeanFile}`);
+					await StreamLogger.log(`[LearningProcessor.process] Found ReadNoteBean file: ${readNoteBeanFile}`);
 					const annotations = await StreamingZipUtils.extractJson<ReadNoteBean[]>(
 						zipReader,
 						readNoteBeanFile
 					);
 
 					if (annotations && annotations.length > 0) {
-						await StreamLogger.log(`[EpubFormatProcessor.process] Processing ${annotations.length} annotations...`);
+						await StreamLogger.log(`[LearningProcessor.process] Processing ${annotations.length} annotations...`);
 
 						for (const annotation of annotations) {
 							const files = await AnnotationProcessor.processAnnotation(
@@ -271,7 +271,7 @@ export class EpubFormatProcessor {
 						}
 					}
 				} else {
-					await StreamLogger.log(`[EpubFormatProcessor.process] No ReadNoteBean file found, skipping annotations`);
+					await StreamLogger.log(`[LearningProcessor.process] No ReadNoteBean file found, skipping annotations`);
 				}
 			}
 
@@ -284,7 +284,7 @@ export class EpubFormatProcessor {
 			return {
 				success: false,
 				createdFiles,
-				errors: [`Failed to process EPUB note: ${err.message}`],
+				errors: [`Failed to process Learning module note: ${err.message}`],
 			};
 		}
 	}

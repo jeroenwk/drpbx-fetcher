@@ -118,3 +118,4 @@ The settings tab includes:
 - remember to run the tests before to build a new version and fix issues if needed
 - typescript checking and eslinting must always be proceeded before to create a new version or release
 - All specifications will go to the specs folder
+- When coding Viwoods processors always make sure you have read specs/VIWOODS_SPECIFICATION.md

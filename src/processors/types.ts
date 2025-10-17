@@ -60,6 +60,8 @@ export interface ConfigField {
 	defaultValue?: unknown;
 	placeholder?: string;
 	options?: { value: string; label: string }[]; // For select type
+	group?: string; // Optional group name for organizing fields into collapsible sections
+	groupToggleKey?: string; // Key to check if group should be shown (e.g., "learning.enabled")
 }
 
 /**
