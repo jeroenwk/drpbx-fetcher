@@ -262,11 +262,11 @@ If you encounter any issues or have feature requests:
 - ⬇️ **Download icon** - Changed ribbon icon from sync to download
 
 ### 0.2.52 - 2025-01-11
-- ⚙️ **Source file configuration** - Enable/disable downloading source files (.epub, .note) to save space
+- ⚙️ **Source file configuration** - Enable/disable downloading source files (.epub, .note) per module to save space
 - 🚀 **Performance boost** - 20-50% faster fetch on slow devices when source downloads disabled
 - 🔗 **BookPath linking** - File:// links to original book locations when sources disabled
 - 📝 **Better source info** - Shows file extension links (e.g., `[epub](file://...)`) instead of broken links
-- 🎨 **Settings reorganization** - Dropbox authentication moved to top of General Settings
+- 🎨 **Settings reorganization** - Module-specific settings grouped with their respective modules
 - 📊 **Enhanced logging** - Better tracking of file creation and processing
 
 ### 0.2.39 - 2025-01-10

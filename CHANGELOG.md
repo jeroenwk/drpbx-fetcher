@@ -5,6 +5,30 @@ All notable changes to the Dropbox Fetcher plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.98] - 2025-10-17
+
+### Added
+- **Image Cache Busting Utility**: New ImageCacheBuster class for forcing Obsidian to refresh updated images
+- Architecture documentation (specs/ARCHITECTURE.md) describing plugin structure and design patterns
+- File modification event triggering to ensure proper workspace refresh
+
+### Changed
+- Modified files now use `vault.modifyBinary()` instead of `adapter.writeBinary()` for proper change detection
+- Improved image update mechanism with workspace event triggering
+
+### Removed
+- Deleted obsolete specification files (IMPLEMENTATION-SUMMARY.md, multiple SPEC-*.md files)
+- Removed outdated debugging and installation guides from specs folder
+
+### Improved
+- Better image refresh behavior - updated images now display immediately without requiring restart
+- Cleaner specs folder organization with consolidated architecture documentation
+
+### Technical
+- Added TFile import for proper type handling
+- ImageCacheBuster implements ping-pong filename strategy (image.png ↔ image-cache-bust.png)
+- Workspace triggers 'file-modified' event after binary modifications for view updates
+
 ## [0.2.85] - 2025-01-17
 
 ### Fixed

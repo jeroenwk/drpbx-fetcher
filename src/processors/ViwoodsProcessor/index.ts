@@ -429,6 +429,7 @@ export class ViwoodsProcessor implements FileProcessor {
 				annotationImagesFolder: "Viwoods/Learning/Annotations/resources",
 				includeSummaryInAnnotation: true,
 				createCompositeImages: true,
+				downloadSourceFiles: true,
 			},
 			paper: {
 				enabled: true,
@@ -634,6 +635,15 @@ export class ViwoodsProcessor implements FileProcessor {
 					key: "learning.createCompositeImages",
 					label: "Create Composite Images",
 					description: "Combine page image with annotation overlay",
+					type: "boolean",
+					defaultValue: true,
+					group: "Learning",
+					groupToggleKey: "learning.enabled",
+				},
+				{
+					key: "learning.downloadSourceFiles",
+					label: "Download Source Files",
+					description: "Download source files (.epub, .note) to Sources folder",
 					type: "boolean",
 					defaultValue: true,
 					group: "Learning",

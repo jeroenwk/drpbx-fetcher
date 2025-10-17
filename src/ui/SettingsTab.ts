@@ -138,16 +138,6 @@ export class DrpbxFetcherSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Download source files")
-      .setDesc("Download source files (.epub, .note) to Sources folder.")
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.downloadSourceFiles).onChange(async (value) => {
-          this.plugin.settings.downloadSourceFiles = value;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    new Setting(containerEl)
       .setName("Clear processed files tracking")
       .setDesc("Clears the internal tracking of processed files. Use this after deleting fetched files to allow re-fetching. Note: Modified files (markdown, images, EPUBs) will NOT be overwritten - only files that don't exist will be re-created.")
       .addButton((button) =>

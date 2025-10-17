@@ -1,4 +1,5 @@
 import { ZipReader } from "@zip.js/zip.js";
+import { TFile } from "obsidian";
 import { FileUtils } from "../../../utils/FileUtils";
 import { StreamingZipUtils } from "../../../utils/StreamingZipUtils";
 import { StreamLogger } from "../../../utils/StreamLogger";
@@ -12,6 +13,7 @@ import {
 	ResourceType
 } from "../ViwoodsTypes";
 import { TemplateDefaults } from "../TemplateDefaults";
+import { ImageCacheBuster } from "../../../utils/ImageCacheBuster";
 
 /**
  * Handles processing of Paper module notes (handwritten notes)
@@ -126,10 +128,14 @@ export class PaperProcessor {
 									resourcesFolder,
 									`${noteSlug}-page-${pageNum}.png`
 								);
-								await context.vault.adapter.writeBinary(screenshotPath, screenshotData.buffer);
-								createdFiles.push(screenshotPath);
-								screenshotPaths.push(screenshotPath);
-								await StreamLogger.log(`[PaperProcessor.process] Saved screenshot: ${screenshotPath}`);
+								const finalPath = await ImageCacheBuster.updateImageWithCacheBust(
+									context.vault,
+									screenshotPath,
+									new Uint8Array(screenshotData.buffer)
+								);
+								createdFiles.push(finalPath);
+								screenshotPaths.push(finalPath);
+								await StreamLogger.log(`[PaperProcessor.process] Saved screenshot: ${finalPath}`);
 							}
 						}
 					} catch (pageError) {
@@ -201,7 +207,14 @@ export class PaperProcessor {
 			const filename = `${data.noteName}.md`;
 			const filepath = FileUtils.joinPath(outputFolder, filename);
 
-			await context.vault.adapter.write(filepath, content);
+			// Check if file exists and use appropriate method
+			const existingFile = context.vault.getAbstractFileByPath(filepath);
+			if (existingFile instanceof TFile) {
+				// Use modify to trigger Obsidian's file change detection
+				await context.vault.modify(existingFile, content);
+			} else {
+				await context.vault.create(filepath, content);
+			}
 			await StreamLogger.log(`[PaperProcessor.generateNoteFile] Created note file: ${filepath}`);
 			return filepath;
 		} catch (error) {

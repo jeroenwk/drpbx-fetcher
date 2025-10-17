@@ -50,6 +50,7 @@ export interface LearningModuleConfig extends BaseModuleConfig {
 	annotationImagesFolder?: string;
 	includeSummaryInAnnotation?: boolean;
 	createCompositeImages?: boolean;
+	downloadSourceFiles?: boolean; // Whether to download source files (.epub, .note) to Sources folder
 }
 
 /**

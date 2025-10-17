@@ -1,4 +1,5 @@
 import { ZipReader } from "@zip.js/zip.js";
+import { TFile } from "obsidian";
 import { FileUtils } from "../../../utils/FileUtils";
 import { StreamingZipUtils } from "../../../utils/StreamingZipUtils";
 import { StreamLogger } from "../../../utils/StreamLogger";
@@ -7,6 +8,7 @@ import { ProcessorContext, ProcessorResult, FileMetadata } from "../../types";
 import { PickingModuleConfig, NotesBean, NoteList } from "../ViwoodsTypes";
 import { TemplateDefaults } from "../TemplateDefaults";
 import { ImageCompositor } from "../ImageCompositor";
+import { ImageCacheBuster } from "../../../utils/ImageCacheBuster";
 
 /**
  * Handles processing of Picking module notes (quick captures)
@@ -128,10 +130,14 @@ export class PickingProcessor {
 									resourcesFolder,
 									`${noteSlug}-item-${itemNum}.png`
 								);
-								await context.vault.adapter.writeBinary(compositePath, compositeData);
-								createdFiles.push(compositePath);
-								compositePaths.push(compositePath);
-								await StreamLogger.log(`[PickingProcessor.process] Saved composite image: ${compositePath}`);
+								const finalPath = await ImageCacheBuster.updateImageWithCacheBust(
+									context.vault,
+									compositePath,
+									compositeData
+								);
+								createdFiles.push(finalPath);
+								compositePaths.push(finalPath);
+								await StreamLogger.log(`[PickingProcessor.process] Saved composite image: ${finalPath}`);
 							}
 						} else if (item.pageShotFilePath) {
 							// Fallback: use pageShotFilePath if available
@@ -141,10 +147,14 @@ export class PickingProcessor {
 									resourcesFolder,
 									`${noteSlug}-item-${itemNum}.png`
 								);
-								await context.vault.adapter.writeBinary(screenshotPath, screenshotData);
-								createdFiles.push(screenshotPath);
-								compositePaths.push(screenshotPath);
-								await StreamLogger.log(`[PickingProcessor.process] Saved screenshot: ${screenshotPath}`);
+								const finalPath = await ImageCacheBuster.updateImageWithCacheBust(
+									context.vault,
+									screenshotPath,
+									screenshotData
+								);
+								createdFiles.push(finalPath);
+								compositePaths.push(finalPath);
+								await StreamLogger.log(`[PickingProcessor.process] Saved screenshot: ${finalPath}`);
 							}
 						}
 					} catch (itemError) {
@@ -214,7 +224,14 @@ export class PickingProcessor {
 			const filename = `${data.noteName}.md`;
 			const filepath = FileUtils.joinPath(outputFolder, filename);
 
-			await context.vault.adapter.write(filepath, content);
+			// Check if file exists and use appropriate method
+			const existingFile = context.vault.getAbstractFileByPath(filepath);
+			if (existingFile instanceof TFile) {
+				// Use modify to trigger Obsidian's file change detection
+				await context.vault.modify(existingFile, content);
+			} else {
+				await context.vault.create(filepath, content);
+			}
 			await StreamLogger.log(`[PickingProcessor.generateCaptureFile] Created capture file: ${filepath}`);
 			return filepath;
 		} catch (error) {
@@ -263,16 +280,15 @@ export class PickingProcessor {
 				await FileUtils.ensurePath(context.vault, capturesFolder);
 
 				// Write file to vault
-				const existingFile = context.vault.getAbstractFileByPath(outputPath);
-				if (existingFile) {
-					await context.vault.adapter.writeBinary(outputPath, fileData);
-				} else {
-					await context.vault.createBinary(outputPath, fileData);
-				}
+				const finalPath = await ImageCacheBuster.updateImageWithCacheBust(
+					context.vault,
+					outputPath,
+					fileData
+				);
 
 				return {
 					success: true,
-					createdFiles: [outputPath],
+					createdFiles: [finalPath],
 				};
 			}
 

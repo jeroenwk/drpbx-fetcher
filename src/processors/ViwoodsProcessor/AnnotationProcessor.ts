@@ -70,7 +70,7 @@ export class AnnotationProcessor {
 			const existingImage = context.vault.getAbstractFileByPath(imagePath);
 			if (!existingImage) {
 				const imageBuffer = await compositeImage.arrayBuffer();
-				await context.vault.adapter.writeBinary(imagePath, imageBuffer);
+				await context.vault.createBinary(imagePath, new Uint8Array(imageBuffer));
 				createdFiles.push(imagePath);
 				await StreamLogger.log(`[processAnnotation] Saved composite image: ${imagePath}`);
 			} else {
@@ -190,7 +190,7 @@ export class AnnotationProcessor {
 					contentLength: content.length
 				});
 				await FileUtils.ensurePath(context.vault, config.annotationsFolder);
-				await context.vault.adapter.write(filepath, content);
+				await context.vault.create(filepath, content);
 				await StreamLogger.log(`[AnnotationProcessor.generateAnnotationMarkdown] EPUB annotation file created: ${filepath}`);
 				return filepath;
 			} else {

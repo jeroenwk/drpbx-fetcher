@@ -1,4 +1,4 @@
-import { Plugin, requestUrl, RequestUrlParam, RequestUrlResponse, TFolder } from "obsidian";
+import { Plugin, requestUrl, RequestUrlParam, RequestUrlResponse, TFolder, TFile } from "obsidian";
 import { Dropbox, files } from "dropbox";
 import { OAuthManager } from "./src/auth/OAuthManager";
 import { PlatformHelper } from "./src/utils/platform";
@@ -708,8 +708,11 @@ export default class DrpbxFetcherPlugin extends Plugin {
               if (shouldWrite) {
                 // Write file to vault
                 const existingFile = this.app.vault.getAbstractFileByPath(localFilePath);
-                if (existingFile) {
-                  await this.app.vault.adapter.writeBinary(localFilePath, uint8Array);
+                if (existingFile instanceof TFile) {
+                  // Use modifyBinary to trigger Obsidian's file change detection
+                  await this.app.vault.modifyBinary(existingFile, uint8Array);
+                  // Trigger workspace to refresh views displaying this file (especially images)
+                  this.app.workspace.trigger('file-modified', existingFile);
                 } else {
                   await this.app.vault.createBinary(localFilePath, uint8Array);
                 }

@@ -124,9 +124,9 @@ export class LearningProcessor {
 				bookPath
 			});
 
-			// Extract EPUB file if configured and enabled in settings (preserve if exists to allow user modifications)
+			// Extract EPUB file if configured and enabled in module settings (preserve if exists to allow user modifications)
 			let epubPath = "";
-			if (epubFile && config.sourcesFolder && context.pluginSettings.downloadSourceFiles) {
+			if (epubFile && config.sourcesFolder && config.downloadSourceFiles !== false) {
 				await StreamLogger.log(`[LearningProcessor.process] Extracting EPUB file: ${epubFile}`);
 				const epubData = await StreamingZipUtils.extractFile(zipReader, epubFile);
 				if (epubData) {
@@ -137,7 +137,7 @@ export class LearningProcessor {
 					// Only write if file doesn't exist (preserve user modifications)
 					const existingEpub = context.vault.getAbstractFileByPath(epubPath);
 					if (!existingEpub) {
-						await context.vault.adapter.writeBinary(epubPath, epubData.buffer);
+						await context.vault.createBinary(epubPath, new Uint8Array(epubData.buffer));
 						createdFiles.push(epubPath);
 						await StreamLogger.log(`[LearningProcessor.process] Saved EPUB file: ${epubPath}`);
 					} else {
@@ -231,7 +231,7 @@ export class LearningProcessor {
 							fullPath: filepath,
 							contentLength: content.length
 						});
-						await context.vault.adapter.write(filepath, content);
+						await context.vault.create(filepath, content);
 						createdFiles.push(filepath);
 						await StreamLogger.log(`[LearningProcessor.process] EPUB highlight file created: ${filepath}`);
 					} else {

@@ -1,3 +1,4 @@
+import { TFile } from "obsidian";
 import { FileUtils } from "../utils/FileUtils";
 import {
 	FileProcessor,
@@ -43,8 +44,9 @@ export class DefaultProcessor implements FileProcessor {
 
 			// Write file
 			const existingFile = context.vault.getAbstractFileByPath(outputPath);
-			if (existingFile) {
-				await context.vault.adapter.writeBinary(outputPath, fileData);
+			if (existingFile instanceof TFile) {
+				// Use modifyBinary to trigger Obsidian's file change detection
+				await context.vault.modifyBinary(existingFile, fileData);
 			} else {
 				await context.vault.createBinary(outputPath, fileData);
 			}
