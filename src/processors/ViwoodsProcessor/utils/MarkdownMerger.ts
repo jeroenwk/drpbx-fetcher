@@ -1,13 +1,13 @@
-import { parseYaml, stringifyYaml } from "obsidian";
+import { Vault } from "obsidian";
 import { StreamLogger } from "../../../utils/StreamLogger";
 
 /**
- * Metadata stored in frontmatter for tracking Viwoods paper notes
+ * Metadata stored in sidecar .meta.json file for tracking Viwoods paper notes
  */
 export interface ViwoodsNoteMetadata {
-	"viwoods-file-id": string;
-	"viwoods-last-modified": number;
-	"viwoods-pages": Array<{
+	fileId: string;
+	lastModified: number;
+	pages: Array<{
 		page: number;
 		image: string;
 	}>;
@@ -26,7 +26,6 @@ export interface PageSection {
  * Result of parsing a markdown file
  */
 export interface ParsedMarkdown {
-	frontmatter: ViwoodsNoteMetadata | null;
 	header: string;  // Content before first page section
 	pages: PageSection[];
 	footer: string;  // Content after last page section (if any)
@@ -50,22 +49,6 @@ export class MarkdownMerger {
 	 */
 	static parseMarkdown(content: string): ParsedMarkdown {
 		const lines = content.split("\n");
-		let frontmatter: ViwoodsNoteMetadata | null = null;
-		let currentIndex = 0;
-
-		// Extract frontmatter if present
-		if (lines[0]?.trim() === "---") {
-			const endIndex = lines.findIndex((line, i) => i > 0 && line.trim() === "---");
-			if (endIndex > 0) {
-				const yamlContent = lines.slice(1, endIndex).join("\n");
-				try {
-					frontmatter = parseYaml(yamlContent) as ViwoodsNoteMetadata;
-					currentIndex = endIndex + 1;
-				} catch (error) {
-					StreamLogger.warn("[MarkdownMerger] Failed to parse frontmatter", error);
-				}
-			}
-		}
 
 		// Find all page sections by looking for image embeds
 		// Pattern: ![[resources/...]] or ![[anything]]
@@ -77,7 +60,7 @@ export class MarkdownMerger {
 		const headerLines: string[] = [];
 		let isInHeader = true;
 
-		for (let i = currentIndex; i < lines.length; i++) {
+		for (let i = 0; i < lines.length; i++) {
 			const line = lines[i];
 			const match = line.match(imageEmbedPattern);
 
@@ -116,13 +99,11 @@ export class MarkdownMerger {
 		footer = "";
 
 		StreamLogger.log("[MarkdownMerger] Parsed markdown", {
-			hasFrontmatter: !!frontmatter,
 			headerLines: headerLines.length,
 			pageCount: pages.length,
 		});
 
 		return {
-			frontmatter,
 			header,
 			pages,
 			footer,
@@ -133,38 +114,22 @@ export class MarkdownMerger {
 	 * Merge updated page data into existing markdown while preserving user content
 	 *
 	 * @param existingContent Current markdown content
-	 * @param fileId Dropbox file ID
-	 * @param modifiedTime Last modified timestamp
 	 * @param newPages Array of new/updated page image paths
 	 * @param imageUpdates Optional mappings for updated images
 	 * @returns Merged markdown content
 	 */
 	static merge(
 		existingContent: string,
-		fileId: string,
-		modifiedTime: number,
 		newPages: Array<{ pageNumber: number; imagePath: string }>,
 		imageUpdates?: ImageUpdateMapping[]
 	): string {
 		StreamLogger.log("[MarkdownMerger] Starting merge", {
-			fileId,
-			modifiedTime,
 			newPageCount: newPages.length,
 			hasImageUpdates: !!imageUpdates?.length,
 		});
 
 		const parsed = this.parseMarkdown(existingContent);
 		const updateMap = new Map(imageUpdates?.map(u => [u.pageNumber, u]) || []);
-
-		// Update or create frontmatter
-		const frontmatter: ViwoodsNoteMetadata = {
-			"viwoods-file-id": fileId,
-			"viwoods-last-modified": modifiedTime,
-			"viwoods-pages": newPages.map(p => ({
-				page: p.pageNumber,
-				image: p.imagePath,
-			})),
-		};
 
 		// Build merged pages
 		const mergedPages: PageSection[] = [];
@@ -205,25 +170,18 @@ export class MarkdownMerger {
 		}
 
 		// Reconstruct markdown
-		return this.buildMarkdown(frontmatter, parsed.header, mergedPages, parsed.footer);
+		return this.buildMarkdown(parsed.header, mergedPages, parsed.footer);
 	}
 
 	/**
 	 * Build markdown content from structured sections
 	 */
 	private static buildMarkdown(
-		frontmatter: ViwoodsNoteMetadata,
 		header: string,
 		pages: PageSection[],
 		footer: string
 	): string {
 		const parts: string[] = [];
-
-		// Add frontmatter
-		parts.push("---");
-		parts.push(stringifyYaml(frontmatter).trim());
-		parts.push("---");
-		parts.push("");
 
 		// Add header (if not empty)
 		if (header.trim()) {
@@ -258,11 +216,70 @@ export class MarkdownMerger {
 	}
 
 	/**
-	 * Check if content has Viwoods frontmatter
+	 * Generate metadata filename from note filename
+	 * Example: "My Note.md" -> ".my-note.meta.json"
 	 */
-	static hasViwoodsFrontmatter(content: string): boolean {
-		const parsed = this.parseMarkdown(content);
-		return parsed.frontmatter !== null &&
-			"viwoods-file-id" in parsed.frontmatter;
+	static getMetadataFilename(noteFilename: string): string {
+		// Remove .md extension and convert to slug
+		const baseName = noteFilename.replace(/\.md$/i, "");
+		const slug = baseName
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, "-")
+			.replace(/^-+|-+$/g, "");
+		return `.${slug}.meta.json`;
+	}
+
+	/**
+	 * Get full path to metadata file
+	 */
+	static getMetadataPath(noteFolder: string, resourcesFolder: string, noteFilename: string): string {
+		const metaFilename = this.getMetadataFilename(noteFilename);
+		return `${resourcesFolder}/${metaFilename}`;
+	}
+
+	/**
+	 * Load metadata from sidecar file
+	 */
+	static async loadMetadata(
+		vault: Vault,
+		metadataPath: string
+	): Promise<ViwoodsNoteMetadata | null> {
+		try {
+			const file = vault.getAbstractFileByPath(metadataPath);
+			if (!file) {
+				return null;
+			}
+			const content = await vault.adapter.read(metadataPath);
+			return JSON.parse(content) as ViwoodsNoteMetadata;
+		} catch (error) {
+			await StreamLogger.warn("[MarkdownMerger] Failed to load metadata", error);
+			return null;
+		}
+	}
+
+	/**
+	 * Save metadata to sidecar file
+	 */
+	static async saveMetadata(
+		vault: Vault,
+		metadataPath: string,
+		metadata: ViwoodsNoteMetadata
+	): Promise<void> {
+		try {
+			const content = JSON.stringify(metadata, null, 2);
+			await vault.adapter.write(metadataPath, content);
+			await StreamLogger.log("[MarkdownMerger] Saved metadata", { path: metadataPath });
+		} catch (error) {
+			await StreamLogger.error("[MarkdownMerger] Failed to save metadata", error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Check if metadata file exists
+	 */
+	static async hasMetadata(vault: Vault, metadataPath: string): Promise<boolean> {
+		const file = vault.getAbstractFileByPath(metadataPath);
+		return file !== null;
 	}
 }
