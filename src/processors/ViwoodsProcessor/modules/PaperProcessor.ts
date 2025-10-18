@@ -31,7 +31,7 @@ export class PaperProcessor {
 		config: PaperModuleConfig,
 		context: ProcessorContext
 	): Promise<ProcessorResult> {
-		await StreamLogger.log(`[PaperProcessor.process] Starting Paper module processing`);
+		StreamLogger.log(`[PaperProcessor.process] Starting Paper module processing`);
 		const createdFiles: string[] = [];
 		const errors: string[] = [];
 		const warnings: string[] = [];
@@ -39,7 +39,7 @@ export class PaperProcessor {
 		try {
 			// Find JSON files
 			const allFiles = await StreamingZipUtils.listFiles(zipReader);
-			await StreamLogger.log(`[PaperProcessor.process] Files in ZIP:`, { count: allFiles.length });
+			StreamLogger.log(`[PaperProcessor.process] Files in ZIP:`, { count: allFiles.length });
 
 			const noteFileInfoFile = allFiles.find(f => f.endsWith("_NoteFileInfo.json"));
 			const pageListFile = allFiles.find(f => f.endsWith("_PageListFileInfo.json"));
@@ -53,7 +53,7 @@ export class PaperProcessor {
 			}
 
 			// Extract NoteFileInfo
-			await StreamLogger.log(`[PaperProcessor.process] Extracting NoteFileInfo: ${noteFileInfoFile}`);
+			StreamLogger.log(`[PaperProcessor.process] Extracting NoteFileInfo: ${noteFileInfoFile}`);
 			const noteInfo = await StreamingZipUtils.extractJson<NoteFileInfo>(zipReader, noteFileInfoFile);
 
 			if (!noteInfo) {
@@ -68,7 +68,7 @@ export class PaperProcessor {
 			const createTime = new Date(noteInfo.creationTime);
 			const modifiedTime = new Date(noteInfo.lastModifiedTime);
 
-			await StreamLogger.log(`[PaperProcessor.process] Note info:`, {
+			StreamLogger.log(`[PaperProcessor.process] Note info:`, {
 				noteName,
 				noteSlug,
 				folderPath,
@@ -83,7 +83,7 @@ export class PaperProcessor {
 				const pathMatch = originalPath.match(/Paper\/Papers\/([^/]+)/);
 				if (pathMatch && pathMatch[1] !== "Unclassified Notes") {
 					noteOutputFolder = FileUtils.joinPath(config.notesFolder, pathMatch[1]);
-					await StreamLogger.log(`[PaperProcessor.process] Preserving folder structure: ${noteOutputFolder}`);
+					StreamLogger.log(`[PaperProcessor.process] Preserving folder structure: ${noteOutputFolder}`);
 				}
 			}
 
@@ -103,7 +103,7 @@ export class PaperProcessor {
 				: [];
 
 			const totalPages = pages?.length || 0;
-			await StreamLogger.log(`[PaperProcessor.process] Found ${totalPages} pages and ${resources?.length || 0} resources`);
+			StreamLogger.log(`[PaperProcessor.process] Found ${totalPages} pages and ${resources?.length || 0} resources`);
 
 			// Process each page and collect screenshot paths and image update mappings
 			const screenshotPaths: string[] = [];
@@ -116,11 +116,11 @@ export class PaperProcessor {
 					const pageNum = i + 1;
 
 					try {
-						await StreamLogger.log(`[PaperProcessor.process] Processing page ${pageNum}/${totalPages}`);
+						StreamLogger.log(`[PaperProcessor.process] Processing page ${pageNum}/${totalPages}`);
 
 						// Find resources for this page
 						const pageResources = resources?.filter(r => r.pid === page.id) || [];
-						await StreamLogger.log(`[PaperProcessor.process] Found ${pageResources.length} resources for page ${pageNum}`);
+						StreamLogger.log(`[PaperProcessor.process] Found ${pageResources.length} resources for page ${pageNum}`);
 
 						// Extract screenshot if available
 						const screenshot = pageResources.find(r => r.resourceType === ResourceType.SCREENSHOT);
@@ -147,9 +147,9 @@ export class PaperProcessor {
 										oldPath: result.oldPath,
 										newPath: result.newPath,
 									});
-									await StreamLogger.log(`[PaperProcessor.process] Updated screenshot: ${result.oldPath} -> ${result.newPath}`);
+									StreamLogger.log(`[PaperProcessor.process] Updated screenshot: ${result.oldPath} -> ${result.newPath}`);
 								} else {
-									await StreamLogger.log(`[PaperProcessor.process] Created new screenshot: ${result.newPath}`);
+									StreamLogger.log(`[PaperProcessor.process] Created new screenshot: ${result.newPath}`);
 								}
 
 								// Track page metadata for frontmatter
@@ -162,7 +162,7 @@ export class PaperProcessor {
 					} catch (pageError) {
 						const err = pageError as Error;
 						errors.push(`Error processing page ${pageNum}: ${err.message}`);
-						await StreamLogger.error(`[PaperProcessor.process] Error on page ${pageNum}:`, err);
+						StreamLogger.error(`[PaperProcessor.process] Error on page ${pageNum}:`, err);
 					}
 				}
 			}
@@ -208,7 +208,7 @@ export class PaperProcessor {
 			};
 		} catch (error) {
 			const err = error as Error;
-			await StreamLogger.error(`[PaperProcessor.process] Fatal error:`, err);
+			StreamLogger.error(`[PaperProcessor.process] Fatal error:`, err);
 			return {
 				success: false,
 				createdFiles,
@@ -234,7 +234,6 @@ export class PaperProcessor {
 
 			// Generate metadata key for settings
 			const metadataKey = MarkdownMerger.getMetadataKey(filepath);
-			await StreamLogger.log(`[VERBOSE] Checking metadata for: ${metadataKey}`);
 
 			// Create metadata object
 			const metadata = {
@@ -253,63 +252,28 @@ export class PaperProcessor {
 			if (existingFile instanceof TFile) {
 				// File exists - check if we have metadata
 				const existingMetadata = context.pluginSettings.viwoodsNoteMetadata[metadataKey];
-				await StreamLogger.log(`[VERBOSE] Metadata exists: ${!!existingMetadata}`);
-
-				if (existingMetadata) {
-					await StreamLogger.log(`[VERBOSE] Metadata content:`, {
-						fileId: existingMetadata.fileId,
-						pages: existingMetadata.pages.length,
-						lastModified: existingMetadata.lastModified
-					});
-				}
 
 				// File exists - use merge strategy
-				await StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Merging existing file: ${filepath}`, {
+				StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Merging existing file: ${filepath}`, {
 					pageCount: pageImagePaths.length,
 					imageUpdates: imageUpdates.length,
+					hasMetadata: !!existingMetadata,
 				});
 
 				const existingContent = await context.vault.read(existingFile);
 
-				if (existingMetadata) {
-					// Merge: preserve user content, update images
-					await StreamLogger.log(`[VERBOSE] Decision: MERGE (metadata found)`);
-					await StreamLogger.log(`[VERBOSE] Parsing existing markdown...`);
+				// Always merge to preserve user content
+				const mergedContent = MarkdownMerger.merge(
+					existingContent,
+					pageImagePaths,
+					imageUpdates
+				);
 
-					await StreamLogger.log(`[VERBOSE] Image updates:`, imageUpdates.map(u => ({
-						page: u.pageNumber,
-						old: u.oldPath,
-						new: u.newPath
-					})));
-
-					await StreamLogger.log(`[VERBOSE] Merging content...`);
-					const mergedContent = MarkdownMerger.merge(
-						existingContent,
-						pageImagePaths,
-						imageUpdates
-					);
-
-					await context.vault.modify(existingFile, mergedContent);
-					await StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Merged note file with user edits preserved`);
-				} else {
-					// File exists but no metadata - still try to merge
-					// This handles migration from old versions
-					await StreamLogger.log(`[VERBOSE] Decision: MERGE (no metadata but file exists - migration case)`);
-					await StreamLogger.log(`[VERBOSE] Parsing existing markdown for merge...`);
-
-					const mergedContent = MarkdownMerger.merge(
-						existingContent,
-						pageImagePaths,
-						imageUpdates
-					);
-
-					await context.vault.modify(existingFile, mergedContent);
-					await StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Merged note file (migration case)`);
-				}
+				await context.vault.modify(existingFile, mergedContent);
+				StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Merged note file with user edits preserved`);
 			} else {
 				// New file - generate from template
-				await StreamLogger.log(`[VERBOSE] Decision: CREATE NEW (file doesn't exist)`);
-				await StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Creating new note file: ${filepath}`);
+				StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Creating new note file: ${filepath}`);
 				const defaultTemplate = await TemplateDefaults.load("viwoods-paper-note.md");
 				const template = await context.templateResolver.resolve(config.noteTemplate, defaultTemplate);
 				const content = TemplateEngine.render(template, data, createTime);
@@ -317,14 +281,13 @@ export class PaperProcessor {
 			}
 
 			// Save metadata to settings
-			await StreamLogger.log(`[VERBOSE] Saving metadata to settings`);
 			context.pluginSettings.viwoodsNoteMetadata[metadataKey] = metadata;
 			// Note: saveSettings() will be called by the plugin after processing
 
-			await StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Note file saved: ${filepath}`);
+			StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Note file saved: ${filepath}`);
 			return filepath;
 		} catch (error) {
-			await StreamLogger.error("[PaperProcessor.generateOrMergeNoteFile] Failed to generate/merge note file:", error);
+			StreamLogger.error("[PaperProcessor.generateOrMergeNoteFile] Failed to generate/merge note file:", error);
 			return null;
 		}
 	}
