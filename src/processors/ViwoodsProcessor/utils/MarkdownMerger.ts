@@ -1,17 +1,4 @@
-import { Vault } from "obsidian";
 import { StreamLogger } from "../../../utils/StreamLogger";
-
-/**
- * Metadata stored in sidecar .meta.json file for tracking Viwoods paper notes
- */
-export interface ViwoodsNoteMetadata {
-	fileId: string;
-	lastModified: number;
-	pages: Array<{
-		page: number;
-		image: string;
-	}>;
-}
 
 /**
  * Represents a page section in the markdown file
@@ -216,70 +203,11 @@ export class MarkdownMerger {
 	}
 
 	/**
-	 * Generate metadata filename from note filename
-	 * Example: "My Note.md" -> ".my-note.meta.json"
+	 * Generate metadata key from note file path
+	 * This is used as the key in settings.viwoodsNoteMetadata
+	 * Example: "Viwoods/Paper/how are you.md" -> "Viwoods/Paper/how are you.md"
 	 */
-	static getMetadataFilename(noteFilename: string): string {
-		// Remove .md extension and convert to slug
-		const baseName = noteFilename.replace(/\.md$/i, "");
-		const slug = baseName
-			.toLowerCase()
-			.replace(/[^a-z0-9]+/g, "-")
-			.replace(/^-+|-+$/g, "");
-		return `.${slug}.meta.json`;
-	}
-
-	/**
-	 * Get full path to metadata file
-	 */
-	static getMetadataPath(noteFolder: string, resourcesFolder: string, noteFilename: string): string {
-		const metaFilename = this.getMetadataFilename(noteFilename);
-		return `${resourcesFolder}/${metaFilename}`;
-	}
-
-	/**
-	 * Load metadata from sidecar file
-	 */
-	static async loadMetadata(
-		vault: Vault,
-		metadataPath: string
-	): Promise<ViwoodsNoteMetadata | null> {
-		try {
-			const file = vault.getAbstractFileByPath(metadataPath);
-			if (!file) {
-				return null;
-			}
-			const content = await vault.adapter.read(metadataPath);
-			return JSON.parse(content) as ViwoodsNoteMetadata;
-		} catch (error) {
-			await StreamLogger.warn("[MarkdownMerger] Failed to load metadata", error);
-			return null;
-		}
-	}
-
-	/**
-	 * Save metadata to sidecar file
-	 */
-	static async saveMetadata(
-		vault: Vault,
-		metadataPath: string,
-		metadata: ViwoodsNoteMetadata
-	): Promise<void> {
-		try {
-			const content = JSON.stringify(metadata, null, 2);
-			await vault.adapter.write(metadataPath, content);
-			await StreamLogger.log("[MarkdownMerger] Saved metadata", { path: metadataPath });
-		} catch (error) {
-			await StreamLogger.error("[MarkdownMerger] Failed to save metadata", error);
-			throw error;
-		}
-	}
-
-	/**
-	 * Check if metadata file exists
-	 */
-	static async hasMetadata(vault: Vault, metadataPath: string): Promise<boolean> {
-		const file = vault.getAbstractFileByPath(metadataPath);
-		return file !== null;
+	static getMetadataKey(notePath: string): string {
+		return notePath;
 	}
 }

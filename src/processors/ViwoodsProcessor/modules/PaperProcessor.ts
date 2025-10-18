@@ -221,7 +221,7 @@ export class PaperProcessor {
 		context: ProcessorContext,
 		config: PaperModuleConfig,
 		outputFolder: string,
-		resourcesFolder: string,
+		_resourcesFolder: string,
 		data: Record<string, unknown>,
 		createTime: Date,
 		pageImagePaths: Array<{ pageNumber: number; imagePath: string }>,
@@ -232,13 +232,15 @@ export class PaperProcessor {
 			const filename = `${data.noteName}.md`;
 			const filepath = FileUtils.joinPath(outputFolder, filename);
 
-			// Generate metadata path
-			const metadataPath = MarkdownMerger.getMetadataPath(outputFolder, resourcesFolder, filename);
+			// Generate metadata key for settings
+			const metadataKey = MarkdownMerger.getMetadataKey(filepath);
+			await StreamLogger.log(`[VERBOSE] Checking metadata for: ${metadataKey}`);
 
 			// Create metadata object
 			const metadata = {
 				fileId: data.fileId as string,
 				lastModified: data.lastModified as number,
+				notePath: filepath,
 				pages: pageImagePaths.map(p => ({
 					page: p.pageNumber,
 					image: p.imagePath,
@@ -249,6 +251,18 @@ export class PaperProcessor {
 			const existingFile = context.vault.getAbstractFileByPath(filepath);
 
 			if (existingFile instanceof TFile) {
+				// File exists - check if we have metadata
+				const existingMetadata = context.pluginSettings.viwoodsNoteMetadata[metadataKey];
+				await StreamLogger.log(`[VERBOSE] Metadata exists: ${!!existingMetadata}`);
+
+				if (existingMetadata) {
+					await StreamLogger.log(`[VERBOSE] Metadata content:`, {
+						fileId: existingMetadata.fileId,
+						pages: existingMetadata.pages.length,
+						lastModified: existingMetadata.lastModified
+					});
+				}
+
 				// File exists - use merge strategy
 				await StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Merging existing file: ${filepath}`, {
 					pageCount: pageImagePaths.length,
@@ -257,10 +271,18 @@ export class PaperProcessor {
 
 				const existingContent = await context.vault.read(existingFile);
 
-				// Check if it has metadata file (was processed by us before)
-				const hasMetadata = await MarkdownMerger.hasMetadata(context.vault, metadataPath);
-				if (hasMetadata) {
+				if (existingMetadata) {
 					// Merge: preserve user content, update images
+					await StreamLogger.log(`[VERBOSE] Decision: MERGE (metadata found)`);
+					await StreamLogger.log(`[VERBOSE] Parsing existing markdown...`);
+
+					await StreamLogger.log(`[VERBOSE] Image updates:`, imageUpdates.map(u => ({
+						page: u.pageNumber,
+						old: u.oldPath,
+						new: u.newPath
+					})));
+
+					await StreamLogger.log(`[VERBOSE] Merging content...`);
 					const mergedContent = MarkdownMerger.merge(
 						existingContent,
 						pageImagePaths,
@@ -270,16 +292,23 @@ export class PaperProcessor {
 					await context.vault.modify(existingFile, mergedContent);
 					await StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Merged note file with user edits preserved`);
 				} else {
-					// File exists but no metadata file - generate new content
-					// This handles migration from old format or manual creation
-					await StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Existing file has no metadata - regenerating`);
-					const defaultTemplate = await TemplateDefaults.load("viwoods-paper-note.md");
-					const template = await context.templateResolver.resolve(config.noteTemplate, defaultTemplate);
-					const content = TemplateEngine.render(template, data, createTime);
-					await context.vault.modify(existingFile, content);
+					// File exists but no metadata - still try to merge
+					// This handles migration from old versions
+					await StreamLogger.log(`[VERBOSE] Decision: MERGE (no metadata but file exists - migration case)`);
+					await StreamLogger.log(`[VERBOSE] Parsing existing markdown for merge...`);
+
+					const mergedContent = MarkdownMerger.merge(
+						existingContent,
+						pageImagePaths,
+						imageUpdates
+					);
+
+					await context.vault.modify(existingFile, mergedContent);
+					await StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Merged note file (migration case)`);
 				}
 			} else {
 				// New file - generate from template
+				await StreamLogger.log(`[VERBOSE] Decision: CREATE NEW (file doesn't exist)`);
 				await StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Creating new note file: ${filepath}`);
 				const defaultTemplate = await TemplateDefaults.load("viwoods-paper-note.md");
 				const template = await context.templateResolver.resolve(config.noteTemplate, defaultTemplate);
@@ -287,8 +316,10 @@ export class PaperProcessor {
 				await context.vault.create(filepath, content);
 			}
 
-			// Save metadata to sidecar file
-			await MarkdownMerger.saveMetadata(context.vault, metadataPath, metadata);
+			// Save metadata to settings
+			await StreamLogger.log(`[VERBOSE] Saving metadata to settings`);
+			context.pluginSettings.viwoodsNoteMetadata[metadataKey] = metadata;
+			// Note: saveSettings() will be called by the plugin after processing
 
 			await StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Note file saved: ${filepath}`);
 			return filepath;

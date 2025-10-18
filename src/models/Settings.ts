@@ -20,6 +20,19 @@ export interface FileTypeMapping {
 }
 
 /**
+ * Metadata for tracking Viwoods note processing
+ */
+export interface ViwoodsNoteMetadata {
+	fileId: string; // Dropbox file ID
+	lastModified: number; // Last modified timestamp
+	notePath: string; // Path to markdown file in vault
+	pages: Array<{
+		page: number;
+		image: string; // Current image path
+	}>;
+}
+
+/**
  * Main plugin settings
  */
 export interface DrpbxFetcherSettings {
@@ -45,6 +58,8 @@ export interface DrpbxFetcherSettings {
 	// Chunked download settings
 	chunkSizeBytes: number; // Chunk size for large file downloads (default: 2MB)
 	chunkedDownloadThreshold: number; // File size threshold to use chunked download (default: 10MB)
+	// Viwoods note metadata (for merge tracking)
+	viwoodsNoteMetadata: Record<string, ViwoodsNoteMetadata>; // Key: markdown file path
 }
 
 /**
@@ -68,4 +83,5 @@ export const DEFAULT_SETTINGS: DrpbxFetcherSettings = {
 	maxFileSizeMobile: 10 * 1024 * 1024, // 10 MB default for mobile
 	chunkSizeBytes: 2 * 1024 * 1024, // 2 MB chunks
 	chunkedDownloadThreshold: 10 * 1024 * 1024, // Use chunked download for files >10 MB
+	viwoodsNoteMetadata: {}, // Empty by default
 };
