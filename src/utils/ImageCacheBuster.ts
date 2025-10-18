@@ -6,23 +6,23 @@ import { Vault, TFile } from "obsidian";
  * Obsidian aggressively caches images for performance. When an image file is updated,
  * even with proper Vault API methods, the visual display doesn't refresh without restart.
  *
- * This utility works around the caching issue by using a "ping-pong" filename strategy:
+ * This utility works around the caching issue by using a timestamp-based filename strategy:
  * - Original: image.png
- * - Alternate: image-cache-bust.png
+ * - Timestamped: image-1234567890.png
  *
- * On each update, it renames the file to the alternate name, forcing Obsidian to treat
- * it as a "new" file and invalidate the cache.
+ * On each update, it renames the file with a new timestamp suffix, forcing Obsidian to treat
+ * it as a "new" file and invalidate the cache. Old timestamped variants are cleaned up.
  */
 export class ImageCacheBuster {
-	private static readonly CACHE_BUST_SUFFIX = "-cache-bust";
+	private static readonly TIMESTAMP_PATTERN = /-\d+$/;
 
 	/**
-	 * Update an image file with cache-busting via filename alternation.
+	 * Update an image file with cache-busting via timestamp-based renaming.
 	 *
 	 * @param vault Obsidian Vault instance
-	 * @param basePath Original file path (without cache-bust suffix, e.g., "folder/image.png")
+	 * @param basePath Original file path (without timestamp, e.g., "folder/image.png")
 	 * @param imageData New image data to write
-	 * @returns The actual path where the file was saved (may include cache-bust suffix)
+	 * @returns The actual path where the file was saved (includes timestamp)
 	 */
 	static async updateImageWithCacheBust(
 		vault: Vault,
@@ -39,55 +39,118 @@ export class ImageCacheBuster {
 		const name = lastDot >= 0 ? fullName.substring(0, lastDot) : fullName;
 		const ext = lastDot >= 0 ? fullName.substring(lastDot) : "";
 
-		// Generate alternate path
-		const alternatePath = dir
-			? `${dir}/${name}${this.CACHE_BUST_SUFFIX}${ext}`
-			: `${name}${this.CACHE_BUST_SUFFIX}${ext}`;
+		// Generate new timestamped path
+		const timestamp = Date.now();
+		const newPath = dir
+			? `${dir}/${name}-${timestamp}${ext}`
+			: `${name}-${timestamp}${ext}`;
 
-		// Check which variant exists
+		// Clean up any old variants with timestamps
+		const baseNamePattern = dir ? `${dir}/${name}` : name;
+		await this.cleanupOldVariants(vault, baseNamePattern, ext);
+
+		// Create the new timestamped file
+		await vault.createBinary(newPath, imageData.buffer as ArrayBuffer);
+
+		return newPath;
+	}
+
+	/**
+	 * Remove old timestamped variants of an image file.
+	 *
+	 * @param vault Obsidian Vault instance
+	 * @param baseNamePattern Base path + filename without extension (e.g., "folder/image")
+	 * @param extension File extension (e.g., ".png")
+	 */
+	private static async cleanupOldVariants(
+		vault: Vault,
+		baseNamePattern: string,
+		extension: string
+	): Promise<void> {
+		// Check for base file without timestamp
+		const basePath = `${baseNamePattern}${extension}`;
 		const baseFile = vault.getAbstractFileByPath(basePath);
-		const alternateFile = vault.getAbstractFileByPath(alternatePath);
-
-		let existingFile: TFile | null = null;
-		let targetPath: string;
-
 		if (baseFile instanceof TFile) {
-			existingFile = baseFile;
-			targetPath = alternatePath; // Switch to alternate
-		} else if (alternateFile instanceof TFile) {
-			existingFile = alternateFile;
-			targetPath = basePath; // Switch back to base
-		} else {
-			// No existing file, create new one at base path
-			await vault.createBinary(basePath, imageData);
-			return basePath;
+			await vault.delete(baseFile);
 		}
 
-		// Update content and rename to trigger cache invalidation
-		await vault.modifyBinary(existingFile, imageData);
-		await vault.rename(existingFile, targetPath);
+		// Find and delete timestamped variants
+		const dir = baseNamePattern.includes("/")
+			? baseNamePattern.substring(0, baseNamePattern.lastIndexOf("/"))
+			: "";
+		const baseName = baseNamePattern.includes("/")
+			? baseNamePattern.substring(baseNamePattern.lastIndexOf("/") + 1)
+			: baseNamePattern;
 
-		return targetPath;
+		const parentFolder = dir
+			? vault.getAbstractFileByPath(dir)
+			: vault.getRoot();
+
+		if (!parentFolder || !("children" in parentFolder)) return;
+
+		// Find all files matching the pattern: baseName-<timestamp>.ext
+		const timestampRegex = new RegExp(
+			`^${this.escapeRegex(baseName)}-\\d+${this.escapeRegex(extension)}$`
+		);
+
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const children = (parentFolder as any).children as unknown[];
+		const filesToDelete = children.filter(
+			(child: unknown) => child instanceof TFile && timestampRegex.test(child.name)
+		) as TFile[];
+
+		for (const file of filesToDelete) {
+			await vault.delete(file);
+		}
 	}
 
 	/**
-	 * Check if a path is a cache-bust variant.
+	 * Escape special regex characters in a string.
+	 *
+	 * @param str String to escape
+	 * @returns Escaped string safe for use in RegExp
+	 */
+	private static escapeRegex(str: string): string {
+		return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	}
+
+	/**
+	 * Check if a path is a timestamped cache-bust variant.
 	 *
 	 * @param path File path to check
-	 * @returns true if path contains cache-bust suffix
+	 * @returns true if path contains timestamp suffix
 	 */
 	static isCacheBustPath(path: string): boolean {
-		return path.includes(this.CACHE_BUST_SUFFIX);
+		// Extract filename without extension
+		const lastSlash = path.lastIndexOf("/");
+		const fullName = lastSlash >= 0 ? path.substring(lastSlash + 1) : path;
+		const lastDot = fullName.lastIndexOf(".");
+		const nameWithoutExt = lastDot >= 0 ? fullName.substring(0, lastDot) : fullName;
+
+		// Check if name ends with timestamp pattern
+		return this.TIMESTAMP_PATTERN.test(nameWithoutExt);
 	}
 
 	/**
-	 * Get the base path from a cache-bust path.
-	 * Removes the cache-bust suffix if present.
+	 * Get the base path from a timestamped cache-bust path.
+	 * Removes the timestamp suffix if present.
 	 *
-	 * @param path File path (may or may not have cache-bust suffix)
-	 * @returns Base path without cache-bust suffix
+	 * @param path File path (may or may not have timestamp suffix)
+	 * @returns Base path without timestamp suffix
 	 */
 	static getBasePath(path: string): string {
-		return path.replace(this.CACHE_BUST_SUFFIX, "");
+		const lastSlash = path.lastIndexOf("/");
+		const dir = lastSlash >= 0 ? path.substring(0, lastSlash) : "";
+		const fullName = lastSlash >= 0 ? path.substring(lastSlash + 1) : path;
+
+		// Split filename and extension
+		const lastDot = fullName.lastIndexOf(".");
+		const name = lastDot >= 0 ? fullName.substring(0, lastDot) : fullName;
+		const ext = lastDot >= 0 ? fullName.substring(lastDot) : "";
+
+		// Remove timestamp if present
+		const baseName = name.replace(this.TIMESTAMP_PATTERN, "");
+
+		return dir ? `${dir}/${baseName}${ext}` : `${baseName}${ext}`;
 	}
 }
