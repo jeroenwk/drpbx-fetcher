@@ -22,13 +22,13 @@ export class ImageCacheBuster {
 	 * @param vault Obsidian Vault instance
 	 * @param basePath Original file path (without timestamp, e.g., "folder/image.png")
 	 * @param imageData New image data to write
-	 * @returns The actual path where the file was saved (includes timestamp)
+	 * @returns Object with newPath and oldPath (if an old version existed)
 	 */
 	static async updateImageWithCacheBust(
 		vault: Vault,
 		basePath: string,
 		imageData: Uint8Array
-	): Promise<string> {
+	): Promise<{ newPath: string; oldPath: string | null }> {
 		// Extract path components
 		const lastSlash = basePath.lastIndexOf("/");
 		const dir = lastSlash >= 0 ? basePath.substring(0, lastSlash) : "";
@@ -45,14 +45,69 @@ export class ImageCacheBuster {
 			? `${dir}/${name}-${timestamp}${ext}`
 			: `${name}-${timestamp}${ext}`;
 
-		// Clean up any old variants with timestamps
+		// Find any old variants before cleaning up
 		const baseNamePattern = dir ? `${dir}/${name}` : name;
+		const oldPath = await this.findExistingVariant(vault, baseNamePattern, ext);
+
+		// Clean up any old variants with timestamps
 		await this.cleanupOldVariants(vault, baseNamePattern, ext);
 
 		// Create the new timestamped file
 		await vault.createBinary(newPath, imageData.buffer as ArrayBuffer);
 
-		return newPath;
+		return { newPath, oldPath };
+	}
+
+	/**
+	 * Find an existing variant of an image file (base or timestamped).
+	 *
+	 * @param vault Obsidian Vault instance
+	 * @param baseNamePattern Base path + filename without extension (e.g., "folder/image")
+	 * @param extension File extension (e.g., ".png")
+	 * @returns Path to existing file, or null if none found
+	 */
+	private static async findExistingVariant(
+		vault: Vault,
+		baseNamePattern: string,
+		extension: string
+	): Promise<string | null> {
+		// Check for base file without timestamp
+		const basePath = `${baseNamePattern}${extension}`;
+		const baseFile = vault.getAbstractFileByPath(basePath);
+		if (baseFile instanceof TFile) {
+			return basePath;
+		}
+
+		// Find timestamped variant
+		const dir = baseNamePattern.includes("/")
+			? baseNamePattern.substring(0, baseNamePattern.lastIndexOf("/"))
+			: "";
+		const baseName = baseNamePattern.includes("/")
+			? baseNamePattern.substring(baseNamePattern.lastIndexOf("/") + 1)
+			: baseNamePattern;
+
+		const parentFolder = dir
+			? vault.getAbstractFileByPath(dir)
+			: vault.getRoot();
+
+		if (!parentFolder || !("children" in parentFolder)) return null;
+
+		// Find files matching the pattern: baseName-<timestamp>.ext
+		const timestampRegex = new RegExp(
+			`^${this.escapeRegex(baseName)}-\\d+${this.escapeRegex(extension)}$`
+		);
+
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const children = (parentFolder as any).children as unknown[];
+		const matchingFile = children.find(
+			(child: unknown) => child instanceof TFile && timestampRegex.test(child.name)
+		) as TFile | undefined;
+
+		if (matchingFile) {
+			return dir ? `${dir}/${matchingFile.name}` : matchingFile.name;
+		}
+
+		return null;
 	}
 
 	/**

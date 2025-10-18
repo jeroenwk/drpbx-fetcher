@@ -130,14 +130,14 @@ export class PickingProcessor {
 									resourcesFolder,
 									`${noteSlug}-item-${itemNum}.png`
 								);
-								const finalPath = await ImageCacheBuster.updateImageWithCacheBust(
+								const result = await ImageCacheBuster.updateImageWithCacheBust(
 									context.vault,
 									compositePath,
 									compositeData
 								);
-								createdFiles.push(finalPath);
-								compositePaths.push(finalPath);
-								await StreamLogger.log(`[PickingProcessor.process] Saved composite image: ${finalPath}`);
+								createdFiles.push(result.newPath);
+								compositePaths.push(result.newPath);
+								await StreamLogger.log(`[PickingProcessor.process] Saved composite image: ${result.newPath}`);
 							}
 						} else if (item.pageShotFilePath) {
 							// Fallback: use pageShotFilePath if available
@@ -147,14 +147,14 @@ export class PickingProcessor {
 									resourcesFolder,
 									`${noteSlug}-item-${itemNum}.png`
 								);
-								const finalPath = await ImageCacheBuster.updateImageWithCacheBust(
+								const result = await ImageCacheBuster.updateImageWithCacheBust(
 									context.vault,
 									screenshotPath,
 									screenshotData
 								);
-								createdFiles.push(finalPath);
-								compositePaths.push(finalPath);
-								await StreamLogger.log(`[PickingProcessor.process] Saved screenshot: ${finalPath}`);
+								createdFiles.push(result.newPath);
+								compositePaths.push(result.newPath);
+								await StreamLogger.log(`[PickingProcessor.process] Saved screenshot: ${result.newPath}`);
 							}
 						}
 					} catch (itemError) {
@@ -280,7 +280,7 @@ export class PickingProcessor {
 				await FileUtils.ensurePath(context.vault, capturesFolder);
 
 				// Write file to vault
-				const finalPath = await ImageCacheBuster.updateImageWithCacheBust(
+				const result = await ImageCacheBuster.updateImageWithCacheBust(
 					context.vault,
 					outputPath,
 					fileData
@@ -288,7 +288,7 @@ export class PickingProcessor {
 
 				return {
 					success: true,
-					createdFiles: [finalPath],
+					createdFiles: [result.newPath],
 				};
 			}
 
