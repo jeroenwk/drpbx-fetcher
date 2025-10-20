@@ -836,14 +836,15 @@ export default class DrpbxFetcherPlugin extends Plugin {
     await this.tempFileManager.ensureTempDir();
 
     // Initialize metadata manager for Viwoods note metadata
-    // Use vault adapter to read/write separate metadata file
-    const metadataPath = `${this.manifest.dir}/viwoodsNoteMetadata.json`;
+    // Use vault adapter to read/write separate metadata file in plugin config directory
+    const configDir = (this.app.vault.adapter as any).getBasePath?.() || '';
+    const metadataPath = `${configDir}/.obsidian/plugins/drpbx-fetcher/viwoodsNoteMetadata.json`;
     this.metadataManager = new MetadataManager(
       metadataPath,
       async () => {
         // Load metadata from separate file using vault adapter
         try {
-          const content = await this.app.vault.adapter.read(metadataPath);
+          const content = await this.app.vault.adapter.read('.obsidian/plugins/drpbx-fetcher/viwoodsNoteMetadata.json');
           return JSON.parse(content) as Record<string, ViwoodsNoteMetadata>;
         } catch (error) {
           // File doesn't exist or can't be read
@@ -852,7 +853,7 @@ export default class DrpbxFetcherPlugin extends Plugin {
       },
       async (data: Record<string, ViwoodsNoteMetadata>) => {
         // Save metadata to separate file using vault adapter
-        await this.app.vault.adapter.write(metadataPath, JSON.stringify(data, null, 2));
+        await this.app.vault.adapter.write('.obsidian/plugins/drpbx-fetcher/viwoodsNoteMetadata.json', JSON.stringify(data, null, 2));
       }
     );
     await this.loadMetadata();
