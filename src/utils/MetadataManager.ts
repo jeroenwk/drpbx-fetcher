@@ -31,6 +31,10 @@ export class MetadataManager {
 			StreamLogger.log("[MetadataManager] Loaded metadata", {
 				path: this.metadataFilePath,
 				count: Object.keys(this.metadata).length,
+				entries: Object.entries(this.metadata).map(([key, val]) => ({
+					key,
+					pageCount: val.pages.length
+				}))
 			});
 		} catch (error) {
 			StreamLogger.warn("[MetadataManager] Failed to load metadata, using empty", error);
@@ -43,11 +47,19 @@ export class MetadataManager {
 	 */
 	async save(): Promise<void> {
 		try {
-			await this.saveDataFn(this.metadata);
-			StreamLogger.log("[MetadataManager] Saved metadata", {
+			// Log metadata details before saving
+			StreamLogger.log("[MetadataManager] Saving metadata", {
 				path: this.metadataFilePath,
 				count: Object.keys(this.metadata).length,
+				entries: Object.entries(this.metadata).map(([key, val]) => ({
+					key,
+					lastModified: val.lastModified,
+					pageCount: val.pages.length
+				}))
 			});
+
+			await this.saveDataFn(this.metadata);
+			StreamLogger.log("[MetadataManager] Saved metadata successfully");
 		} catch (error) {
 			StreamLogger.error("[MetadataManager] Failed to save metadata", error);
 			throw error;
@@ -63,7 +75,8 @@ export class MetadataManager {
 
 		// Create markdown content
 		return `---
-${yaml}---
+${yaml}
+---
 
 # Viwoods Paper Note Metadata
 
@@ -142,12 +155,24 @@ Each note entry contains:
 					continue;
 				}
 
-				// Match note key (2 spaces indent)
-				const noteMatch = line.match(/^ {2}([^:]+):\s*$/);
-				if (noteMatch) {
+				// Match note key (EXACTLY 2 spaces indent, not followed by more spaces)
+				const noteMatch = line.match(/^  ([^:]+):\s*$/);
+				if (noteMatch && !line.startsWith('   ')) {
 					// Save previous note if exists
+					if (currentKey && currentMetadata) {
+						StreamLogger.log(`[MetadataManager.fromYAML] Saving note: ${currentKey}`, {
+							hasFileId: !!currentMetadata.fileId,
+							hasLastModified: currentMetadata.lastModified !== undefined,
+							hasNotePath: !!currentMetadata.notePath,
+							hasPages: !!currentMetadata.pages,
+							pagesLength: currentMetadata.pages?.length || 0
+						});
+					}
 					if (currentKey && currentMetadata && currentMetadata.fileId && currentMetadata.lastModified !== undefined && currentMetadata.notePath && currentMetadata.pages) {
 						metadata[currentKey] = currentMetadata as ViwoodsNoteMetadata;
+						StreamLogger.log(`[MetadataManager.fromYAML] Successfully saved note: ${currentKey}`);
+					} else if (currentKey) {
+						StreamLogger.warn(`[MetadataManager.fromYAML] Skipped note ${currentKey} - missing required fields`);
 					}
 
 					// Start new note

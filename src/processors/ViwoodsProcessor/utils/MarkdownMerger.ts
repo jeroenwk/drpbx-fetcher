@@ -98,17 +98,42 @@ export class MarkdownMerger {
 	}
 
 	/**
+	 * Update header metadata with new modified time and page count
+	 */
+	private static updateHeader(header: string, modifiedTime: Date, totalPages: number): string {
+		const lines = header.split('\n');
+		const updatedLines = lines.map(line => {
+			// Update Modified date
+			if (line.startsWith('**Modified:**')) {
+				const formatted = modifiedTime.toISOString()
+					.replace('T', ' ')
+					.replace(/:\d{2}\.\d{3}Z$/, '')
+					.substring(0, 16);
+				return `**Modified:** ${formatted}`;
+			}
+			// Update Total Pages
+			if (line.startsWith('**Total Pages:**')) {
+				return `**Total Pages:** ${totalPages}`;
+			}
+			return line;
+		});
+		return updatedLines.join('\n');
+	}
+
+	/**
 	 * Merge updated page data into existing markdown while preserving user content
 	 *
 	 * @param existingContent Current markdown content
 	 * @param newPages Array of new/updated page image paths
 	 * @param imageUpdates Optional mappings for updated images
+	 * @param modifiedTime Optional new modified time to update in header
 	 * @returns Merged markdown content
 	 */
 	static merge(
 		existingContent: string,
 		newPages: Array<{ pageNumber: number; imagePath: string }>,
-		imageUpdates?: ImageUpdateMapping[]
+		imageUpdates?: ImageUpdateMapping[],
+		modifiedTime?: Date
 	): string {
 		StreamLogger.log("[MarkdownMerger] Starting merge", {
 			newPageCount: newPages.length,
@@ -156,8 +181,13 @@ export class MarkdownMerger {
 			}
 		}
 
+		// Update header if modified time provided
+		const finalHeader = modifiedTime
+			? this.updateHeader(parsed.header, modifiedTime, mergedPages.length)
+			: parsed.header;
+
 		// Reconstruct markdown
-		return this.buildMarkdown(parsed.header, mergedPages, parsed.footer);
+		return this.buildMarkdown(finalHeader, mergedPages, parsed.footer);
 	}
 
 	/**

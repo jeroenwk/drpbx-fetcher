@@ -195,6 +195,7 @@ export class PaperProcessor {
 					screenshotSections,
 				},
 				createTime,
+				modifiedTime,
 				pageImagePaths,
 				imageUpdates,
 				metadataManager
@@ -227,6 +228,7 @@ export class PaperProcessor {
 		_resourcesFolder: string,
 		data: Record<string, unknown>,
 		createTime: Date,
+		modifiedTime: Date,
 		pageImagePaths: Array<{ pageNumber: number; imagePath: string }>,
 		imageUpdates: ImageUpdateMapping[],
 		metadataManager: MetadataManager
@@ -250,6 +252,13 @@ export class PaperProcessor {
 				})),
 			};
 
+			StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Created metadata for ${filepath}`, {
+				key: metadataKey,
+				pageImagePathsCount: pageImagePaths.length,
+				pageImagePaths: pageImagePaths,
+				metadataPages: metadata.pages
+			});
+
 			// Check if file exists
 			const existingFile = context.vault.getAbstractFileByPath(filepath);
 
@@ -266,15 +275,16 @@ export class PaperProcessor {
 
 				const existingContent = await context.vault.read(existingFile);
 
-				// Always merge to preserve user content
+				// Always merge to preserve user content and update metadata
 				const mergedContent = MarkdownMerger.merge(
 					existingContent,
 					pageImagePaths,
-					imageUpdates
+					imageUpdates,
+					modifiedTime
 				);
 
 				await context.vault.modify(existingFile, mergedContent);
-				StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Merged note file with user edits preserved`);
+				StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Merged note file with user edits preserved and metadata updated`);
 			} else {
 				// New file - generate from template
 				StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Creating new note file: ${filepath}`);
