@@ -1,6 +1,7 @@
 import { App, Vault } from "obsidian";
 import { files } from "dropbox";
 import type { DrpbxFetcherSettings } from "../models/Settings";
+import type { MetadataManager } from "../utils/MetadataManager";
 
 /**
  * Base configuration interface for all processors
@@ -26,6 +27,7 @@ export interface ProcessorContext {
 	app: App;
 	templateResolver: TemplateResolver;
 	pluginSettings: DrpbxFetcherSettings;
+	metadataManager: MetadataManager;
 }
 
 /**

@@ -251,7 +251,7 @@ export class PaperProcessor {
 
 			if (existingFile instanceof TFile) {
 				// File exists - check if we have metadata
-				const existingMetadata = context.pluginSettings.viwoodsNoteMetadata[metadataKey];
+				const existingMetadata = context.metadataManager.get(metadataKey);
 
 				// File exists - use merge strategy
 				StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Merging existing file: ${filepath}`, {
@@ -280,9 +280,9 @@ export class PaperProcessor {
 				await context.vault.create(filepath, content);
 			}
 
-			// Save metadata to settings
-			context.pluginSettings.viwoodsNoteMetadata[metadataKey] = metadata;
-			// Note: saveSettings() will be called by the plugin after processing
+			// Save metadata to separate file
+			context.metadataManager.set(metadataKey, metadata);
+			// Note: metadata will be saved by the plugin after processing
 
 			StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Note file saved: ${filepath}`);
 			return filepath;
