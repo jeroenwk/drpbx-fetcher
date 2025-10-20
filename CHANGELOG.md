@@ -5,6 +5,30 @@ All notable changes to the Dropbox Fetcher plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.116] - 2025-10-20
+
+### Fixed
+- **YAML Parser Metadata Loss**: Fixed critical bug where YAML parser incorrectly matched `    pages:` (4-space indent) as note keys, causing all Paper note metadata to be lost after first save/load cycle
+- **Modified Date Not Updating**: Fixed bug where markdown note headers showed stale Modified timestamps even after syncing updated notes
+- **Total Pages Not Updating**: Fixed bug where Total Pages count in note headers wasn't updated when page counts changed
+
+### Changed
+- **Metadata Storage Format**: Moved Paper note metadata from plugin settings (data.json) to separate markdown file with YAML frontmatter (`viwoodsNoteMetadata.md`)
+- **Header Updates During Merge**: Note headers now automatically update Modified date and Total Pages count during merge operations
+
+### Improved
+- **Metadata Reliability**: All Paper notes are now correctly tracked with complete page information across multiple sync cycles
+- **Timestamp Accuracy**: Modified dates update correctly on each sync to reflect actual note modification times
+- **Page Count Tracking**: Total pages count stays accurate in note headers
+- **User Content Preservation**: All user notes and edits continue to be preserved during merges
+
+### Technical
+- Fixed YAML parser regex from `/^ {2}([^:]+):\s*$/` to `/^  ([^:]+):\s*$/` with `!line.startsWith('   ')` check
+- Added `MetadataManager` class for centralized metadata operations with YAML serialization
+- Added `updateHeader()` method to `MarkdownMerger` for updating metadata fields
+- Enhanced logging for metadata save/load operations and parser debugging
+- Metadata now stored in vault alongside Paper notes for better visibility and backup
+
 ## [0.2.104] - 2025-10-20
 
 ### Fixed

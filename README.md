@@ -217,6 +217,19 @@ If you encounter any issues or have feature requests:
 
 ## Changelog
 
+### 0.2.116 - 2025-10-20
+- 🐛 **Fixed metadata tracking** - YAML parser now correctly handles all Paper note metadata across save/load cycles
+- ⏱️ **Updated timestamps** - Modified dates and Total Pages counts now update correctly in note headers
+- 💾 **Separate metadata file** - Paper note metadata moved from data.json to vault-based markdown file with YAML frontmatter
+- 🔒 **Reliable preservation** - All user notes and edits preserved while metadata stays accurate
+- 📝 **Better visibility** - Metadata file stored in vault (`viwoodsNoteMetadata.md`) for easier backup and inspection
+
+### 0.2.104 - 2025-10-20
+- 🐛 **Fixed user notes preservation** - User-edited notes in Paper markdown files no longer lost during image updates
+- 💾 **Centralized metadata** - Moved Paper note metadata to plugin settings for more reliable storage
+- 🔄 **Simplified merge strategy** - Always merge existing files to preserve user edits
+- 🧹 **Cleaner production code** - Removed verbose debug logging
+
 ### 0.2.81 - 2025-10-17
 - 🏗️ **Architecture Refactoring** - Removed all processor-specific code from main.ts
 - 🔌 **Extensible Design** - Processors now control their own filtering and routing via lifecycle hooks
