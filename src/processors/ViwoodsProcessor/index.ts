@@ -48,24 +48,35 @@ export class ViwoodsProcessor implements FileProcessor {
 	 * Initialize metadata manager with vault from context
 	 * Called lazily on first use
 	 */
-	private initializeMetadataManager(context: ProcessorContext): void {
+	private initializeMetadataManager(context: ProcessorContext, paperConfig: PaperModuleConfig): void {
 		if (this.metadataManager) return;
 
+		// Store metadata in Paper resources folder as markdown with YAML frontmatter
+		const metadataPath = `${paperConfig.notesFolder}/resources/viwoodsNoteMetadata.md`;
+
 		this.metadataManager = new MetadataManager(
-			"viwoodsNoteMetadata.json",
+			metadataPath,
 			async () => {
-				// Load metadata from separate file using vault adapter
+				// Load metadata from markdown file with YAML frontmatter
 				try {
-					const content = await context.vault.adapter.read('.obsidian/plugins/drpbx-fetcher/viwoodsNoteMetadata.json');
-					return JSON.parse(content) as Record<string, ViwoodsNoteMetadata>;
+					const content = await context.vault.adapter.read(metadataPath);
+					return MetadataManager.fromMarkdown(content);
 				} catch (error) {
 					// File doesn't exist yet - return empty
 					return null;
 				}
 			},
 			async (data: Record<string, ViwoodsNoteMetadata>) => {
-				// Save metadata to separate file using vault adapter
-				await context.vault.adapter.write('.obsidian/plugins/drpbx-fetcher/viwoodsNoteMetadata.json', JSON.stringify(data, null, 2));
+				// Save metadata to markdown file with YAML frontmatter
+				const markdown = MetadataManager.toMarkdown(data);
+				// Ensure resources folder exists
+				const resourcesFolder = `${paperConfig.notesFolder}/resources`;
+				try {
+					await context.vault.createFolder(resourcesFolder);
+				} catch (error) {
+					// Folder might already exist
+				}
+				await context.vault.adapter.write(metadataPath, markdown);
 			}
 		);
 	}
@@ -77,14 +88,6 @@ export class ViwoodsProcessor implements FileProcessor {
 		config: ProcessorConfig,
 		context: ProcessorContext
 	): Promise<ProcessorResult> {
-		// Initialize metadata manager if not already done
-		this.initializeMetadataManager(context);
-
-		// Load metadata at start of processing
-		if (this.metadataManager) {
-			await this.metadataManager.load();
-		}
-
 		await StreamLogger.log(`[ViwoodsProcessor] Starting processing of ${metadata.name}`);
 		await StreamLogger.log(`[ViwoodsProcessor] File size: ${fileData.length} bytes`);
 		await StreamLogger.log(`[ViwoodsProcessor] Original path: ${originalPath}`);
@@ -148,6 +151,8 @@ export class ViwoodsProcessor implements FileProcessor {
 							errors: ["Paper module is disabled in settings"],
 						};
 					}
+					// Initialize metadata manager for Paper module
+					this.initializeMetadataManager(context, viwoodsConfig.paper);
 					if (!this.metadataManager) {
 						return {
 							success: false,
@@ -155,6 +160,9 @@ export class ViwoodsProcessor implements FileProcessor {
 							errors: ["MetadataManager not initialized"],
 						};
 					}
+					// Load metadata before processing
+					await this.metadataManager.load();
+
 					await StreamLogger.log(`[ViwoodsProcessor] Processing as Paper module...`);
 					result = await PaperProcessor.process(
 						zipReader,
