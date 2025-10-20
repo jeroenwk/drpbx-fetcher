@@ -62,9 +62,7 @@ Points: {{pointCount}}
 #annotation #book/{{bookSlug}} #page/{{pageNumber}}`,
 
 		// Paper module templates
-		"viwoods-paper-note.md": `# {{noteName}}
-
-**Created:** {{createTime}}
+		"viwoods-paper-note.md": `**Created:** {{createTime}}
 **Modified:** {{modifiedTime}}
 **Total Pages:** {{totalPages}}
 
