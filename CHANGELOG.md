@@ -5,6 +5,28 @@ All notable changes to the Dropbox Fetcher plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.104] - 2025-10-20
+
+### Fixed
+- **User Notes Preservation**: Fixed critical bug where user-edited notes in Paper markdown files were lost during image updates
+- User content in markdown files is now always preserved when images are updated from Dropbox
+
+### Changed
+- **Metadata Storage**: Moved Paper note metadata from sidecar files to plugin settings (data.json)
+- Metadata storage is now more reliable - no issues with hidden file detection
+- Simplified merge strategy: always merge existing files to preserve user edits
+
+### Improved
+- More robust Paper note processing with guaranteed user content preservation
+- Better logging and error handling for Paper note merge operations
+- Cleaner production code after removing verbose debug logging
+
+### Technical
+- Added `viwoodsNoteMetadata` to plugin settings for centralized metadata storage
+- Refactored `MarkdownMerger` to use settings-based metadata lookup
+- Removed unnecessary `await` keywords on StreamLogger calls (TypeScript warning fixes)
+- Settings-based approach eliminates filesystem dependency for metadata
+
 ## [0.2.98] - 2025-10-17
 
 ### Added
