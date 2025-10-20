@@ -2,7 +2,7 @@ import { Plugin, requestUrl, RequestUrlParam, RequestUrlResponse, TFolder, TFile
 import { Dropbox, files } from "dropbox";
 import { OAuthManager } from "./src/auth/OAuthManager";
 import { PlatformHelper } from "./src/utils/platform";
-import { DrpbxFetcherSettings, DEFAULT_SETTINGS, ViwoodsNoteMetadata } from "./src/models/Settings";
+import { DrpbxFetcherSettings, DEFAULT_SETTINGS } from "./src/models/Settings";
 import { ProcessorRegistry } from "./src/processors/ProcessorRegistry";
 import { DefaultProcessor } from "./src/processors/DefaultProcessor";
 import { ViwoodsProcessor } from "./src/processors/ViwoodsProcessor/index";
@@ -11,7 +11,6 @@ import { TemplateResolver } from "./src/processors/templates/TemplateResolver";
 import { StreamLogger } from "./src/utils/StreamLogger";
 import { TempFileManager } from "./src/utils/TempFileManager";
 import { DrpbxFetcherSettingTab } from "./src/ui/SettingsTab";
-import { MetadataManager } from "./src/utils/MetadataManager";
 
 export default class DrpbxFetcherPlugin extends Plugin {
   settings: DrpbxFetcherSettings;
@@ -20,7 +19,6 @@ export default class DrpbxFetcherPlugin extends Plugin {
   oauthManager: OAuthManager | null = null;
   settingsTab: DrpbxFetcherSettingTab | null = null;
   tempFileManager: TempFileManager | null = null;
-  metadataManager: MetadataManager | null = null;
   private statusBarItem: HTMLElement | null = null;
 
   // Pure function to create a fetch-compatible response from Obsidian's RequestUrlResponse
@@ -646,7 +644,6 @@ export default class DrpbxFetcherPlugin extends Plugin {
                           app: this.app,
                           templateResolver,
                           pluginSettings: this.settings,
-                          metadataManager: this.metadataManager!,
                         }
                       );
                       StreamLogger.log(`[DrpbxFetcher] Processor completed`, {
@@ -661,8 +658,6 @@ export default class DrpbxFetcherPlugin extends Plugin {
                         // Track successful processing
                         this.settings.processedFiles[fileId] = file.size;
                         await this.saveSettings();
-                        // Save metadata after processing
-                        await this.saveMetadata();
                         console.log(`✓ Processed: ${result.createdFiles.length} files created`);
                         if (result.warnings && result.warnings.length > 0) {
                           console.warn(`Warnings: ${result.warnings.join(", ")}`);
@@ -835,29 +830,6 @@ export default class DrpbxFetcherPlugin extends Plugin {
     this.tempFileManager = new TempFileManager(this.app.vault);
     await this.tempFileManager.ensureTempDir();
 
-    // Initialize metadata manager for Viwoods note metadata
-    // Use vault adapter to read/write separate metadata file in plugin config directory
-    const configDir = (this.app.vault.adapter as any).getBasePath?.() || '';
-    const metadataPath = `${configDir}/.obsidian/plugins/drpbx-fetcher/viwoodsNoteMetadata.json`;
-    this.metadataManager = new MetadataManager(
-      metadataPath,
-      async () => {
-        // Load metadata from separate file using vault adapter
-        try {
-          const content = await this.app.vault.adapter.read('.obsidian/plugins/drpbx-fetcher/viwoodsNoteMetadata.json');
-          return JSON.parse(content) as Record<string, ViwoodsNoteMetadata>;
-        } catch (error) {
-          // File doesn't exist or can't be read
-          return null;
-        }
-      },
-      async (data: Record<string, ViwoodsNoteMetadata>) => {
-        // Save metadata to separate file using vault adapter
-        await this.app.vault.adapter.write('.obsidian/plugins/drpbx-fetcher/viwoodsNoteMetadata.json', JSON.stringify(data, null, 2));
-      }
-    );
-    await this.loadMetadata();
-
     // Initialize stream logger
     const manifest = (this.app as { plugins?: { manifests?: Record<string, { version?: string }> } }).plugins?.manifests?.["drpbx-fetcher"];
     const version = manifest?.version || "unknown";
@@ -940,17 +912,5 @@ export default class DrpbxFetcherPlugin extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings);
-  }
-
-  async loadMetadata() {
-    if (this.metadataManager) {
-      await this.metadataManager.load();
-    }
-  }
-
-  async saveMetadata() {
-    if (this.metadataManager) {
-      await this.metadataManager.save();
-    }
   }
 }

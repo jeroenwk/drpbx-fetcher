@@ -15,6 +15,7 @@ import {
 import { TemplateDefaults } from "../TemplateDefaults";
 import { ImageCacheBuster } from "../../../utils/ImageCacheBuster";
 import { MarkdownMerger, ImageUpdateMapping } from "../utils/MarkdownMerger";
+import { MetadataManager } from "../../../utils/MetadataManager";
 
 /**
  * Handles processing of Paper module notes (handwritten notes)
@@ -29,7 +30,8 @@ export class PaperProcessor {
 		originalPath: string,
 		metadata: FileMetadata,
 		config: PaperModuleConfig,
-		context: ProcessorContext
+		context: ProcessorContext,
+		metadataManager: MetadataManager
 	): Promise<ProcessorResult> {
 		StreamLogger.log(`[PaperProcessor.process] Starting Paper module processing`);
 		const createdFiles: string[] = [];
@@ -194,7 +196,8 @@ export class PaperProcessor {
 				},
 				createTime,
 				pageImagePaths,
-				imageUpdates
+				imageUpdates,
+				metadataManager
 			);
 			if (notePath) {
 				createdFiles.push(notePath);
@@ -225,7 +228,8 @@ export class PaperProcessor {
 		data: Record<string, unknown>,
 		createTime: Date,
 		pageImagePaths: Array<{ pageNumber: number; imagePath: string }>,
-		imageUpdates: ImageUpdateMapping[]
+		imageUpdates: ImageUpdateMapping[],
+		metadataManager: MetadataManager
 	): Promise<string | null> {
 		try {
 			// Use the note name as filename
@@ -251,7 +255,7 @@ export class PaperProcessor {
 
 			if (existingFile instanceof TFile) {
 				// File exists - check if we have metadata
-				const existingMetadata = context.metadataManager.get(metadataKey);
+				const existingMetadata = metadataManager.get(metadataKey);
 
 				// File exists - use merge strategy
 				StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Merging existing file: ${filepath}`, {
@@ -281,8 +285,8 @@ export class PaperProcessor {
 			}
 
 			// Save metadata to separate file
-			context.metadataManager.set(metadataKey, metadata);
-			// Note: metadata will be saved by the plugin after processing
+			metadataManager.set(metadataKey, metadata);
+			// Note: metadata will be saved by ViwoodsProcessor after processing
 
 			StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Note file saved: ${filepath}`);
 			return filepath;

@@ -1,5 +1,7 @@
 import { StreamingZipUtils } from "../../utils/StreamingZipUtils";
 import { StreamLogger } from "../../utils/StreamLogger";
+import { MetadataManager } from "../../utils/MetadataManager";
+import { ViwoodsNoteMetadata } from "../../models/Settings";
 import {
 	FileProcessor,
 	ProcessorConfig,
@@ -40,6 +42,34 @@ export class ViwoodsProcessor implements FileProcessor {
 	readonly description = "Process viwoods files from all modules";
 	readonly supportedExtensions = ["note", "jpg", "jpeg", "png", "gif", "pdf", "webp"];
 
+	private metadataManager: MetadataManager | null = null;
+
+	/**
+	 * Initialize metadata manager with vault from context
+	 * Called lazily on first use
+	 */
+	private initializeMetadataManager(context: ProcessorContext): void {
+		if (this.metadataManager) return;
+
+		this.metadataManager = new MetadataManager(
+			"viwoodsNoteMetadata.json",
+			async () => {
+				// Load metadata from separate file using vault adapter
+				try {
+					const content = await context.vault.adapter.read('.obsidian/plugins/drpbx-fetcher/viwoodsNoteMetadata.json');
+					return JSON.parse(content) as Record<string, ViwoodsNoteMetadata>;
+				} catch (error) {
+					// File doesn't exist yet - return empty
+					return null;
+				}
+			},
+			async (data: Record<string, ViwoodsNoteMetadata>) => {
+				// Save metadata to separate file using vault adapter
+				await context.vault.adapter.write('.obsidian/plugins/drpbx-fetcher/viwoodsNoteMetadata.json', JSON.stringify(data, null, 2));
+			}
+		);
+	}
+
 	async process(
 		fileData: Uint8Array,
 		originalPath: string,
@@ -47,6 +77,14 @@ export class ViwoodsProcessor implements FileProcessor {
 		config: ProcessorConfig,
 		context: ProcessorContext
 	): Promise<ProcessorResult> {
+		// Initialize metadata manager if not already done
+		this.initializeMetadataManager(context);
+
+		// Load metadata at start of processing
+		if (this.metadataManager) {
+			await this.metadataManager.load();
+		}
+
 		await StreamLogger.log(`[ViwoodsProcessor] Starting processing of ${metadata.name}`);
 		await StreamLogger.log(`[ViwoodsProcessor] File size: ${fileData.length} bytes`);
 		await StreamLogger.log(`[ViwoodsProcessor] Original path: ${originalPath}`);
@@ -110,6 +148,13 @@ export class ViwoodsProcessor implements FileProcessor {
 							errors: ["Paper module is disabled in settings"],
 						};
 					}
+					if (!this.metadataManager) {
+						return {
+							success: false,
+							createdFiles: [],
+							errors: ["MetadataManager not initialized"],
+						};
+					}
 					await StreamLogger.log(`[ViwoodsProcessor] Processing as Paper module...`);
 					result = await PaperProcessor.process(
 						zipReader,
@@ -117,8 +162,13 @@ export class ViwoodsProcessor implements FileProcessor {
 						originalPath,
 						metadata,
 						viwoodsConfig.paper,
-						context
+						context,
+						this.metadataManager
 					);
+					// Save metadata after successful Paper processing
+					if (result.success && this.metadataManager) {
+						await this.metadataManager.save();
+					}
 					break;
 
 				case ViwoodsModuleType.DAILY:
