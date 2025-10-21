@@ -156,7 +156,7 @@ Each note entry contains:
 				}
 
 				// Match note key (EXACTLY 2 spaces indent, not followed by more spaces)
-				const noteMatch = line.match(/^  ([^:]+):\s*$/);
+				const noteMatch = line.match(/^ {2}([^:]+):\s*$/);
 				if (noteMatch && !line.startsWith('   ')) {
 					// Save previous note if exists
 					if (currentKey && currentMetadata) {
@@ -278,5 +278,38 @@ Each note entry contains:
 	 */
 	clear(): void {
 		this.metadata = {};
+	}
+
+	/**
+	 * Find metadata by content hash (for detecting renamed notes)
+	 * Returns the first matching entry where contentHash matches but fileId differs
+	 *
+	 * @param contentHash Content hash to search for
+	 * @param excludeFileId File ID to exclude from search (the new file's ID)
+	 * @returns Matching metadata entry or undefined
+	 */
+	findByContentHash(contentHash: string, excludeFileId: string): { key: string; metadata: ViwoodsNoteMetadata } | undefined {
+		for (const [key, metadata] of Object.entries(this.metadata)) {
+			if (metadata.contentHash === contentHash && metadata.fileId !== excludeFileId) {
+				StreamLogger.log("[MetadataManager] Found note with matching content hash", {
+					key,
+					oldFileId: metadata.fileId,
+					newFileId: excludeFileId,
+					contentHash,
+				});
+				return { key, metadata };
+			}
+		}
+		return undefined;
+	}
+
+	/**
+	 * Check if a fileId already exists in metadata
+	 *
+	 * @param fileId Dropbox file ID to check
+	 * @returns True if fileId exists
+	 */
+	hasFileId(fileId: string): boolean {
+		return Object.values(this.metadata).some(m => m.fileId === fileId);
 	}
 }
