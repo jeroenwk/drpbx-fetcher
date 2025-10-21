@@ -16,7 +16,7 @@ export interface RenameResult {
 }
 
 /**
- * Handles renaming of Viwoods notes when detected via content hash matching
+ * Handles renaming of Viwoods notes when detected via noteId matching
  */
 export class NoteRenameHandler {
 	/**
@@ -26,7 +26,7 @@ export class NoteRenameHandler {
 	 * @param existingMetadata Metadata of the existing note (old name)
 	 * @param newNoteName New note name
 	 * @param newNoteSlug New note slug for file paths
-	 * @param newFileId New Dropbox file ID
+	 * @param newDropboxFileId New Dropbox file ID
 	 * @param outputFolder Output folder for the note
 	 * @param metadataManager Metadata manager instance
 	 * @returns Rename result with paths and errors
@@ -36,15 +36,16 @@ export class NoteRenameHandler {
 		existingMetadata: ViwoodsNoteMetadata,
 		newNoteName: string,
 		newNoteSlug: string,
-		newFileId: string,
+		newDropboxFileId: string,
 		outputFolder: string,
 		metadataManager: MetadataManager
 	): Promise<RenameResult> {
 		StreamLogger.log("[NoteRenameHandler] Detected renamed note", {
 			oldPath: existingMetadata.notePath,
 			newName: newNoteName,
-			oldFileId: existingMetadata.fileId,
-			newFileId: newFileId,
+			noteId: existingMetadata.noteId,
+			oldDropboxFileId: existingMetadata.dropboxFileId,
+			newDropboxFileId: newDropboxFileId,
 		});
 
 		const errors: string[] = [];
@@ -161,7 +162,7 @@ export class NoteRenameHandler {
 			// Create updated metadata with new paths
 			const updatedMetadata: ViwoodsNoteMetadata = {
 				...existingMetadata,
-				fileId: newFileId,
+				dropboxFileId: newDropboxFileId,
 				notePath: newNotePath,
 				pages: existingMetadata.pages.map((page) => {
 					const update = updatedImagePaths.find((u) => u.oldPath === page.image);

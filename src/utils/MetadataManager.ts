@@ -87,7 +87,8 @@ This file tracks metadata for Viwoods Paper notes to support intelligent merging
 ## Metadata Structure
 
 Each note entry contains:
-- \`fileId\`: Dropbox file ID
+- \`noteId\`: Viwoods internal note ID (stable across renames)
+- \`dropboxFileId\`: Dropbox file ID (changes on rename)
 - \`lastModified\`: Last modified timestamp
 - \`notePath\`: Path to the markdown note in vault
 - \`pages\`: Array of page metadata with page number and image path
@@ -105,7 +106,8 @@ Each note entry contains:
 			// Escape key if needed (YAML safe string)
 			const safeKey = key.includes(':') || key.includes('"') ? `"${key.replace(/"/g, '\\"')}"` : key;
 			lines.push(`  ${safeKey}:`);
-			lines.push(`    fileId: "${value.fileId}"`);
+			lines.push(`    noteId: "${value.noteId}"`);
+			lines.push(`    dropboxFileId: "${value.dropboxFileId}"`);
 			lines.push(`    lastModified: ${value.lastModified}`);
 			lines.push(`    notePath: "${value.notePath}"`);
 			lines.push(`    pages:`);
@@ -161,14 +163,15 @@ Each note entry contains:
 					// Save previous note if exists
 					if (currentKey && currentMetadata) {
 						StreamLogger.log(`[MetadataManager.fromYAML] Saving note: ${currentKey}`, {
-							hasFileId: !!currentMetadata.fileId,
+							hasNoteId: !!currentMetadata.noteId,
+							hasDropboxFileId: !!currentMetadata.dropboxFileId,
 							hasLastModified: currentMetadata.lastModified !== undefined,
 							hasNotePath: !!currentMetadata.notePath,
 							hasPages: !!currentMetadata.pages,
 							pagesLength: currentMetadata.pages?.length || 0
 						});
 					}
-					if (currentKey && currentMetadata && currentMetadata.fileId && currentMetadata.lastModified !== undefined && currentMetadata.notePath && currentMetadata.pages) {
+					if (currentKey && currentMetadata && currentMetadata.noteId && currentMetadata.dropboxFileId && currentMetadata.lastModified !== undefined && currentMetadata.notePath && currentMetadata.pages) {
 						metadata[currentKey] = currentMetadata as ViwoodsNoteMetadata;
 						StreamLogger.log(`[MetadataManager.fromYAML] Successfully saved note: ${currentKey}`);
 					} else if (currentKey) {
@@ -182,10 +185,17 @@ Each note entry contains:
 					continue;
 				}
 
-				// Match fileId (4 spaces indent)
-				const fileIdMatch = line.match(/^ {4}fileId: "([^"]+)"/);
-				if (fileIdMatch && currentMetadata) {
-					currentMetadata.fileId = fileIdMatch[1];
+				// Match noteId (4 spaces indent)
+				const noteIdMatch = line.match(/^ {4}noteId: "([^"]+)"/);
+				if (noteIdMatch && currentMetadata) {
+					currentMetadata.noteId = noteIdMatch[1];
+					continue;
+				}
+
+				// Match dropboxFileId (4 spaces indent)
+				const dropboxFileIdMatch = line.match(/^ {4}dropboxFileId: "([^"]+)"/);
+				if (dropboxFileIdMatch && currentMetadata) {
+					currentMetadata.dropboxFileId = dropboxFileIdMatch[1];
 					continue;
 				}
 
@@ -234,7 +244,7 @@ Each note entry contains:
 			}
 
 			// Save last note if exists
-			if (currentKey && currentMetadata && currentMetadata.fileId && currentMetadata.lastModified !== undefined && currentMetadata.notePath && currentMetadata.pages) {
+			if (currentKey && currentMetadata && currentMetadata.noteId && currentMetadata.dropboxFileId && currentMetadata.lastModified !== undefined && currentMetadata.notePath && currentMetadata.pages) {
 				metadata[currentKey] = currentMetadata as ViwoodsNoteMetadata;
 			}
 
@@ -281,21 +291,19 @@ Each note entry contains:
 	}
 
 	/**
-	 * Find metadata by content hash (for detecting renamed notes)
-	 * Returns the first matching entry where contentHash matches but fileId differs
+	 * Find metadata by Viwoods note ID (for detecting renamed notes)
+	 * Returns the first matching entry where noteId matches
 	 *
-	 * @param contentHash Content hash to search for
-	 * @param excludeFileId File ID to exclude from search (the new file's ID)
+	 * @param noteId Viwoods internal note ID to search for
 	 * @returns Matching metadata entry or undefined
 	 */
-	findByContentHash(contentHash: string, excludeFileId: string): { key: string; metadata: ViwoodsNoteMetadata } | undefined {
+	findByNoteId(noteId: string): { key: string; metadata: ViwoodsNoteMetadata } | undefined {
 		for (const [key, metadata] of Object.entries(this.metadata)) {
-			if (metadata.contentHash === contentHash && metadata.fileId !== excludeFileId) {
-				StreamLogger.log("[MetadataManager] Found note with matching content hash", {
+			if (metadata.noteId === noteId) {
+				StreamLogger.log("[MetadataManager] Found note with matching noteId", {
 					key,
-					oldFileId: metadata.fileId,
-					newFileId: excludeFileId,
-					contentHash,
+					noteId,
+					currentPath: metadata.notePath,
 				});
 				return { key, metadata };
 			}
@@ -304,12 +312,12 @@ Each note entry contains:
 	}
 
 	/**
-	 * Check if a fileId already exists in metadata
+	 * Check if a Dropbox file ID already exists in metadata
 	 *
-	 * @param fileId Dropbox file ID to check
-	 * @returns True if fileId exists
+	 * @param dropboxFileId Dropbox file ID to check
+	 * @returns True if Dropbox file ID exists
 	 */
-	hasFileId(fileId: string): boolean {
-		return Object.values(this.metadata).some(m => m.fileId === fileId);
+	hasDropboxFileId(dropboxFileId: string): boolean {
+		return Object.values(this.metadata).some(m => m.dropboxFileId === dropboxFileId);
 	}
 }

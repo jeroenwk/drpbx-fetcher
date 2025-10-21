@@ -16,7 +16,6 @@ import { TemplateDefaults } from "../TemplateDefaults";
 import { ImageCacheBuster } from "../../../utils/ImageCacheBuster";
 import { MarkdownMerger, ImageUpdateMapping } from "../utils/MarkdownMerger";
 import { MetadataManager } from "../../../utils/MetadataManager";
-import { ContentHasher } from "../../../utils/ContentHasher";
 import { NoteRenameHandler } from "../../../utils/NoteRenameHandler";
 
 /**
@@ -109,57 +108,68 @@ export class PaperProcessor {
 			const totalPages = pages?.length || 0;
 			StreamLogger.log(`[PaperProcessor.process] Found ${totalPages} pages and ${resources?.length || 0} resources`);
 
-			// Generate content hash for rename detection
-			const contentHash = ContentHasher.generatePaperNoteHash(
-				noteInfo.creationTime,
-				totalPages,
-				folderPath
-			);
-			StreamLogger.log(`[PaperProcessor.process] Generated content hash:`, { contentHash });
+			// Get note identifiers
+			const noteId = noteInfo.id; // Viwoods internal note ID (stable across renames)
+			const dropboxFileId = metadata.id; // Dropbox file ID (changes on rename)
 
-			// Check if this note was renamed (same content hash, different file ID)
-			const fileId = metadata.id || noteInfo.id;
-			const existingNote = metadataManager.findByContentHash(contentHash, fileId);
+			StreamLogger.log(`[PaperProcessor.process] Note identifiers:`, {
+				noteId,
+				dropboxFileId,
+			});
+
+			// Check if this note already exists (by noteId) - if so, it might be renamed
+			const existingNote = metadataManager.findByNoteId(noteId);
 
 			if (existingNote) {
-				// Detected a rename - handle it before processing
-				StreamLogger.log(`[PaperProcessor.process] Detected renamed note`, {
-					oldPath: existingNote.metadata.notePath,
-					newName: noteName,
-				});
+				// Check if the current file path matches the expected path
+				const expectedNotePath = FileUtils.joinPath(noteOutputFolder, `${noteName}.md`);
 
-				const renameResult = await NoteRenameHandler.handleRename(
-					context.vault,
-					existingNote.metadata,
-					noteName,
-					noteSlug,
-					fileId,
-					noteOutputFolder,
-					metadataManager
-				);
-
-				if (renameResult.success) {
-					StreamLogger.log(`[PaperProcessor.process] Rename successful`, {
-						oldPath: renameResult.oldNotePath,
-						newPath: renameResult.newNotePath,
-						imagesRenamed: renameResult.updatedImagePaths.length,
+				if (existingNote.metadata.notePath !== expectedNotePath) {
+					// File path doesn't match - note was renamed
+					StreamLogger.log(`[PaperProcessor.process] Detected renamed note`, {
+						oldPath: existingNote.metadata.notePath,
+						newPath: expectedNotePath,
+						noteId,
 					});
 
-					// Add renamed file to created files list
-					createdFiles.push(renameResult.newNotePath);
+					const renameResult = await NoteRenameHandler.handleRename(
+						context.vault,
+						existingNote.metadata,
+						noteName,
+						noteSlug,
+						dropboxFileId,
+						noteOutputFolder,
+						metadataManager
+					);
 
-					// Add any warnings from rename
-					if (renameResult.errors && renameResult.errors.length > 0) {
-						warnings.push(...renameResult.errors);
+					if (renameResult.success) {
+						StreamLogger.log(`[PaperProcessor.process] Rename successful`, {
+							oldPath: renameResult.oldNotePath,
+							newPath: renameResult.newNotePath,
+							imagesRenamed: renameResult.updatedImagePaths.length,
+						});
+
+						// Add renamed file to created files list
+						createdFiles.push(renameResult.newNotePath);
+
+						// Add any warnings from rename
+						if (renameResult.errors && renameResult.errors.length > 0) {
+							warnings.push(...renameResult.errors);
+						}
+					} else {
+						// Rename failed - add errors and continue with normal processing
+						StreamLogger.warn(`[PaperProcessor.process] Rename failed, will create new file`, {
+							errors: renameResult.errors,
+						});
+						if (renameResult.errors) {
+							warnings.push(...renameResult.errors);
+						}
 					}
 				} else {
-					// Rename failed - add errors and continue with normal processing
-					StreamLogger.warn(`[PaperProcessor.process] Rename failed, will create new file`, {
-						errors: renameResult.errors,
+					// Same path - just an update to existing note
+					StreamLogger.log(`[PaperProcessor.process] Note exists at expected path, will merge updates`, {
+						notePath: existingNote.metadata.notePath,
 					});
-					if (renameResult.errors) {
-						warnings.push(...renameResult.errors);
-					}
 				}
 			}
 
@@ -240,7 +250,8 @@ export class PaperProcessor {
 				noteOutputFolder,
 				resourcesFolder,
 				{
-					fileId: fileId,
+					noteId: noteId,
+					dropboxFileId: dropboxFileId,
 					noteName,
 					noteSlug,
 					totalPages,
@@ -249,7 +260,6 @@ export class PaperProcessor {
 					lastModified: noteInfo.lastModifiedTime,
 					folderPath,
 					screenshotSections,
-					contentHash,
 				},
 				createTime,
 				modifiedTime,
@@ -300,10 +310,10 @@ export class PaperProcessor {
 
 			// Create metadata object
 			const metadata = {
-				fileId: data.fileId as string,
+				noteId: data.noteId as string,
+				dropboxFileId: data.dropboxFileId as string,
 				lastModified: data.lastModified as number,
 				notePath: filepath,
-				contentHash: data.contentHash as string,
 				pages: pageImagePaths.map(p => ({
 					page: p.pageNumber,
 					image: p.imagePath,
