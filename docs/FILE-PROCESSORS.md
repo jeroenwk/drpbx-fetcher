@@ -18,16 +18,26 @@ The File Processor system allows the Dropbox Fetcher plugin to intelligently pro
 - **Configuration:**
   - `outputFolder`: Where to save files (default: vault root)
 
-### viwoods Notes Processor
+### Viwoods Notes Processor
 - **Type:** `viwoods`
-- **Extensions:** `.note`
-- **Description:** Processes Viwoods/AIPaper `.note` files (ZIP archives containing handwriting data)
+- **Extensions:** `.note`, `.jpg`, `.png`, `.pdf`, `.epub` (when in Viwoods folders)
+- **Description:** Comprehensive processing of Viwoods ecosystem files from all 6 modules
+- **Supported Modules:**
+  - **Learning** - EPUB/PDF reading notes and annotations
+  - **Paper** - Handwritten notes with custom folders
+  - **Daily** - Daily journal entries
+  - **Meeting** - Meeting notes with templates
+  - **Picking** - Quick captures and screenshots
+  - **Memo** - Text memos with todo integration
 - **What it extracts:**
   - Handwriting strokes (PATH_*.json files)
   - Page images (*.png files)
-  - Text annotations (LayoutText.json)
+  - Text annotations (LayoutText.json, PageTextAnnotation.json)
   - Image annotations (LayoutImage.json)
-  - Metadata (HeaderInfo.json, NotesBean.json)
+  - Metadata (HeaderInfo.json, NotesBean.json, NoteFileInfo.json)
+  - Books and source files (.epub, .pdf)
+  - Todo items and reminders (Memo module)
+  - Composite annotation images (handwriting + page backgrounds)
 
 ## Using File Processors
 
@@ -43,37 +53,124 @@ This creates a new file type mapping with default configuration.
 
 ### 2. Configuring a Processor
 
-**viwoods Processor Configuration:**
+**Viwoods Processor Configuration:**
 
 ```json
 {
-  "highlightsFolder": "Viwoods/Highlights",
-  "annotationsFolder": "Viwoods/Annotations",
-  "sourcesFolder": "Viwoods/Library",
-  "pagesFolder": "Viwoods/Pages",
-  "highlightTemplate": "",
-  "annotationTemplate": "",
-  "pageTemplate": "",
-  "includeMetadata": true,
-  "includeThumbnail": true,
-  "extractImages": true,
-  "createIndex": true
+  "learning": {
+    "enabled": true,
+    "highlightsFolder": "Viwoods/Highlights",
+    "annotationsFolder": "Viwoods/Annotations",
+    "sourcesFolder": "Viwoods/Library",
+    "highlightTemplate": "",
+    "annotationTemplate": "",
+    "includeMetadata": true,
+    "includeThumbnail": true,
+    "extractImages": true,
+    "processAnnotations": true,
+    "annotationImagesFolder": "Viwoods/Annotations/resources",
+    "includeSummaryInAnnotation": true,
+    "createCompositeImages": true,
+    "downloadSourceFiles": true
+  },
+  "paper": {
+    "enabled": true,
+    "highlightsFolder": "Viwoods/Paper",
+    "sourcesFolder": "Viwoods/Paper/Sources",
+    "pagesFolder": "Viwoods/Paper/Pages",
+    "highlightTemplate": "",
+    "pageTemplate": "",
+    "includeMetadata": true,
+    "includeThumbnail": true,
+    "extractImages": true,
+    "enableRenameDetection": true
+  },
+  "daily": {
+    "enabled": true,
+    "dailyFolder": "Viwoods/Daily",
+    "dailyTemplate": "",
+    "includeMetadata": true,
+    "includeThumbnail": true,
+    "extractImages": true
+  },
+  "meeting": {
+    "enabled": true,
+    "meetingsFolder": "Viwoods/Meeting",
+    "meetingTemplate": "",
+    "includeMetadata": true,
+    "includeThumbnail": true,
+    "extractImages": true
+  },
+  "picking": {
+    "enabled": true,
+    "pickingsFolder": "Viwoods/Picking",
+    "pickingTemplate": "",
+    "includeMetadata": true,
+    "includeThumbnail": true,
+    "extractImages": true,
+    "processNonNoteFiles": true
+  },
+  "memo": {
+    "enabled": true,
+    "memosFolder": "Viwoods/Memo",
+    "memoTemplate": "",
+    "includeMetadata": true,
+    "includeThumbnail": true,
+    "extractImages": true,
+    "enableRenameDetection": true,
+    "processImagesWithWhiteBackground": true
+  }
 }
 ```
 
 **Configuration Options:**
 
-- **highlightsFolder**: Folder for highlight markdown files (contains handwriting data)
-- **annotationsFolder**: Folder for text annotations
-- **sourcesFolder**: Folder to save original .note files
+#### General Settings
+- **enabled** - Enable/disable processing for this module
+- **includeMetadata** - Extract and include metadata files
+- **includeThumbnail** - Extract thumbnail images
+- **extractImages** - Extract page and content images
+
+#### Module-Specific Settings
+
+**Learning Module:**
+- **highlightsFolder**: Folder for highlight markdown files
+- **annotationsFolder**: Folder for annotation markdown files
+- **sourcesFolder**: Folder to save EPUB/PDF source files
+- **annotationImagesFolder**: Folder for composite annotation images
+- **processAnnotations**: Process handwritten annotations
+- **createCompositeImages**: Combine page backgrounds with handwriting
+- **downloadSourceFiles**: Include original EPUB/PDF files
+
+**Paper Module:**
+- **highlightsFolder**: Folder for handwritten note markdowns
+- **sourcesFolder**: Folder for original .note files
 - **pagesFolder**: Folder for page images and comprehensive page markdown
+- **enableRenameDetection**: Track renamed notes using internal note IDs
+
+**Daily Module:**
+- **dailyFolder**: Folder for daily note markdowns
+
+**Meeting Module:**
+- **meetingsFolder**: Folder for meeting note markdowns
+
+**Picking Module:**
+- **pickingsFolder**: Folder for quick capture markdowns
+- **processNonNoteFiles**: Process standalone images in Picking folders
+
+**Memo Module:**
+- **memosFolder**: Folder for memo markdowns
+- **enableRenameDetection**: Track renamed memos
+- **processImagesWithWhiteBackground**: Apply white background to memo images
+
+#### Template Settings (All Modules)
 - **highlightTemplate**: Path to custom template (optional, uses default if empty)
 - **annotationTemplate**: Path to custom annotation template
 - **pageTemplate**: Path to custom page template
-- **includeMetadata**: Extract and include HeaderInfo.json data
-- **includeThumbnail**: Extract thumbnail image
-- **extractImages**: Extract page images
-- **createIndex**: Create an index file linking all content
+- **dailyTemplate**: Path to custom daily template
+- **meetingTemplate**: Path to custom meeting template
+- **pickingTemplate**: Path to custom picking template
+- **memoTemplate**: Path to custom memo template
 
 ### 3. Enabling/Disabling Processors
 
@@ -95,8 +192,32 @@ Templates use Obsidian's template syntax:
 - `{{date}}` or `{{date:YYYY-MM-DD}}` - Current date with optional format
 - `{{time}}` or `{{time:HH:mm}}` - Current time with optional format
 
-### viwoods Template Variables
+### Template Syntax
 
+Templates use Obsidian's template syntax:
+
+- `{{variable}}` - Simple variable replacement
+- `{{date}}` or `{{date:YYYY-MM-DD}}` - Current date with optional format
+- `{{time}}` or `{{time:HH:mm}}` - Current time with optional format
+
+### Module-Specific Template Variables
+
+#### Learning Module
+**Highlight Template:**
+- `{{bookTitle}}` - Book name
+- `{{bookAuthor}}` - Book author (if available)
+- `{{highlightCount}}` - Number of highlights
+- `{{sourceLink}}` - Link to source EPUB/PDF
+
+**Annotation Template:**
+- `{{bookTitle}}` - Book name
+- `{{chapterName}}` - Chapter name
+- `{{textContent}}` - Highlighted text
+- `{{summary}}` - Annotation/note text
+- `{{pageNumber}}` - Page number
+- `{{annotationImagePath}}` - Path to composite annotation image
+
+#### Paper Module
 **Highlight Template:**
 - `{{noteTitle}}` - Title of the note
 - `{{noteName}}` - Filename
@@ -109,12 +230,43 @@ Templates use Obsidian's template syntax:
 - `{{strokeCount}}` - Number of handwriting strokes
 - `{{pointCount}}` - Total number of points in strokes
 
-**Annotation Template:**
-- Same as highlight, plus:
-- `{{textContent}}` - JSON of text annotations
+#### Daily Module
+**Daily Template:**
+- `{{date}}` - ISO date (YYYY-MM-DD)
+- `{{year}}`, `{{month}}`, `{{day}}` - Date components
+- `{{lastTab}}` - Active tab in Viwoods Daily
+- `{{pageImagePath}}` - Path to daily page image
+- `{{createTime}}` - Daily note creation time
 
-**Page Template:**
-- Combines all available variables
+#### Meeting Module
+**Meeting Template:**
+- `{{meetingTitle}}` - Meeting name
+- `{{noteTitle}}` - Note title
+- `{{createTime}}` - Meeting creation time
+- `{{pageImagePath}}` - Path to meeting page image
+- `{{totalPages}}` - Total pages in meeting
+
+#### Picking Module
+**Picking Template:**
+- `{{captureTitle}}` - Capture title
+- `{{captureType}}` - Type (Screenshot/Photo/Note)
+- `{{imageCount}}` - Number of images
+- `{{captureImagePath}}` - Path to composite capture image
+- `{{screenshotPath}}` - Path to screenshot
+- `{{createTime}}` - Capture creation time
+
+#### Memo Module
+**Memo Template:**
+- `{{memoTitle}}` - Memo filename
+- `{{created}}`, `{{modified}}` - Formatted timestamps
+- `{{isTodo}}` - Todo status boolean
+- `{{isTodoFinished}}` - Todo completion status
+- `{{hasRemind}}` - Has reminder boolean
+- `{{remindTime}}` - Formatted reminder time
+- `{{pageCount}}` - Number of pages
+- `{{memoImagePath}}` - Main image path
+- `{{screenshotPath}}` - Screenshot path
+- `{{memoContent}}` - Todo checkbox content
 
 ### Creating Custom Templates
 
@@ -155,24 +307,60 @@ Templates use Obsidian's template syntax:
 
 ## How It Works
 
-1. **During Sync:** When a file is downloaded from Dropbox:
-   - The file extension is extracted (e.g., "note" from "MyNote.note")
-   - The processor registry is checked for enabled mappings
-   - If a processor is found, it processes the file
-   - Otherwise, the default file handler is used
+### Module Detection
 
-2. **Processing Flow:**
-   - Processor receives the file data
-   - Extracts/transforms content based on file type
+The Viwoods processor automatically detects which module created a note:
+
+1. **Package Name Detection** (most reliable):
+   - `com.wisky.schedule` → Daily module
+   - `com.wisky.meeting` → Meeting module
+   - `com.wisky.notewriter` → Paper module
+   - `com.wisky.captureLog` → Picking module
+   - `com.wisky.memo` → Memo module
+   - `com.wisky.learning` → Learning module
+
+2. **File Structure Analysis**:
+   - Presence of `NotesBean.json` with date fields → Daily
+   - Presence of `LayoutImage.json` → Picking
+   - Presence of `BookBean.json` → Learning
+   - EPUB/PDF files in archive → Learning
+
+3. **Path-Based Detection**:
+   - Folder path contains `/Daily/` → Daily module
+   - Folder path contains `/Meeting/` → Meeting module
+   - Folder path contains `/Paper/` → Paper module
+   - etc.
+
+### Processing Flow
+
+1. **During Sync:** When a file is downloaded from Dropbox:
+   - The file extension and path are extracted
+   - The processor registry is checked for enabled mappings
+   - ViwoodsProcessor claims all files in Viwoods module folders
+   - Files are filtered by enabled modules before download
+
+2. **Module Processing:**
+   - Processor receives the file data (ZIP archive for .note files)
+   - Detects module type using HeaderInfo.json and file structure
+   - Routes to specialized module processor
+   - Extracts JSON metadata and images based on module
    - Loads templates (custom or default)
    - Generates markdown files using template engine
+   - Handles rename detection and image management
    - Writes all output files to vault
    - Returns list of created files
 
-3. **Template Resolution:**
+3. **Rename Detection:**
+   - Metadata stored in YAML frontmatter of generated files
+   - Cross-referenced with `viwoodsNoteMetadata.md` in vault
+   - When notes are renamed in Viwoods, output files are renamed
+   - Images and references are updated automatically
+
+4. **Template Resolution:**
    - If custom template path is specified, load from vault
    - If path is empty or file not found, use default template
    - Templates are cached for performance
+   - Module-specific template variables available
 
 ## Architecture
 
@@ -184,19 +372,47 @@ src/
 │   ├── types.ts                    # Core interfaces
 │   ├── ProcessorRegistry.ts        # Processor registry
 │   ├── DefaultProcessor.ts         # Default passthrough
-│   ├── viwoodsProcessor.ts         # viwoods implementation
+│   ├── ViwoodsProcessor/           # Complete Viwoods system
+│   │   ├── index.ts                # Main processor router
+│   │   ├── AnnotationProcessor.ts  # Shared annotation handling
+│   │   ├── ImageCompositor.ts      # Composite image generation
+│   │   ├── TemplateDefaults.ts     # Default templates
+│   │   ├── ViwoodsTypes.ts         # Type definitions
+│   │   ├── utils/                  # Utilities
+│   │   │   └── MarkdownMerger.ts   # Content preservation
+│   │   └── modules/                # Module processors
+│   │       ├── LearningProcessor.ts    # EPUB/PDF notes
+│   │       ├── PaperProcessor.ts        # Handwritten notes
+│   │       ├── DailyProcessor.ts        # Daily journal
+│   │       ├── MeetingProcessor.ts      # Meeting notes
+│   │       ├── PickingProcessor.ts      # Quick captures
+│   │       └── MemoProcessor.ts         # Text memos
 │   └── templates/
 │       ├── TemplateEngine.ts       # Template rendering
 │       ├── TemplateResolver.ts     # Template loading
 │       └── defaults/               # Default templates
 │           ├── viwoods-highlight.md
 │           ├── viwoods-annotation.md
-│           └── viwoods-page.md
+│           ├── viwoods-page.md
+│           ├── viwoods-daily.md
+│           ├── viwoods-meeting.md
+│           ├── viwoods-picking.md
+│           └── viwoods-memo.md
 ├── models/
 │   └── Settings.ts                 # Settings interfaces
-└── utils/
-    ├── FileUtils.ts                # File operations
-    └── ZipUtils.ts                 # ZIP extraction
+├── utils/
+│   ├── FileUtils.ts                # File operations
+│   ├── ZipUtils.ts                 # ZIP extraction (legacy)
+│   ├── StreamingZipUtils.ts        # Streaming ZIP extraction
+│   ├── MetadataManager.ts          # Note metadata handling
+│   ├── ImageCacheBuster.ts         # Image refresh handling
+│   ├── NoteRenameHandler.ts        # Rename detection
+│   ├── TempFileManager.ts          # Temporary file handling
+│   ├── StreamLogger.ts             # Logging system
+│   ├── crypto.ts                   # OAuth crypto
+│   └── platform.ts                 # Platform detection
+└── auth/
+    └── OAuthManager.ts             # OAuth authentication
 ```
 
 ## Adding New Processors
@@ -216,6 +432,8 @@ To add a new processor:
      getDefaultConfig() { /* defaults */ }
      getDefaultTemplates() { /* templates */ }
      getConfigSchema() { /* schema */ }
+     shouldSkipFile(path, metadata, config) { /* optional early filtering */ }
+     canHandleFile(path, ext, config) { /* optional path-based routing */ }
    }
    ```
 
@@ -228,14 +446,48 @@ To add a new processor:
 
 4. **Document** in this file
 
+### Advanced Processor Features
+
+#### Early Filtering
+Implement `shouldSkipFile()` to filter files before download:
+```typescript
+shouldSkipFile(path: string, metadata: DropboxFile, config: ProcessorConfig): SkipResult {
+  if (shouldSkipBasedOnPath(path)) {
+    return { shouldSkip: true, reason: 'Path not supported' };
+  }
+  return { shouldSkip: false };
+}
+```
+
+#### Path-Based Routing
+Implement `canHandleFile()` to claim files based on path patterns:
+```typescript
+canHandleFile(path: string, ext: string, config: ProcessorConfig): boolean {
+  // Claim all files in specific folders regardless of extension
+  return path.includes('/my-special-folder/');
+}
+```
+
+#### Module-Specific Processors
+For complex file types (like Viwoods), create a router processor:
+```typescript
+async process(...) {
+  const moduleType = this.detectModuleType(zipContent);
+  const moduleProcessor = this.getModuleProcessor(moduleType);
+  return await moduleProcessor.process(...);
+}
+```
+
 ## Troubleshooting
 
 ### Processor Not Working
 
 1. Check that the mapping is **enabled** (toggle in settings)
-2. Verify the file extension matches the mapping
-3. Check console logs for errors (`Ctrl+Shift+I` / `Cmd+Opt+I`)
-4. Ensure output folders exist or can be created
+2. Verify the file extension or path matches the processor's routing rules
+3. For Viwoods: ensure the specific module is enabled in configuration
+4. Check console logs for errors (`Ctrl+Shift+I` / `Cmd+Opt+I`)
+5. Ensure output folders exist or can be created
+6. Check that files are in the correct Dropbox folder structure
 
 ### Template Not Applied
 
@@ -243,6 +495,7 @@ To add a new processor:
 2. Check template file exists and is readable
 3. Look for template syntax errors
 4. Templates are cached - restart Obsidian to clear cache
+5. Ensure template variables are spelled correctly
 
 ### Files Not Created
 
@@ -250,6 +503,21 @@ To add a new processor:
 2. Ensure you have write permissions to output folders
 3. Review console logs for specific errors
 4. Verify the source file is a valid format for the processor
+5. For Viwoods: check that the specific module is enabled
+
+### Rename Detection Not Working
+
+1. Ensure `enableRenameDetection` is true in module configuration
+2. Check that `viwoodsNoteMetadata.md` exists in vault and is accessible
+3. Verify YAML frontmatter in generated files contains `viwoodsNoteId`
+4. Check that metadata files are being updated during fetch
+
+### Images Not Updating
+
+1. Verify `ImageCacheBuster` is working (check for timestamp suffixes)
+2. Check that images are being regenerated during fetch
+3. Ensure image paths in markdown files are correct
+4. For Memos: check `processImagesWithWhiteBackground` setting
 
 ## Future Enhancements
 
@@ -257,12 +525,91 @@ Planned features:
 
 - **Visual configuration modal** with form-based editing
 - **Template editor** with syntax highlighting and preview
-- **More processors**: PDF, EPUB, markdown enrichment, image processing
+- **More processors**: PDF, EPUB (standalone), markdown enrichment, image processing
 - **Batch processing** for faster syncs
 - **Conflict resolution** for duplicate files
 - **Preview mode** to see what would be created
 - **Template marketplace** for sharing custom templates
+- **Enhanced rename detection** for more file types
+- **Image optimization** and compression options
+- **Background sync** with configurable intervals
 
 ## Examples
 
-See `SPEC-FileProcessors.md` for detailed technical specifications and examples.
+### Viwoods Module Setup Examples
+
+#### Learning Module for Academic Reading
+```json
+{
+  "learning": {
+    "enabled": true,
+    "highlightsFolder": "Academic/Highlights",
+    "annotationsFolder": "Academic/Annotations",
+    "sourcesFolder": "Academic/Library",
+    "downloadSourceFiles": true,
+    "processAnnotations": true,
+    "createCompositeImages": true
+  }
+}
+```
+
+#### Paper Module for Creative Work
+```json
+{
+  "paper": {
+    "enabled": true,
+    "highlightsFolder": "Creative/Notes",
+    "sourcesFolder": "Creative/Originals",
+    "enableRenameDetection": true,
+    "extractImages": true
+  }
+}
+```
+
+#### Memo Module for Task Management
+```json
+{
+  "memo": {
+    "enabled": true,
+    "memosFolder": "Tasks/Memos",
+    "enableRenameDetection": true,
+    "processImagesWithWhiteBackground": true
+  }
+}
+```
+
+See `specs/VIWOODS_SPECIFICATION.md` for detailed technical specifications.
+
+### Custom Template Example
+
+#### Memo Template with Todo Integration
+```markdown
+# 📝 {{memoTitle}}
+
+> Created: {{created}} | Modified: {{modified}}
+
+{{#hasRemind}}
+> ⏰ **Reminder:** {{remindTime}}
+{{/hasRemind}}
+
+---
+
+{{#isTodo}}
+## Todo Status
+{{#isTodoFinished}}✅ Completed{{/isTodoFinished}}
+{{^isTodoFinished}}⭕ Pending{{/isTodoFinished}}
+
+{{/isTodo}}
+
+## Content
+
+![Memo Image]({{memoImagePath}})
+
+{{#screenshotPath}}
+### Screenshot
+![Screenshot]({{screenshotPath}})
+{{/screenshotPath}}
+
+---
+#memo/{{memoTitle}}
+```

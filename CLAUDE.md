@@ -134,3 +134,4 @@ The settings tab includes:
 - log.txt in the root of the project can be analysed for debugging purposes
 - never push a release to github without have updated the changelog and readme
 - when i say i want to test the changes, first commit, build and install the plugin
+- never use the any type in typescript

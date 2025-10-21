@@ -1,7 +1,7 @@
 # Drpbx-Fetcher Plugin Architecture Specification
 
-**Version:** 0.2.81
-**Last Updated:** 2025-10-17
+**Version:** 0.2.130
+**Last Updated:** 2025-10-21
 
 ## Table of Contents
 
@@ -11,10 +11,12 @@
 4. [File Fetching Flow](#file-fetching-flow)
 5. [File Processing Pipeline](#file-processing-pipeline)
 6. [Processor System](#processor-system)
-7. [OAuth Authentication](#oauth-authentication)
-8. [Data Models](#data-models)
-9. [Key Design Patterns](#key-design-patterns)
-10. [Platform Support](#platform-support)
+7. [Viwoods Module Architecture](#viwoods-module-architecture)
+8. [OAuth Authentication](#oauth-authentication)
+9. [Data Models](#data-models)
+10. [Key Design Patterns](#key-design-patterns)
+11. [Platform Support](#platform-support)
+12. [Advanced Features](#advanced-features)
 
 ---
 
@@ -25,10 +27,14 @@ The Drpbx-Fetcher plugin is an Obsidian plugin that automatically fetches and pr
 - **OAuth 2.0 Authentication** with PKCE for secure Dropbox access
 - **Folder Mapping** system to sync specific Dropbox folders to vault locations
 - **Extensible Processor Architecture** for custom file processing
-- **Specialized Viwoods Processor** for handling proprietary note formats
+- **Complete Viwoods Ecosystem Support** with 6 specialized module processors
+- **Advanced Rename Detection** using stable internal note IDs
+- **Smart Image Management** with cache-busting and automatic cleanup
+- **Metadata Management** with YAML frontmatter integration
 - **Chunked Downloads** for memory-efficient handling of large files
 - **Cross-Platform Support** (Desktop, Android, iOS)
 - **Duplicate Detection** to avoid re-downloading unchanged files
+- **Content Preservation** protecting user edits during re-fetch
 
 ---
 
@@ -59,9 +65,24 @@ graph TB
     subgraph "Processing System"
         Registry[ProcessorRegistry<br/>Singleton]
         Default[DefaultProcessor]
-        Viwoods[ViwoodsProcessor]
+        Viwoods[ViwoodsProcessor<br/>6-Module System]
         TemplateEngine[TemplateEngine]
         TemplateResolver[TemplateResolver]
+        MetadataMgr[MetadataManager]
+        RenameHandler[NoteRenameHandler]
+        ImageCache[ImageCacheBuster]
+    end
+
+    subgraph "Viwoods Modules"
+        Learning[LearningProcessor]
+        Paper[PaperProcessor]
+        Daily[DailyProcessor]
+        Meeting[MeetingProcessor]
+        Picking[PickingProcessor]
+        Memo[MemoProcessor]
+        Annotation[AnnotationProcessor]
+        ImageComp[ImageCompositor]
+        MarkdownMerger[MarkdownMerger]
     end
 
     subgraph "File Handling"
@@ -74,6 +95,7 @@ graph TB
     subgraph "Utilities"
         Logger[StreamLogger]
         Crypto[Crypto Utils]
+        Platform[PlatformHelper]
     end
 
     Plugin --> OAuth
@@ -92,15 +114,36 @@ graph TB
     Registry --> Default
     Registry --> Viwoods
 
+    Viwoods --> Learning
+    Viwoods --> Paper
+    Viwoods --> Daily
+    Viwoods --> Meeting
+    Viwoods --> Picking
+    Viwoods --> Memo
+    
+    Learning --> Annotation
+    Paper --> Annotation
+    Learning --> ImageComp
+    Paper --> ImageComp
+    Picking --> ImageComp
+    
+    RenameHandler --> MarkdownMerger
+    MetadataMgr --> RenameHandler
+    ImageCache --> FileUtils
+
     Viwoods --> ZipUtils
     Viwoods --> TemplateEngine
     Viwoods --> TemplateResolver
+    Viwoods --> MetadataMgr
+    Viwoods --> RenameHandler
+    Viwoods --> ImageCache
 
     Downloader --> FileUtils
     Downloader --> TempMgr
 
     Plugin --> Logger
     OAuth --> Crypto
+    Plugin --> Platform
 ```
 
 ---
@@ -589,6 +632,148 @@ The `ProcessorRegistry` uses a two-stage routing system:
 
 ---
 
+## Viwoods Module Architecture
+
+### Module Processor System
+
+The ViwoodsProcessor implements a modular architecture with dedicated processors for each Viwoods app module:
+
+```mermaid
+classDiagram
+    class ViwoodsProcessor {
+        <<router>>
+        +type: "viwoods"
+        +supportedExtensions: string[]
+        +process() ProcessorResult
+        +shouldSkipFile() SkipResult
+        +canHandleFile() boolean
+        -detectModuleType() ViwoodsModuleType
+        -getModuleProcessor() ModuleProcessor
+    }
+
+    class ModuleProcessor {
+        <<interface>>
+        +process(zipEntries, path, metadata, config) Promise~ProcessorResult~
+        +validateConfig() ValidationResult
+        +getDefaultConfig() ModuleConfig
+        +extractMetadata() ModuleMetadata
+    }
+
+    class LearningProcessor {
+        <<static>>
+        +process() ProcessorResult
+        +extractBookMetadata() BookMetadata
+        +processHighlights() HighlightData[]
+        +processAnnotations() AnnotationData[]
+    }
+
+    class PaperProcessor {
+        <<static>>
+        +process() ProcessorResult
+        +processCustomFolders() FolderStructure
+        +extractPaperMetadata() PaperMetadata
+    }
+
+    class DailyProcessor {
+        <<static>>
+        +process() ProcessorResult
+        +extractDateFromPath() Date
+        +formatDailyNote() string
+    }
+
+    class MeetingProcessor {
+        <<static>>
+        +process() ProcessorResult
+        +extractMeetingMetadata() MeetingMetadata
+    }
+
+    class PickingProcessor {
+        <<static>>
+        +process() ProcessorResult
+        +processNonNoteFile() ProcessorResult
+        +extractLayoutData() LayoutData
+    }
+
+    class MemoProcessor {
+        <<static>>
+        +process() ProcessorResult
+        +extractTodoData() TodoData
+        +processReminderData() ReminderData
+        +processMemoImages() ImageData[]
+    }
+
+    ViwoodsProcessor --> ModuleProcessor: routes to
+    ModuleProcessor <|.. LearningProcessor
+    ModuleProcessor <|.. PaperProcessor
+    ModuleProcessor <|.. DailyProcessor
+    ModuleProcessor <|.. MeetingProcessor
+    ModuleProcessor <|.. PickingProcessor
+    ModuleProcessor <|.. MemoProcessor
+```
+
+### Module Detection Strategy
+
+Each .note file is analyzed to determine its module type:
+
+1. **Package Name Detection** (Primary):
+   - `com.wisky.learning` → Learning module
+   - `com.wisky.notewriter` → Paper module
+   - `com.wisky.schedule` → Daily module
+   - `com.wisky.meeting` → Meeting module
+   - `com.wisky.captureLog` → Picking module
+   - `com.wisky.memo` → Memo module
+
+2. **File Structure Detection** (Secondary):
+   - `BookBean.json` + `.epub` files → Learning
+   - `LayoutImage.json` → Picking
+   - Date-based filename → Daily
+   - Custom folder structure → Paper
+
+3. **Path-Based Detection** (Fallback):
+   - `/Learning/` → Learning module
+   - `/Paper/` → Paper module
+   - `/Daily/` → Daily module
+   - `/Meeting/` → Meeting module
+   - `/Picking/` → Picking module
+   - `/Memo/` → Memo module
+
+### Module-Specific Features
+
+#### Learning Module
+- **EPUB Processing**: Extract book files and metadata
+- **Annotation Support**: Process handwritten annotations on EPUB pages
+- **Composite Images**: Merge handwriting with page backgrounds
+- **Chapter Organization**: Structure highlights by chapters
+
+#### Paper Module
+- **Custom Folders**: Preserve user-created folder hierarchy
+- **Rename Detection**: Track renamed notes using internal note IDs
+- **PDF Templates**: Handle notes created from PDF templates
+- **Multi-page Support**: Process notes with multiple pages
+
+#### Daily Module
+- **Date Extraction**: Parse dates from filenames and metadata
+- **Daily Notes Format**: Generate Obsidian-compatible daily notes
+- **Tab Information**: Extract active tab information from Viwoods
+
+#### Meeting Module
+- **Meeting Templates**: Process meeting-specific templates
+- **Meeting Metadata**: Extract meeting dates and participants
+- **Structure Preservation**: Maintain meeting note organization
+
+#### Picking Module
+- **Image Composites**: Merge screenshots with handwritten annotations
+- **Layout Processing**: Preserve relative positioning of elements
+- **Non-Note Files**: Process standalone images in Picking folders
+
+#### Memo Module
+- **Todo Integration**: Extract and format todo items with checkboxes
+- **Reminder Support**: Process Viwoods reminder metadata
+- **White Background**: Apply white background to memo images
+- **Quick Processing**: Handle rapid memo creation workflows
+
+---
+
 ## OAuth Authentication
 
 ### Desktop OAuth Flow
@@ -974,6 +1159,123 @@ Tracks processed files by Dropbox file ID:
 ### UI
 - **Settings Tab:** `src/ui/SettingsTab.ts`
 - **Processor Config Modal:** `src/ui/ProcessorConfigModal.ts`
+
+---
+
+## Advanced Features
+
+### Rename Detection System
+
+The plugin includes sophisticated rename detection for Viwoods notes that preserves user edits when notes are renamed in the source app.
+
+#### Components
+
+**MetadataManager** (`src/utils/MetadataManager.ts`)
+- Stores note metadata in YAML frontmatter of generated files
+- Maintains cross-reference between Dropbox file IDs and Viwoods internal note IDs
+- Enables detection of renamed notes across sync cycles
+
+**NoteRenameHandler** (`src/utils/NoteRenameHandler.ts`)
+- Handles the renaming logic for output files
+- Updates image references and internal links
+- Manages vault-based metadata file (`viwoodsNoteMetadata.md`)
+
+**MarkdownMerger** (`src/processors/ViwoodsProcessor/utils/MarkdownMerger.ts`)
+- Preserves user-edited content during file updates
+- Merges template-generated content with user additions
+- Protects custom sections from being overwritten
+
+#### Workflow
+
+1. **First Sync**: Note metadata is extracted and stored in YAML frontmatter
+2. **Rename Detection**: When a note is renamed in Viwoods, the internal `noteId` remains constant
+3. **File Rename**: Output markdown files are renamed to match new source filename
+4. **Content Preservation**: User edits are merged with new template-generated content
+5. **Image Updates**: Image filenames are updated with cache-busting timestamps
+
+### Smart Image Management
+
+**ImageCacheBuster** (`src/utils/ImageCacheBuster.ts`)
+- Ensures Obsidian displays updated images after changes
+- Adds timestamp-based cache-busting to image filenames
+- Handles image cleanup when files are renamed or deleted
+
+#### Image Processing Features
+
+- **Composite Images**: Merge handwritten annotations with page backgrounds
+- **White Background Processing**: Apply white backgrounds to memo images for better visibility
+- **Automatic Cleanup**: Remove orphaned images when notes are deleted
+- **Cache Invalidation**: Force image refresh after content updates
+
+### Template System
+
+**TemplateEngine** (`src/processors/templates/TemplateEngine.ts`)
+- Simple yet powerful template rendering
+- Supports conditional logic (`{{#condition}}...{{/condition}}`)
+- Date/time formatting with custom patterns
+- Variable escaping for markdown safety
+
+**TemplateResolver** (`src/processors/templates/TemplateResolver.ts`)
+- Loads templates from vault or falls back to defaults
+- Caches templates for performance
+- Handles template inheritance and overrides
+
+#### Template Variables by Module
+
+Each Viwoods module provides specific template variables:
+
+- **Learning**: `{{bookTitle}}`, `{{chapterName}}`, `{{highlightCount}}`
+- **Paper**: `{{noteTitle}}`, `{{folderPath}}`, `{{strokeCount}}`
+- **Daily**: `{{date}}`, `{{year}}`, `{{month}}`, `{{day}}`
+- **Meeting**: `{{meetingTitle}}`, `{{createTime}}`
+- **Picking**: `{{captureType}}`, `{{imageCount}}`
+- **Memo**: `{{isTodo}}`, `{{hasRemind}}`, `{{remindTime}}`
+
+### Content Preservation Strategy
+
+The plugin implements a multi-layered approach to preserve user content:
+
+1. **Early Filtering**: Skip unnecessary downloads before processing
+2. **Duplicate Detection**: Avoid reprocessing unchanged files
+3. **Selective Updates**: Only regenerate missing or changed output files
+4. **User Edit Protection**: Never overwrite user-modified content without explicit consent
+5. **Metadata Tracking**: Store processing metadata separately from user content
+
+### Performance Optimizations
+
+#### Memory Efficiency
+- **Streaming ZIP Processing**: Use `@zip.js/zip.js` for memory-efficient extraction
+- **Chunked Downloads**: Process large files in configurable chunks
+- **On-Demand Processing**: Only load file contents when needed
+
+#### Network Efficiency
+- **Early Filtering**: Skip files based on processor rules before download
+- **Pagination**: Handle large Dropbox folders efficiently with cursors
+- **Conditional Downloads**: Skip files that haven't changed
+
+#### Storage Efficiency
+- **Image Compression**: Optional image processing for space-constrained vaults
+- **Source File Options**: Configurable download of source EPUB/PDF files
+- **Cleanup Automation**: Remove orphaned files and temporary data
+
+### Testing Infrastructure
+
+The plugin includes comprehensive testing with Jest:
+
+- **115+ Tests** covering core functionality
+- **Unit Tests** for utilities and processors
+- **Integration Tests** for complex workflows
+- **Mock Support** for Obsidian APIs
+- **Coverage Reports** for code quality assurance
+
+#### Test Categories
+
+- **FileUtils**: Path manipulation, sanitization, slugification
+- **Crypto**: PKCE OAuth flow implementation
+- **TemplateEngine**: Variable replacement and formatting
+- **ProcessorRegistry**: Registration and routing logic
+- **ViwoodsProcessor**: Configuration validation and processing
+- **Utilities**: Metadata management and rename detection
 
 ---
 

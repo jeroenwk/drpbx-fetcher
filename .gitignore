@@ -15,6 +15,7 @@ samples/
 .vscode/
 *.swp
 *~
+claude_code_zai_env.sh
 
 # OS files
 .DS_Store
