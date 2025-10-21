@@ -9,13 +9,36 @@ This plugin automatically fetches and processes files from your Dropbox folders 
 - **Multiple folder mappings** (Dropbox folder → Vault folder)
 - **Recursive folder fetching** with subdirectories
 - **Smart file processing** - Extract and transform different file types
-- **viwoods Notes support** - Extract text highlights from EPUB reader .note files
-- **Automatic rename detection** - Tracks renamed notes and updates markdown files automatically
-- **Smart identity tracking** - Uses internal note IDs to preserve user content across renames
-- **Custom templates** - Customize markdown output with Obsidian-style templates
-- **Skip unchanged files** (based on file size)
-- **Secure OAuth 2.0** authentication with PKCE
-- **Privacy-first** - No data sent to third-party servers
+- **🎉 Complete Viwoods Memo Support** - Full processing of Viwoods Memo notes with todo integration
+- **📝 Viwoods Paper Notes** - Extract handwritten content with smart rename detection
+- **📚 Viwoods Learning Notes** - Process reading notes with annotations
+- **🤝 Viwoods Meeting Notes** - Extract meeting content and participants
+- **📋 Viwoods Daily Notes** - Process daily entries with date organization
+- **🎯 Viwoods Picking Notes** - Extract captured screenshots and content
+- **🔄 Automatic rename detection** - Tracks renamed notes and updates markdown files automatically
+- **🆔 Smart identity tracking** - Uses internal note IDs to preserve user content across renames
+- **🖼️ Smart image management** - Cache-busting, automatic cleanup, and rename handling
+- **📋 Custom templates** - Customize markdown output with Obsidian-style templates
+- **⏭️ Skip unchanged files** (based on file size)
+- **🔐 Secure OAuth 2.0** authentication with PKCE
+- **🛡️ Privacy-first** - No data sent to third-party servers
+
+## 🎉 New in v0.2.130: Complete Memo Module
+
+The latest major update brings full support for Viwoods Memo notes with advanced features:
+
+### ✨ Memo Module Features
+- **Todo Integration**: Automatic checkbox generation and completion tracking
+- **Reminder Support**: Full Viwoods reminder metadata preservation
+- **Smart Images**: White background processing and automatic cleanup
+- **Template System**: Customizable memo templates with todo variables
+- **Rename Detection**: Automatic detection when memo notes are renamed in Viwoods
+
+### 🔧 Technical Improvements
+- **Content Preservation**: MemoMerger class protects user edits during updates
+- **Type Safety**: Complete TypeScript interface implementation
+- **Code Quality**: Zero ESLint warnings and no `any` types
+- **Architecture**: Extended NoteRenameHandler for memo-specific patterns
 
 ## Installation
 

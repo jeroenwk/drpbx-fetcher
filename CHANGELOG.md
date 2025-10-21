@@ -5,6 +5,35 @@ All notable changes to the Dropbox Fetcher plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.130] - 2025-10-21
+
+### 🎉 Major New Feature: Complete Memo Module Implementation
+- **Full Viwoods Memo Support**: Complete processing of Viwoods Memo notes (`com.wisky.memo`) with todo integration and reminder functionality
+- **Advanced Rename Detection**: Automatic detection and handling of memo note renames using stable Viwoods internal noteId
+- **Smart Image Management**: Memo-specific image patterns with cache-busting, white background processing, and automatic cleanup
+- **Content Preservation**: MemoMerger class ensures all user edits are preserved during updates and renames
+- **Template System**: Enhanced memo templates with todo-specific variables and minute-level time formatting
+
+### 🔄 Image and Rename Features
+- **Memo Image Patterns**: Support for `{slug}-image-{timestamp}.png` pattern distinct from paper notes
+- **Image Rename During Note Rename**: Images automatically renamed to match new note names while preserving timestamps
+- **Automatic Cleanup**: Old cache-busted images cleaned up after successful rename operations
+- **White Background Processing**: Memo images automatically enhanced with white background for better visibility
+- **Proper Tagging**: Separate tags (`#memo #shopping`) instead of combined tags
+
+### 🏗️ Architecture Improvements
+- **MetadataManager Integration**: Memo module now has full metadata tracking for rename detection
+- **Extended NoteRenameHandler**: Enhanced to handle both paper and memo image patterns
+- **TypeScript Enhancements**: Removed all `any` types, added proper interfaces, fixed all ESLint warnings
+- **TemplateEngine Integration**: Consistent template rendering across all Viwoods modules
+
+### 📋 User Experience Improvements
+- **Minute-Level Timestamps**: Clean time formatting without seconds (`21/10/2025, 11:38` instead of `21/10/2025, 11:38:25`)
+- **No Duplicate Titles**: Obsidian filename used as title instead of markdown title
+- **Todo Checkbox Support**: Automatic todo checkbox generation for memo notes marked as todos
+- **Reminder Metadata**: Full support for Viwoods memo reminder functionality
+- **Clean Content Updates**: Fixed "## Content" section duplication during updates
+
 ## [0.2.121] - 2025-10-21
 
 ### Added
