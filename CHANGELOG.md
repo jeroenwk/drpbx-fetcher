@@ -5,6 +5,17 @@ All notable changes to the Dropbox Fetcher plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.117] - 2025-10-21
+
+### Fixed
+- **Learning Module Source Links**: Source field now displays book name as link title instead of generic text like "Open in EPUB" or file extension
+- **Learning Module Hashtags**: Changed hashtag format from `#book/title-of-book` to `#book #title-of-book` for better tag organization
+- **Learning Module Page Tags**: Removed `#page/xxx` hashtag from annotation files to reduce tag clutter
+
+### Changed
+- Source links in Learning module highlights and annotations now use book name for better readability
+- Hashtag structure updated for consistency across Learning module notes
+
 ## [0.2.116] - 2025-10-20
 
 ### Fixed

@@ -217,6 +217,11 @@ If you encounter any issues or have feature requests:
 
 ## Changelog
 
+### 0.2.117 - 2025-10-21
+- 🔗 **Improved source links** - Learning module source field now shows book name as link title instead of generic text
+- 🏷️ **Updated hashtags** - Changed from `#book/title` to `#book #title` format for better tag organization
+- 🧹 **Removed page tags** - Cleaned up annotation files by removing `#page/xxx` hashtags
+
 ### 0.2.116 - 2025-10-20
 - 🐛 **Fixed metadata tracking** - YAML parser now correctly handles all Paper note metadata across save/load cycles
 - ⏱️ **Updated timestamps** - Modified dates and Total Pages counts now update correctly in note headers
