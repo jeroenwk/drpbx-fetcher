@@ -119,6 +119,7 @@ export class PaperProcessor {
 
 			// Check if this note already exists (by noteId) - if so, it might be renamed
 			const existingNote = metadataManager.findByNoteId(noteId);
+			let wasRenamed = false;
 
 			if (existingNote) {
 				// Check if the current file path matches the expected path
@@ -143,14 +144,13 @@ export class PaperProcessor {
 					);
 
 					if (renameResult.success) {
-						StreamLogger.log(`[PaperProcessor.process] Rename successful`, {
+						StreamLogger.log(`[PaperProcessor.process] Rename successful, will continue to update content/images`, {
 							oldPath: renameResult.oldNotePath,
 							newPath: renameResult.newNotePath,
 							imagesRenamed: renameResult.updatedImagePaths.length,
 						});
 
-						// Add renamed file to created files list
-						createdFiles.push(renameResult.newNotePath);
+						wasRenamed = true;
 
 						// Add any warnings from rename
 						if (renameResult.errors && renameResult.errors.length > 0) {
@@ -208,6 +208,10 @@ export class PaperProcessor {
 								createdFiles.push(result.newPath);
 								screenshotPaths.push(result.newPath);
 
+								// If we have existing metadata, use it to track the old image path
+								// This handles cases where the note was renamed and slug changed
+								const oldImageFromMetadata = existingNote?.metadata.pages.find(p => p.page === pageNum)?.image;
+
 								// Track image updates for merge
 								if (result.oldPath) {
 									imageUpdates.push({
@@ -216,6 +220,26 @@ export class PaperProcessor {
 										newPath: result.newPath,
 									});
 									StreamLogger.log(`[PaperProcessor.process] Updated screenshot: ${result.oldPath} -> ${result.newPath}`);
+								} else if (oldImageFromMetadata && oldImageFromMetadata !== result.newPath) {
+									// ImageCacheBuster didn't find the old file (slug mismatch after rename)
+									// But we have it from metadata - add manual update mapping
+									imageUpdates.push({
+										pageNumber: pageNum,
+										oldPath: oldImageFromMetadata,
+										newPath: result.newPath,
+									});
+									StreamLogger.log(`[PaperProcessor.process] Image update from metadata: ${oldImageFromMetadata} -> ${result.newPath}`);
+
+									// Clean up the old image file
+									try {
+										const oldImageFile = context.vault.getAbstractFileByPath(oldImageFromMetadata);
+										if (oldImageFile instanceof TFile) {
+											await context.vault.delete(oldImageFile);
+											StreamLogger.log(`[PaperProcessor.process] Deleted old image: ${oldImageFromMetadata}`);
+										}
+									} catch (err) {
+										StreamLogger.warn(`[PaperProcessor.process] Could not delete old image: ${oldImageFromMetadata}`, err);
+									}
 								} else {
 									StreamLogger.log(`[PaperProcessor.process] Created new screenshot: ${result.newPath}`);
 								}
@@ -267,7 +291,8 @@ export class PaperProcessor {
 				imageUpdates,
 				metadataManager
 			);
-			if (notePath) {
+			// Only add to createdFiles if not already added during rename
+			if (notePath && !wasRenamed) {
 				createdFiles.push(notePath);
 			}
 
