@@ -12,7 +12,7 @@ This plugin automatically fetches and processes files from your Dropbox folders 
 - **🎉 Complete Viwoods Memo Support** - Full processing of Viwoods Memo notes with todo integration
 - **📝 Viwoods Paper Notes** - Extract handwritten content with smart rename detection
 - **📚 Viwoods Learning Notes** - Process reading notes with annotations
-- **🤝 Viwoods Meeting Notes** - Extract meeting content and participants
+- **🤝 Viwoods Meeting Notes** - Extract meeting content with screenshots and smart rename detection
 - **📋 Viwoods Daily Notes** - Process daily entries with date organization
 - **🎯 Viwoods Picking Notes** - Extract captured screenshots and content
 - **🔄 Automatic rename detection** - Tracks renamed notes and updates markdown files automatically
@@ -22,6 +22,22 @@ This plugin automatically fetches and processes files from your Dropbox folders 
 - **⏭️ Skip unchanged files** (based on file size)
 - **🔐 Secure OAuth 2.0** authentication with PKCE
 - **🛡️ Privacy-first** - No data sent to third-party servers
+
+## 🎉 New in v0.2.141: Complete Meeting Module
+The latest major update brings full support for Viwoods Meeting notes with advanced features:
+
+### ✨ Meeting Module Features
+- **Screenshot Processing**: Automatic extraction and organization of meeting note screenshots
+- **Smart Rename Detection**: Automatic detection when meeting notes are renamed in Viwoods
+- **Dedicated Metadata Manager**: Meeting module uses its own metadata space separate from other modules
+- **Content Preservation**: MarkdownMerger integration protects user edits during updates
+- **Template System**: Customizable meeting templates with proper tag structure (`#Viwoods/meeting #meeting #with-myself`)
+- **Clean Folder Structure**: Meeting notes stored directly in `Viwoods/Meeting/` without extra subfolders
+
+### 🔧 Technical Improvements
+- **Image Cache-Busting**: Uses `{slug}-page-{number}-{timestamp}.png` pattern for proper updates
+- **Module Separation**: Each Viwoods module now has independent metadata management
+- **Code Quality**: Full TypeScript implementation with proper type safety
 
 ## 🎉 New in v0.2.130: Complete Memo Module
 

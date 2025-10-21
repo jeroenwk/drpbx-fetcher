@@ -5,6 +5,21 @@ All notable changes to the Dropbox Fetcher plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.141] - 2025-10-21
+
+### 🎉 Major New Feature: Complete Meeting Module Implementation
+- **Full Viwoods Meeting Support**: Complete processing of Viwoods Meeting notes (`com.wisky.meeting`) with screenshot extraction and page organization
+- **Advanced Rename Detection**: Automatic detection and handling of meeting note renames using stable Viwoods internal noteId
+- **Smart Image Management**: Meeting-specific image patterns with cache-busting and automatic cleanup during renames
+- **Content Preservation**: MarkdownMerger integration ensures all user edits are preserved during updates
+- **Clean Folder Structure**: Meeting notes stored directly in `Viwoods/Meeting/` without extra subfolders
+- **Template System**: Enhanced meeting templates with meeting-specific variables and proper tag structure
+
+### 🔄 Image and Rename Features
+- **Meeting Image Cache-Busting**: Uses `{slug}-page-{number}-{timestamp}.png` pattern for proper updates
+- **Dedicated Metadata Manager**: Meeting module now uses its own metadata space separate from Paper/Memo modules
+- **Automatic Image Cleanup**: Old images automatically cleaned up after successful rename operations
+
 ## [0.2.130] - 2025-10-21
 
 ### 🎉 Major New Feature: Complete Memo Module Implementation
