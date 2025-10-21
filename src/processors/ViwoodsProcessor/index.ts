@@ -117,6 +117,42 @@ export class ViwoodsProcessor implements FileProcessor {
 		);
 	}
 
+	/**
+	 * Initialize metadata manager for meeting notes
+	 */
+	private initializeMeetingMetadataManager(context: ProcessorContext, meetingConfig: MeetingModuleConfig): void {
+		if (this.metadataManager) return;
+
+		// Store metadata in Meeting resources folder as markdown with YAML frontmatter
+		const metadataPath = `${meetingConfig.meetingsFolder}/resources/viwoodsNoteMetadata.md`;
+
+		this.metadataManager = new MetadataManager(
+			metadataPath,
+			async () => {
+				// Load metadata from markdown file with YAML frontmatter
+				try {
+					const content = await context.vault.adapter.read(metadataPath);
+					return MetadataManager.fromMarkdown(content);
+				} catch (error) {
+					// File doesn't exist yet - return empty
+					return null;
+				}
+			},
+			async (data: Record<string, ViwoodsNoteMetadata>) => {
+				// Save metadata to markdown file with YAML frontmatter
+				const markdown = MetadataManager.toMarkdown(data);
+				// Ensure resources folder exists
+				const resourcesFolder = `${meetingConfig.meetingsFolder}/resources`;
+				try {
+					await context.vault.createFolder(resourcesFolder);
+				} catch (error) {
+					// Folder might already exist
+				}
+				await context.vault.adapter.write(metadataPath, markdown);
+			}
+		);
+	}
+
 	async process(
 		fileData: Uint8Array,
 		originalPath: string,
@@ -242,6 +278,18 @@ export class ViwoodsProcessor implements FileProcessor {
 							errors: ["Meeting module is disabled in settings"],
 						};
 					}
+					// Initialize metadata manager for Meeting module
+					this.initializeMeetingMetadataManager(context, viwoodsConfig.meeting);
+					if (!this.metadataManager) {
+						return {
+							success: false,
+							createdFiles: [],
+							errors: ["MetadataManager not initialized"],
+						};
+					}
+					// Load metadata before processing
+					await this.metadataManager.load();
+
 					await StreamLogger.log(`[ViwoodsProcessor] Processing as Meeting module...`);
 					result = await MeetingProcessor.process(
 						zipReader,
@@ -249,8 +297,13 @@ export class ViwoodsProcessor implements FileProcessor {
 						originalPath,
 						metadata,
 						viwoodsConfig.meeting,
-						context
+						context,
+						this.metadataManager
 					);
+					// Save metadata after successful Meeting processing
+					if (result.success && this.metadataManager) {
+						await this.metadataManager.save();
+					}
 					break;
 
 				case ViwoodsModuleType.PICKING:
@@ -834,7 +887,7 @@ export class ViwoodsProcessor implements FileProcessor {
 					description: "Folder for meeting notes",
 					type: "folder",
 					required: false,
-					defaultValue: "Viwoods/Meeting/Notes",
+					defaultValue: "Viwoods/Meeting",
 					group: "Meeting",
 					groupToggleKey: "meeting.enabled",
 				},

@@ -129,12 +129,11 @@ This page contains {{strokeCount}} handwriting strokes.
 ---
 #daily-note #Viwoods/daily`,
 
-		// Meeting module templates (stub)
-		"viwoods-meeting-note.md": `# {{noteName}}
-
-**Created:** {{createTime}}
+		// Meeting module templates
+		"viwoods-meeting-note.md": `**Created:** {{createTime}}
 **Modified:** {{modifiedTime}}
-{{#if sourceLink}}**Source:** [Original Note]({{sourceLink}}){{/if}}
+**Meeting Date:** {{meetingDate}}
+**Total Pages:** {{totalPages}}
 
 ---
 
@@ -146,20 +145,20 @@ This page contains {{strokeCount}} handwriting strokes.
 
 *Add agenda items here*
 
-## Notes
+## Meeting Notes
 
-{{#if pageImagePath}}
-![[{{pageImagePath}}]]
-{{/if}}
-
-*Add meeting notes here*
+{{screenshotSections}}
 
 ## Action Items
 
 - [ ] *Add action items here*
 
+## Summary
+
+*Add meeting summary here*
+
 ---
-#Viwoods/meeting #meeting/{{noteSlug}}`,
+#Viwoods/meeting #meeting #{{noteSlug}}`,
 
 		// Picking module templates
 		"viwoods-picking-capture.md": `# {{noteName}}
