@@ -170,13 +170,12 @@ export class LearningProcessor {
 					// Build source info - either link to downloaded EPUB or link to original bookPath
 					let sourceInfo: string;
 					if (epubPath) {
-						sourceInfo = `[Open in EPUB](${epubLink})`;
+						sourceInfo = `[${bookName}](${epubLink})`;
 					} else if (bookPath) {
-						// Extract file extension from bookPath and create file:// link
-						const extension = bookPath.split('.').pop()?.toLowerCase() || 'file';
-						sourceInfo = `[${extension}](file://${bookPath})`;
+						// Use bookName as link title, create file:// link to original bookPath
+						sourceInfo = `[${bookName}](file://${bookPath})`;
 					} else {
-						sourceInfo = `${metadata.name}`;
+						sourceInfo = metadata.name;
 					}
 
 					const highlightData = {
@@ -210,7 +209,7 @@ export class LearningProcessor {
 *Add your thoughts here*
 
 ---
-#highlight #book/{{bookSlug}}
+#highlight #book #{{bookSlug}}
 `;
 
 					const template = await context.templateResolver.resolve(

@@ -59,7 +59,7 @@ Points: {{pointCount}}
 *Add your thoughts here*
 
 ---
-#annotation #book/{{bookSlug}} #page/{{pageNumber}}`,
+#annotation #book #{{bookSlug}}`,
 
 		// Paper module templates
 		"viwoods-paper-note.md": `**Created:** {{createTime}}

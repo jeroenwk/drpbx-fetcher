@@ -133,11 +133,10 @@ export class AnnotationProcessor {
 			// Build source info - either link to downloaded EPUB or link to original bookPath
 			let sourceInfo: string;
 			if (epubPath) {
-				sourceInfo = `[Open in EPUB](${sourceLink})`;
+				sourceInfo = `[${bookName}](${sourceLink})`;
 			} else {
-				// originalFilename contains bookPath from BookBean, extract file extension and create file:// link
-				const extension = originalFilename.split('.').pop()?.toLowerCase() || 'file';
-				sourceInfo = `[${extension}](file://${originalFilename})`;
+				// originalFilename contains bookPath from BookBean, use bookName as link title
+				sourceInfo = `[${bookName}](file://${originalFilename})`;
 			}
 
 			// Build template data (use passed bookName from PageTextAnnotation, not annotation.bookName)
