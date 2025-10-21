@@ -10,6 +10,8 @@ This plugin automatically fetches and processes files from your Dropbox folders 
 - **Recursive folder fetching** with subdirectories
 - **Smart file processing** - Extract and transform different file types
 - **viwoods Notes support** - Extract text highlights from EPUB reader .note files
+- **Automatic rename detection** - Tracks renamed notes and updates markdown files automatically
+- **Smart identity tracking** - Uses internal note IDs to preserve user content across renames
 - **Custom templates** - Customize markdown output with Obsidian-style templates
 - **Skip unchanged files** (based on file size)
 - **Secure OAuth 2.0** authentication with PKCE
@@ -88,6 +90,8 @@ The plugin can intelligently process different file types during fetch:
 - Extract EPUB files from .note archives
 - Generate organized highlight and annotation markdown files
 - Composite JPG page backgrounds with PNG handwriting overlays
+- **Automatic rename detection** - Renamed notes are tracked and updated automatically
+- **Smart image updates** - Images update correctly even after multiple renames
 - Use custom templates for output formatting
 - **[Quick Start Guide](docs/viwoods-setup.md)**
 

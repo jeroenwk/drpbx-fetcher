@@ -5,6 +5,31 @@ All notable changes to the Dropbox Fetcher plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.121] - 2025-10-21
+
+### Added
+- **Automatic Rename Detection**: Plugin now automatically detects when Viwoods Paper notes are renamed in Dropbox and updates the corresponding markdown files
+- **Smart Note Identity Tracking**: Uses Viwoods internal note ID (from NoteFileInfo.json) to track notes across renames instead of relying on Dropbox file IDs that change on rename
+- **Image Path Preservation**: Images are automatically renamed and updated when note slugs change during rename operations
+- **Metadata-Based Image Updates**: Images are tracked via metadata, ensuring proper updates even after multiple renames with different slugs
+
+### Fixed
+- **Duplicate Notes on Rename**: Previously, renaming a note in Dropbox created a duplicate note with the new name while keeping the old one
+- **Lost User Content**: User edits in renamed notes are now preserved through the rename process
+- **Orphaned Images**: Old images are properly cleaned up when notes are renamed and slugs change
+- **Image Update After Rename**: Fixed bug where images weren't updating after rename because ImageCacheBuster couldn't find old files with different slugs
+
+### Changed
+- **Metadata Structure**: Added `noteId` (Viwoods internal ID, stable) and `dropboxFileId` (Dropbox ID, changes on rename) fields to metadata
+- **Processing Flow**: Rename detection happens before image processing, allowing proper image updates in renamed notes
+
+### Technical
+- Added `NoteRenameHandler` utility for handling note rename operations
+- Added `findByNoteId()` method to `MetadataManager` for note identity lookup
+- Enhanced `PaperProcessor` with rename detection logic before processing
+- Improved image update tracking using metadata when filename patterns don't match after rename
+- Updated YAML serialization to track both noteId and dropboxFileId
+
 ## [0.2.117] - 2025-10-21
 
 ### Fixed
