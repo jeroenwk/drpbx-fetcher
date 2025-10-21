@@ -81,6 +81,42 @@ export class ViwoodsProcessor implements FileProcessor {
 		);
 	}
 
+	/**
+	 * Initialize metadata manager for memo notes
+	 */
+	private initializeMemoMetadataManager(context: ProcessorContext, memoConfig: MemoModuleConfig): void {
+		if (this.metadataManager) return;
+
+		// Store metadata in Memo resources folder as markdown with YAML frontmatter
+		const metadataPath = `${memoConfig.memosFolder}/resources/viwoodsNoteMetadata.md`;
+
+		this.metadataManager = new MetadataManager(
+			metadataPath,
+			async () => {
+				// Load metadata from markdown file with YAML frontmatter
+				try {
+					const content = await context.vault.adapter.read(metadataPath);
+					return MetadataManager.fromMarkdown(content);
+				} catch (error) {
+					// File doesn't exist yet - return empty
+					return null;
+				}
+			},
+			async (data: Record<string, ViwoodsNoteMetadata>) => {
+				// Save metadata to markdown file with YAML frontmatter
+				const markdown = MetadataManager.toMarkdown(data);
+				// Ensure resources folder exists
+				const resourcesFolder = `${memoConfig.memosFolder}/resources`;
+				try {
+					await context.vault.createFolder(resourcesFolder);
+				} catch (error) {
+					// Folder might already exist
+				}
+				await context.vault.adapter.write(metadataPath, markdown);
+			}
+		);
+	}
+
 	async process(
 		fileData: Uint8Array,
 		originalPath: string,
@@ -244,6 +280,18 @@ export class ViwoodsProcessor implements FileProcessor {
 							errors: ["Memo module is disabled in settings"],
 						};
 					}
+					// Initialize metadata manager for Memo module
+					this.initializeMemoMetadataManager(context, viwoodsConfig.memo);
+					if (!this.metadataManager) {
+						return {
+							success: false,
+							createdFiles: [],
+							errors: ["MetadataManager not initialized"],
+						};
+					}
+					// Load metadata before processing
+					await this.metadataManager.load();
+
 					await StreamLogger.log(`[ViwoodsProcessor] Processing as Memo module...`);
 					result = await MemoProcessor.process(
 						zipReader,
@@ -251,8 +299,13 @@ export class ViwoodsProcessor implements FileProcessor {
 						originalPath,
 						metadata,
 						viwoodsConfig.memo,
-						context
+						context,
+						this.metadataManager
 					);
+					// Save metadata after successful Memo processing
+					if (result.success && this.metadataManager) {
+						await this.metadataManager.save();
+					}
 					break;
 
 				default:

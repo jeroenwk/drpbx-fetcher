@@ -83,11 +83,10 @@ export class NoteRenameHandler {
 				for (const page of existingMetadata.pages) {
 					const oldImagePath = page.image;
 
-					// Check if this image follows the expected pattern
-					// Pattern: resources/{slug}-page-{N}-{timestamp}.png
-					const imageMatch = oldImagePath.match(/^(.+\/)([^/]+)-page-(\d+)-(\d+)(\.\w+)$/);
-					if (imageMatch) {
-						const [, dir, slug, pageNum, timestamp, ext] = imageMatch;
+					// Check if this image follows paper pattern: resources/{slug}-page-{N}-{timestamp}.png
+					const paperImageMatch = oldImagePath.match(/^(.+\/)([^/]+)-page-(\d+)-(\d+)(\.\w+)$/);
+					if (paperImageMatch) {
+						const [, dir, slug, pageNum, timestamp, ext] = paperImageMatch;
 
 						// Only rename if the slug in the path matches the old note slug
 						if (slug === oldNoteSlug) {
@@ -101,19 +100,53 @@ export class NoteRenameHandler {
 										oldPath: oldImagePath,
 										newPath: newImagePath,
 									});
-									StreamLogger.log("[NoteRenameHandler] Renamed image", {
+									StreamLogger.log("[NoteRenameHandler] Renamed paper image", {
 										old: oldImagePath,
 										new: newImagePath,
 									});
 								} else {
-									StreamLogger.warn("[NoteRenameHandler] Image file not found, skipping rename", {
+									StreamLogger.warn("[NoteRenameHandler] Paper image file not found, skipping rename", {
 										path: oldImagePath,
 									});
 								}
 							} catch (error) {
 								const err = error as Error;
-								errors.push(`Failed to rename image ${oldImagePath}: ${err.message}`);
-								StreamLogger.error("[NoteRenameHandler] Image rename error", error);
+								errors.push(`Failed to rename paper image ${oldImagePath}: ${err.message}`);
+								StreamLogger.error("[NoteRenameHandler] Paper image rename error", error);
+							}
+						}
+					}
+
+					// Check if this image follows memo pattern: resources/{slug}-image-{timestamp}.png
+					const memoImageMatch = oldImagePath.match(/^(.+\/)([^/]+)-image-(\d+)(\.\w+)$/);
+					if (memoImageMatch) {
+						const [, dir, slug, timestamp, ext] = memoImageMatch;
+
+						// Only rename if the slug in the path matches the old note slug
+						if (slug === oldNoteSlug) {
+							const newImagePath = `${dir}${newNoteSlug}-image-${timestamp}${ext}`;
+
+							try {
+								const oldImageFile = vault.getAbstractFileByPath(oldImagePath);
+								if (oldImageFile instanceof TFile) {
+									await vault.rename(oldImageFile, newImagePath);
+									updatedImagePaths.push({
+										oldPath: oldImagePath,
+										newPath: newImagePath,
+									});
+									StreamLogger.log("[NoteRenameHandler] Renamed memo image", {
+										old: oldImagePath,
+										new: newImagePath,
+									});
+								} else {
+									StreamLogger.warn("[NoteRenameHandler] Memo image file not found, skipping rename", {
+										path: oldImagePath,
+									});
+								}
+							} catch (error) {
+								const err = error as Error;
+								errors.push(`Failed to rename memo image ${oldImagePath}: ${err.message}`);
+								StreamLogger.error("[NoteRenameHandler] Memo image rename error", error);
 							}
 						}
 					}
@@ -181,6 +214,9 @@ export class NoteRenameHandler {
 				newKey: newMetadataKey,
 			});
 
+			// 10. Clean up old cache-busted images for memo notes
+			await this.cleanupOldMemoImages(vault, existingMetadata.pages, updatedImagePaths);
+
 			return {
 				success: errors.length === 0,
 				oldNotePath: existingMetadata.notePath,
@@ -200,6 +236,78 @@ export class NoteRenameHandler {
 				updatedImagePaths,
 				errors,
 			};
+		}
+	}
+
+	/**
+	 * Clean up old cache-busted memo images after successful rename
+	 * @param vault Obsidian Vault instance
+	 * @param pages Original page metadata
+	 * @param updatedImagePaths Array of renamed image paths
+	 */
+	private static async cleanupOldMemoImages(
+		vault: Vault,
+		pages: Array<{ page: number; image: string }>,
+		updatedImagePaths: Array<{ oldPath: string; newPath: string }>
+	): Promise<void> {
+		const renamedBasePaths = new Set<string>();
+
+		// Collect base paths of renamed memo images
+		for (const { oldPath } of updatedImagePaths) {
+			const memoImageMatch = oldPath.match(/^(.+\/)([^/]+)-image-(\d+)(\.\w+)$/);
+			if (memoImageMatch) {
+				const [, dir, slug] = memoImageMatch;
+				const basePath = `${dir}${slug}-image`;
+				renamedBasePaths.add(basePath);
+			}
+		}
+
+		// For each renamed memo image, clean up old variants
+		for (const basePath of renamedBasePaths) {
+			await this.cleanupOldImageVariants(vault, basePath);
+		}
+	}
+
+	/**
+	 * Clean up old timestamped variants of a memo image
+	 * @param vault Obsidian Vault instance
+	 * @param basePath Base path without timestamp (e.g., "folder/resources/image")
+	 */
+	private static async cleanupOldImageVariants(
+		vault: Vault,
+		basePath: string
+	): Promise<void> {
+		try {
+			// Extract directory and base name
+			const lastSlash = basePath.lastIndexOf("/");
+			const dir = lastSlash >= 0 ? basePath.substring(0, lastSlash) : "";
+			const baseName = lastSlash >= 0 ? basePath.substring(lastSlash + 1) : basePath;
+
+			const parentFolder = dir
+				? vault.getAbstractFileByPath(dir)
+				: vault.getRoot();
+
+			if (!parentFolder || !("children" in parentFolder)) return;
+
+			// Find all files matching the pattern: {baseName}-{timestamp}.png
+			const timestampRegex = new RegExp(
+				`^${this.escapeRegex(baseName)}-\\d+\\.\\w+$`
+			);
+
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const children = (parentFolder as any).children as unknown[];
+			const filesToDelete = children.filter(
+				(child: unknown) => child instanceof TFile && timestampRegex.test(child.name)
+			) as TFile[];
+
+			for (const file of filesToDelete) {
+				await vault.delete(file);
+				StreamLogger.log("[NoteRenameHandler] Cleaned up old image variant", {
+					deletedFile: file.path,
+				});
+			}
+		} catch (error) {
+			StreamLogger.warn("[NoteRenameHandler] Failed to clean up old image variants", error);
 		}
 	}
 

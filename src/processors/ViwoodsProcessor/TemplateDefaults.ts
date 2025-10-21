@@ -175,17 +175,27 @@ This page contains {{strokeCount}} handwriting strokes.
 ---
 #Viwoods/picking #capture/{{noteSlug}}`,
 
-		// Memo module templates (stub)
-		"viwoods-memo.md": `# {{memoTitle}}
-
-**Created:** {{createTime}}
+		// Memo module templates
+		"viwoods-memo.md": `**Created:** {{created}}
+**Modified:** {{modified}}
+**Type:** {{memoType}}
+{{reminderLine}}
 
 ---
+
+## Content
+
+![[{{memoImagePath}}]]
 
 {{memoContent}}
 
+## Notes
+
+*Add your notes here*
+
 ---
-#Viwoods/memo #memo/{{noteSlug}}`,
+
+#memo #{{noteSlug}}{{todoTag}}`,
 
 		// Legacy template (deprecated)
 		"viwoods-page.md": `# {{noteTitle}} - Page {{pageNumber}}
