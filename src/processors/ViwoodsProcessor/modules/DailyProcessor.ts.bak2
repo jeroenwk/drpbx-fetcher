@@ -99,6 +99,7 @@ export class DailyProcessor {
 
 			// Process page images
 			const pageImages: string[] = [];
+			const timestamp = Date.now(); // Single timestamp for cache-busting
 
 			if (noteList && noteList.length > 0) {
 				// Sort by page order
@@ -115,22 +116,18 @@ export class DailyProcessor {
 							continue;
 						}
 
-					// Generate output filename (base path without timestamp)
-					const outputName = `${dateSlug}-page-${index + 1}.png`;
-					const resourcePath = FileUtils.joinPath(resourcesFolder, outputName);
+						// Generate output filename
+						const outputName = `${dateSlug}-page-${index + 1}.png`;
+						const resourcePath = FileUtils.joinPath(resourcesFolder, outputName);
 
-					// Save image with cache-busting using ImageCacheBuster
-					const result = await ImageCacheBuster.updateImageWithCacheBust(
-						context.vault,
-						resourcePath,
-						new Uint8Array(imageData.buffer)
-					);
+						// Save image
+						await context.vault.adapter.writeBinary(resourcePath, imageData.buffer as ArrayBuffer);
 
-					// Add wiki link with relative path from daily note to image
-					const relativePath = result.newPath.replace(`${dailyNotesFolder}/`, '');
-					pageImages.push(`![[${relativePath}]]`);
+						// Add with query parameter cache-busting for template
+						const cacheBustedPath = `resources/${outputName}?t=${timestamp}`;
+						pageImages.push(`![[${cacheBustedPath}]]`);
 
-					StreamLogger.log(`[DailyProcessor.process] Extracted page ${index + 1}: ${result.newPath}`);
+						StreamLogger.log(`[DailyProcessor.process] Extracted page ${index + 1}: ${outputName}`);
 					} catch (error) {
 						StreamLogger.error(`[DailyProcessor.process] Failed to extract page image ${entry.id}:`, error);
 						warnings.push(`Failed to extract page image: ${entry.id}`);
@@ -212,11 +209,31 @@ export class DailyProcessor {
 				const existingContent = await context.vault.adapter.read(notePath);
 				const newContent = await TemplateEngine.render(template, variables, date);
 
-			// Daily notes don't need merge logic for images since ImageCacheBuster handles it
-			//  Just regenerate the Related Notes section
-			let merged = existingContent;
+				// Build image update mappings for cache-busting
+				const imageUpdates: ImageUpdateMapping[] = [];
+				const oldImagePattern = /resources\/(\d+)-page-(\d+)\.png\?t=(\d+)/g;
+				let match;
+				while ((match = oldImagePattern.exec(existingContent)) !== null) {
+					const pageNum = parseInt(match[2]);
+					const oldPath = `resources/${dateSlug}-page-${pageNum}.png?t=${match[3]}`;
+					const newPath = `resources/${dateSlug}-page-${pageNum}.png?t=${timestamp}`;
+					imageUpdates.push({
+						pageNumber: pageNum,
+						oldPath,
+						newPath
+					});
+				}
 
-			// Replace "Related Notes" section with new content
+				// Merge, preserving user content but regenerating "Related Notes" section
+				// Note: MarkdownMerger.merge expects pageImagePaths array, but we're using a different approach
+				// for daily notes. We'll do a simple merge manually
+				let merged = existingContent;
+
+				// Update image paths with new cache-busting timestamps
+				for (const imageUpdate of imageUpdates) {
+					merged = merged.replace(imageUpdate.oldPath, imageUpdate.newPath);
+				}
+
 				// Replace "Related Notes" section with new content
 				const relatedNotesStart = merged.indexOf('## Related Notes');
 				const nextSectionStart = merged.indexOf('\n---\n', relatedNotesStart);
