@@ -102,32 +102,58 @@ This page contains {{strokeCount}} handwriting strokes.
 ---
 #Viwoods/paper #note/{{noteSlug}} #page/{{pageNumber}}`,
 
-		// Daily module templates (stub)
+		// Daily module templates
 		"viwoods-daily-note.md": `# {{date}}
 
 **Created:** {{createTime}}
-{{#if lastTab}}**Last Active Tab:** {{lastTab}}{{/if}}
+**Modified:** {{modifiedTime}}
+{{#if lastTab}}**Last Tab:** {{lastTab}}{{/if}}
+
+---
+
+## Related Notes
+
+{{#if hasRelatedNotes}}
+{{#if relatedPaper}}
+### Paper Notes
+{{relatedPaper}}
+{{/if}}
+
+{{#if relatedMeeting}}
+### Meeting Notes
+{{relatedMeeting}}
+{{/if}}
+
+{{#if relatedMemo}}
+### Memos
+{{relatedMemo}}
+{{/if}}
+
+{{#if relatedLearning}}
+### Learning Notes
+{{relatedLearning}}
+{{/if}}
+
+{{#if relatedPicking}}
+### Quick Captures
+{{relatedPicking}}
+{{/if}}
+{{else}}
+*No related notes found for this date*
+{{/if}}
 
 ---
 
 ## Journal
 
-*Your daily journal entry*
-
-{{#if pageImagePath}}
-![[{{pageImagePath}}]]
-{{/if}}
+{{pageImages}}
 
 ## Tasks
 
-{{#if taskData}}
-{{taskData}}
-{{else}}
-*No tasks for today*
-{{/if}}
+*Add your tasks here*
 
 ---
-#daily-note #Viwoods/daily`,
+#daily-note #Viwoods/daily #date/{{dateSlug}}`,
 
 		// Meeting module templates
 		"viwoods-meeting-note.md": `**Created:** {{createTime}}

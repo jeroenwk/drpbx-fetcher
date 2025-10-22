@@ -5,6 +5,42 @@ All notable changes to the Dropbox Fetcher plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.142] - 2025-10-22
+
+### 🎉 Major New Feature: Complete Daily Module Implementation with Cross-Referencing
+- **Full Viwoods Daily Support**: Complete processing of Viwoods Daily journal notes (`com.wisky.schedule`) with multi-page support and date-based organization
+- **Smart Cross-Referencing**: Automatically generates links to Paper, Meeting, Memo notes created on the same date
+- **Incremental Link Updates**: Other modules (Paper, Meeting, Memo) automatically add themselves to daily notes when processed
+- **Query Parameter Cache-Busting**: Uses `?t=timestamp` pattern for daily note images to force Obsidian cache invalidation
+- **Content Preservation**: Markdown merging preserves user-added journal and task content while regenerating Related Notes section
+- **Template System**: Enhanced daily note template with dedicated sections for related notes, journal, and tasks
+
+### 🔗 Cross-Reference Architecture
+- **CrossReferenceManager Utility**: Centralized system for finding and linking related notes by creation date
+- **Date-Based Matching**: Finds notes from all modules created on the same calendar day (local timezone)
+- **Processing Order**: Daily notes processed last to ensure all related notes exist first
+- **Incremental Updates**: New notes from other modules automatically add links to existing daily notes
+- **Metadata Integration**: Added `creationTime` field to note metadata for accurate date matching
+
+### 📁 Daily Note Features
+- **Flat Folder Structure**: Daily notes stored directly in `Viwoods/Daily/` with YYYY-MM-DD naming
+- **Multi-Page Support**: All page images embedded sequentially in single markdown file
+- **Related Notes Sections**: Organized by module type (Paper Notes, Meeting Notes, Memos, etc.)
+- **Date Tags**: Automatic tagging with `#daily-note #Viwoods/daily #date/YYYYMMDD`
+- **No Manual Rebuild Needed**: Cross-references update automatically; users can re-sync to reset if needed
+
+### 🏗️ Architecture Improvements
+- **ViwoodsNoteMetadata Enhancement**: Added optional `creationTime` field for cross-referencing
+- **NoteListEntry Interface**: New type for Daily/Picking module note list structures
+- **Template Variables**: Added date-specific and cross-reference template variables
+- **TypeScript Safety**: Proper type handling for cross-module configurations
+
+### 📋 Technical Details
+- **Related Note Query**: O(n) where n = notes in metadata file (fast even with hundreds of notes)
+- **Link Insertion**: Smart section detection and creation in existing daily notes
+- **Duplicate Prevention**: Checks for existing links before adding new ones
+- **Graceful Degradation**: Cross-referencing works even if some modules are disabled
+
 ## [0.2.141] - 2025-10-21
 
 ### 🎉 Major New Feature: Complete Meeting Module Implementation

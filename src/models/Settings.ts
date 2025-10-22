@@ -27,6 +27,7 @@ export interface ViwoodsNoteMetadata {
 	dropboxFileId: string; // Dropbox file ID (changes on rename)
 	lastModified: number; // Last modified timestamp
 	notePath: string; // Path to markdown file in vault
+	creationTime?: number; // Creation timestamp (for date-based cross-referencing)
 	pages: Array<{
 		page: number;
 		image: string; // Current image path

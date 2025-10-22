@@ -192,7 +192,10 @@ export interface NotesBean {
 	noteId?: string;
 	noteName?: string;
 	createTime?: number;
+	creationTime?: number;
 	pageCount?: number;
+	lastModifiedTime?: number;
+	id?: string;
 	// Daily-specific
 	fileName?: string;
 	fileType?: number;
@@ -210,6 +213,23 @@ export interface NotesBean {
 	userId?: string;
 	lastEditDialogTime?: number;
 	upTime?: number;
+}
+
+/**
+ * NoteList.json - Used by Daily and Picking modules for page/image metadata
+ */
+export interface NoteListEntry {
+	id: string;                // Image UUID
+	fileName: string;          // Base filename
+	pageFilePath: string;      // Original Android path
+	isNote: number;            // 0 or 1
+	creationTime: number;      // Unix timestamp
+	lastModifiedTime: number;  // Unix timestamp
+	pageOrder: number;         // Page ordering
+	pageShotFilePath?: string; // Screenshot path (optional)
+	offsetY?: string;          // Y offset (optional)
+	fullPagePath?: string;     // Full path (optional)
+	userId?: string;           // User ID (optional)
 }
 
 /**

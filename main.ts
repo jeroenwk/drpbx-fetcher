@@ -471,17 +471,37 @@ export default class DrpbxFetcherPlugin extends Plugin {
             // Folder might already exist, that's okay
           }
 
+          // Separate daily notes from other notes for processing order
+          // Daily notes should be processed last so they can find related notes
+          const dailyNotes: files.FileMetadata[] = [];
+          const otherNotes: files.FileMetadata[] = [];
+
+          for (const file of files) {
+            const pathLower = file.path_display?.toLowerCase() || "";
+            // Check if this is a daily note (in Daily folder and is a .note file)
+            if (pathLower.includes('/daily/') && file.name.endsWith('.note')) {
+              dailyNotes.push(file);
+            } else {
+              otherNotes.push(file);
+            }
+          }
+
+          StreamLogger.log(`[DrpbxFetcher] Processing order: ${otherNotes.length} non-daily files, then ${dailyNotes.length} daily files`);
+
+          // Process non-daily notes first, then daily notes
+          const orderedFiles = [...otherNotes, ...dailyNotes];
+
           // Download and save each file
-          StreamLogger.log(`[DrpbxFetcher] Processing ${files.length} files...`);
-          for (let i = 0; i < files.length; i++) {
-            const file = files[i];
+          StreamLogger.log(`[DrpbxFetcher] Processing ${orderedFiles.length} files...`);
+          for (let i = 0; i < orderedFiles.length; i++) {
+            const file = orderedFiles[i];
             try {
               // Update status bar with progress
               if (this.statusBarItem) {
-                this.statusBarItem.setText(`⏳ Fetching... ${i + 1}/${files.length} files`);
+                this.statusBarItem.setText(`⏳ Fetching... ${i + 1}/${orderedFiles.length} files`);
               }
 
-              StreamLogger.log(`[DrpbxFetcher] Processing file ${i + 1}/${files.length}`, {
+              StreamLogger.log(`[DrpbxFetcher] Processing file ${i + 1}/${orderedFiles.length}`, {
                 fileName: file.name,
                 size: file.size,
                 path: file.path_display

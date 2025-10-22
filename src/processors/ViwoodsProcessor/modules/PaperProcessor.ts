@@ -5,18 +5,21 @@ import { StreamingZipUtils } from "../../../utils/StreamingZipUtils";
 import { StreamLogger } from "../../../utils/StreamLogger";
 import { TemplateEngine } from "../../templates/TemplateEngine";
 import { ProcessorContext, ProcessorResult, FileMetadata } from "../../types";
+import { FileTypeMapping } from "../../../models/Settings";
 import {
 	PaperModuleConfig,
 	NoteFileInfo,
 	PageListFileInfo,
 	PageResource,
-	ResourceType
+	ResourceType,
+	DailyModuleConfig
 } from "../ViwoodsTypes";
 import { TemplateDefaults } from "../TemplateDefaults";
 import { ImageCacheBuster } from "../../../utils/ImageCacheBuster";
 import { MarkdownMerger, ImageUpdateMapping } from "../utils/MarkdownMerger";
 import { MetadataManager } from "../../../utils/MetadataManager";
 import { NoteRenameHandler } from "../../../utils/NoteRenameHandler";
+import { CrossReferenceManager } from "../../../utils/CrossReferenceManager";
 
 /**
  * Handles processing of Paper module notes (handwritten notes)
@@ -338,6 +341,7 @@ export class PaperProcessor {
 				noteId: data.noteId as string,
 				dropboxFileId: data.dropboxFileId as string,
 				lastModified: data.lastModified as number,
+				creationTime: createTime.getTime(), // Track creation time for cross-referencing
 				notePath: filepath,
 				pages: pageImagePaths.map(p => ({
 					page: p.pageNumber,
@@ -390,6 +394,37 @@ export class PaperProcessor {
 			// Save metadata to separate file
 			metadataManager.set(metadataKey, metadata);
 			// Note: metadata will be saved by ViwoodsProcessor after processing
+
+			// Incremental update: add link to daily note if it exists
+			try {
+				const creationDate = new Date(createTime);
+				const viwoodsConfig = context.pluginSettings.fileTypeMappings
+					.find((m: FileTypeMapping) => m.processorType === 'viwoods')?.config;
+
+				const dailyConfig = (viwoodsConfig as Record<string, unknown>)?.daily as DailyModuleConfig | undefined;
+				if (dailyConfig && dailyConfig.enabled) {
+					const dailyNotePath = CrossReferenceManager.getDailyNotePath(
+						creationDate,
+						dailyConfig.dailyNotesFolder
+					);
+
+					if (await context.vault.adapter.exists(dailyNotePath)) {
+						await CrossReferenceManager.addLinkToDailyNote(
+							context.vault,
+							dailyNotePath,
+							{
+								path: filepath,
+								name: data.noteName as string,
+								module: 'paper'
+							}
+						);
+						StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Added link to daily note: ${dailyNotePath}`);
+					}
+				}
+			} catch (error) {
+				// Non-fatal - log but don't fail processing
+				StreamLogger.warn(`[PaperProcessor.generateOrMergeNoteFile] Failed to update daily note:`, error);
+			}
 
 			StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Note file saved: ${filepath}`);
 			return filepath;

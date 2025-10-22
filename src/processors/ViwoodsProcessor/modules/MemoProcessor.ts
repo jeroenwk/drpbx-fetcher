@@ -3,7 +3,8 @@ import { TFile } from "obsidian";
 import { StreamLogger } from "../../../utils/StreamLogger";
 import { TemplateEngine } from "../../templates/TemplateEngine";
 import { ProcessorContext, ProcessorResult, FileMetadata } from "../../types";
-import { MemoModuleConfig } from "../ViwoodsTypes";
+import { FileTypeMapping } from "../../../models/Settings";
+import { MemoModuleConfig, DailyModuleConfig } from "../ViwoodsTypes";
 import { StreamingZipUtils } from "../../../utils/StreamingZipUtils";
 import { FileUtils } from "../../../utils/FileUtils";
 import { TemplateDefaults } from "../TemplateDefaults";
@@ -12,6 +13,7 @@ import { MetadataManager } from "../../../utils/MetadataManager";
 import { NoteRenameHandler } from "../../../utils/NoteRenameHandler";
 import { ViwoodsNoteMetadata } from "../../../models/Settings";
 import { MarkdownMerger } from "../utils/MarkdownMerger";
+import { CrossReferenceManager } from "../../../utils/CrossReferenceManager";
 
 interface MemoNotesBean {
 	counter: number;
@@ -369,6 +371,7 @@ export class MemoProcessor {
 				noteId,
 				dropboxFileId,
 				lastModified: modifiedTime.getTime(),
+				creationTime: createTime.getTime(), // Track creation time for cross-referencing
 				notePath: markdownPath,
 				pages: finalImagePath ? [{
 					page: 1,
@@ -382,6 +385,36 @@ export class MemoProcessor {
 				notePath: markdownPath,
 				hasImage: !!finalImagePath,
 			});
+
+			// Incremental update: add link to daily note if it exists
+			try {
+				const viwoodsConfig = context.pluginSettings.fileTypeMappings
+					.find((m: FileTypeMapping) => m.processorType === 'viwoods')?.config;
+
+				const dailyConfig = (viwoodsConfig as Record<string, unknown>)?.daily as DailyModuleConfig | undefined;
+				if (dailyConfig && dailyConfig.enabled) {
+					const dailyNotePath = CrossReferenceManager.getDailyNotePath(
+						createTime,
+						dailyConfig.dailyNotesFolder
+					);
+
+					if (await context.vault.adapter.exists(dailyNotePath)) {
+						await CrossReferenceManager.addLinkToDailyNote(
+							context.vault,
+							dailyNotePath,
+							{
+								path: markdownPath,
+								name: notesBean.fileName || "Memo",
+								module: 'memo'
+							}
+						);
+						StreamLogger.log(`[MemoProcessor.process] Added link to daily note: ${dailyNotePath}`);
+					}
+				}
+			} catch (error) {
+				// Non-fatal - log but don't fail processing
+				StreamLogger.warn(`[MemoProcessor.process] Failed to update daily note:`, error);
+			}
 
 			return {
 				success: true,

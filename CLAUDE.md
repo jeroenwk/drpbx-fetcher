@@ -135,3 +135,4 @@ The settings tab includes:
 - never push a release to github without have updated the changelog and readme
 - when i say i want to test the changes, first commit, build and install the plugin
 - never use the any type in typescript
+- if you need to analyse .note files. They are in the samples folder.

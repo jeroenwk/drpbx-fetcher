@@ -1,6 +1,6 @@
 {
   "name": "drpbx-fetcher",
-  "version": "0.2.141",
+  "version": "0.2.142",
   "description": "Fetch and process files from Dropbox folders to your Obsidian vault",
   "main": "dist/main.js",
   "scripts": {
