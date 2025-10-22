@@ -181,7 +181,7 @@ export class DailyProcessor {
 				StreamLogger.log(`[DailyProcessor.process] Merging with existing daily note: ${notePath}`);
 
 				const existingContent = await context.vault.adapter.read(notePath);
-				const newContent = await TemplateEngine.render(template, variables);
+				const newContent = await TemplateEngine.render(template, variables, date);
 
 				// Build image update mappings for cache-busting
 				const imageUpdates: ImageUpdateMapping[] = [];
@@ -226,7 +226,7 @@ export class DailyProcessor {
 				StreamLogger.log(`[DailyProcessor.process] Updated existing daily note`);
 			} else {
 				// New note - render fresh from template
-				const content = await TemplateEngine.render(template, variables);
+				const content = await TemplateEngine.render(template, variables, date);
 				await context.vault.adapter.write(notePath, content);
 				StreamLogger.log(`[DailyProcessor.process] Created new daily note: ${notePath}`);
 			}
