@@ -107,40 +107,13 @@ This page contains {{strokeCount}} handwriting strokes.
 
 **Created:** {{createTime}}
 **Modified:** {{modifiedTime}}
-{{#if lastTab}}**Last Tab:** {{lastTab}}{{/if}}
+{{lastTabLine}}
 
 ---
 
 ## Related Notes
 
-{{#if hasRelatedNotes}}
-{{#if relatedPaper}}
-### Paper Notes
-{{relatedPaper}}
-{{/if}}
-
-{{#if relatedMeeting}}
-### Meeting Notes
-{{relatedMeeting}}
-{{/if}}
-
-{{#if relatedMemo}}
-### Memos
-{{relatedMemo}}
-{{/if}}
-
-{{#if relatedLearning}}
-### Learning Notes
-{{relatedLearning}}
-{{/if}}
-
-{{#if relatedPicking}}
-### Quick Captures
-{{relatedPicking}}
-{{/if}}
-{{else}}
-*No related notes found for this date*
-{{/if}}
+{{relatedNotesContent}}
 
 ---
 

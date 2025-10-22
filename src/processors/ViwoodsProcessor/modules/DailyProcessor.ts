@@ -157,15 +157,40 @@ export class DailyProcessor {
 				relatedNotesData = CrossReferenceManager.formatRelatedNotes(relatedNotes);
 			}
 
+			// Build related notes content as a string (TemplateEngine doesn't support conditionals)
+			let relatedNotesContent = '';
+			if (relatedNotesData.hasRelatedNotes) {
+				if (relatedNotesData.relatedPaper) {
+					relatedNotesContent += `### Paper Notes\n\n${relatedNotesData.relatedPaper}\n\n`;
+				}
+				if (relatedNotesData.relatedMeeting) {
+					relatedNotesContent += `### Meeting Notes\n\n${relatedNotesData.relatedMeeting}\n\n`;
+				}
+				if (relatedNotesData.relatedMemo) {
+					relatedNotesContent += `### Memos\n\n${relatedNotesData.relatedMemo}\n\n`;
+				}
+				if (relatedNotesData.relatedLearning) {
+					relatedNotesContent += `### Learning Notes\n\n${relatedNotesData.relatedLearning}\n\n`;
+				}
+				if (relatedNotesData.relatedPicking) {
+					relatedNotesContent += `### Quick Captures\n\n${relatedNotesData.relatedPicking}\n\n`;
+				}
+			} else {
+				relatedNotesContent = '*No related notes found for this date*';
+			}
+
+			// Build last tab line
+			const lastTabLine = notesBean.lastTab ? `**Last Tab:** ${notesBean.lastTab}` : '';
+
 			// Prepare template variables
 			const variables = {
 				date: dateString,
 				dateSlug: dateSlug,
 				createTime: new Date(createTime).toLocaleString(),
 				modifiedTime: new Date(modifiedTime).toLocaleString(),
-				lastTab: notesBean.lastTab || '',
+				lastTabLine: lastTabLine,
 				pageImages: pageImages.join('\n\n') || '*No journal pages*',
-				...relatedNotesData
+				relatedNotesContent: relatedNotesContent
 			};
 
 			// Get template
