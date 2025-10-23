@@ -107,7 +107,6 @@ This page contains {{strokeCount}} handwriting strokes.
 **Modified:** {{modifiedTime}}
 
 ---
-
 ## Related Notes
 
 {{relatedNotesContent}}
