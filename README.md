@@ -23,21 +23,21 @@ This plugin automatically fetches and processes files from your Dropbox folders 
 - **🔐 Secure OAuth 2.0** authentication with PKCE
 - **🛡️ Privacy-first** - No data sent to third-party servers
 
-## 🎉 New in v0.2.141: Complete Meeting Module
-The latest major update brings full support for Viwoods Meeting notes with advanced features:
+## 🎉 New in v0.2.160: Daily Note Template Improvements
+The latest update improves daily note organization and merge logic to better preserve your content:
 
-### ✨ Meeting Module Features
-- **Screenshot Processing**: Automatic extraction and organization of meeting note screenshots
-- **Smart Rename Detection**: Automatic detection when meeting notes are renamed in Viwoods
-- **Dedicated Metadata Manager**: Meeting module uses its own metadata space separate from other modules
-- **Content Preservation**: MarkdownMerger integration protects user edits during updates
-- **Template System**: Customizable meeting templates with proper tag structure (`#Viwoods/meeting #meeting #with-myself`)
-- **Clean Folder Structure**: Meeting notes stored directly in `Viwoods/Meeting/` without extra subfolders
+### ✨ Daily Note Features
+- **Separate Sections**: Distinct `## Related Notes` and `## Tasks & Notes` sections for better organization
+- **User Content Preservation**: Your custom tasks, notes, and modifications are preserved during re-fetch
+- **Smart Image Updates**: Page images automatically update while preserving user-added content
+- **Note Type Prefixes**: Related notes show their type (e.g., `- Paper: [[note]]`, `- Memo: [[note]]`, `- Meeting: [[note]]`)
+- **Clean Formatting**: Improved spacing and removed blank line accumulation
 
 ### 🔧 Technical Improvements
-- **Image Cache-Busting**: Uses `{slug}-page-{number}-{timestamp}.png` pattern for proper updates
-- **Module Separation**: Each Viwoods module now has independent metadata management
-- **Code Quality**: Full TypeScript implementation with proper type safety
+- **Fixed Metadata Bug**: Meeting and Memo notes now correctly save to their own metadata files (not Paper's)
+- **Enhanced Merge Logic**: Only replaces Related Notes section and images, preserving all other content
+- **Better Newline Handling**: Cleans up multiple consecutive newlines during merge
+- **Module Separation**: Each module (Paper, Meeting, Memo) maintains its own metadata file
 
 ## 🎉 New in v0.2.130: Complete Memo Module
 
@@ -259,6 +259,14 @@ If you encounter any issues or have feature requests:
 3. Include your Obsidian version and operating system details
 
 ## Changelog
+
+### 0.2.160 - 2025-10-23
+- 🎨 **Daily Note Template Improvements** - Separate Related Notes and Tasks & Notes sections
+- ✨ **User Content Preservation** - Custom tasks and notes preserved during re-fetch
+- 🐛 **Fixed Metadata Bug** - Meeting/Memo notes now save to correct metadata files
+- 🔄 **Smart Image Updates** - Images update while preserving user content
+- 🏷️ **Note Type Prefixes** - Related notes show type (Paper, Memo, Meeting, etc.)
+- 🧹 **Clean Formatting** - Removed blank line accumulation and improved spacing
 
 ### 0.2.117 - 2025-10-21
 - 🔗 **Improved source links** - Learning module source field now shows book name as link title instead of generic text
