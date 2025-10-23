@@ -209,7 +209,7 @@ export class LearningProcessor {
 *Add your thoughts here*
 
 ---
-#highlight #book #{{bookSlug}}
+#highlight #book #{{bookSlug}} #{{date}}
 `;
 
 					const template = await context.templateResolver.resolve(

@@ -163,7 +163,7 @@ This page contains {{strokeCount}} handwriting strokes.
 {{screenshotSections}}
 
 ---
-#Viwoods/picking #capture/{{noteSlug}} #{{date}}`,
+#picking #{{date}}`,
 
 		// Memo module templates
 		"viwoods-memo.md": `**Created:** {{created}}
