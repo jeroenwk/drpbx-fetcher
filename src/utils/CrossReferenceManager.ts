@@ -212,18 +212,18 @@ export class CrossReferenceManager {
 
 		return {
 			hasRelatedNotes,
-			relatedPaper: this.formatNoteList(related.paper),
-			relatedMeeting: this.formatNoteList(related.meeting),
-			relatedMemo: this.formatNoteList(related.memo),
-			relatedLearning: this.formatNoteList(related.learning),
-			relatedPicking: this.formatNoteList(related.picking),
+			relatedPaper: this.formatNoteList(related.paper, 'Paper'),
+			relatedMeeting: this.formatNoteList(related.meeting, 'Meeting'),
+			relatedMemo: this.formatNoteList(related.memo, 'Memo'),
+			relatedLearning: this.formatNoteList(related.learning, 'Learning'),
+			relatedPicking: this.formatNoteList(related.picking, 'Picking'),
 		};
 	}
 
 	/**
 	 * Format a list of notes as markdown bullet points with wikilinks
 	 */
-	private static formatNoteList(notes: RelatedNote[]): string {
+	private static formatNoteList(notes: RelatedNote[], noteType: string): string {
 		if (notes.length === 0) {
 			return '';
 		}
@@ -231,7 +231,7 @@ export class CrossReferenceManager {
 		// Sort by creation time (oldest first)
 		const sorted = notes.sort((a, b) => a.creationTime - b.creationTime);
 
-		return sorted.map(note => `- [[${note.name}]]`).join('\n');
+		return sorted.map(note => `- ${noteType}: [[${note.name}]]`).join('\n');
 	}
 
 	/**

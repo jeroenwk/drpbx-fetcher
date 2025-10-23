@@ -93,21 +93,21 @@ export class RelatedNotesManager {
 		let content = '';
 
 		if (relatedNotesData.relatedPaper) {
-			content += `### Paper Notes\n\n${relatedNotesData.relatedPaper}\n\n`;
+			content += `${relatedNotesData.relatedPaper}\n`;
 		}
 		if (relatedNotesData.relatedMeeting) {
-			content += `### Meeting Notes\n\n${relatedNotesData.relatedMeeting}\n\n`;
+			content += `${relatedNotesData.relatedMeeting}\n`;
 		}
 		if (relatedNotesData.relatedMemo) {
-			content += `### Memos\n\n${relatedNotesData.relatedMemo}\n\n`;
+			content += `${relatedNotesData.relatedMemo}\n`;
 		}
 		if (relatedNotesData.relatedLearning) {
-			content += `### Learning Notes\n\n${relatedNotesData.relatedLearning}\n\n`;
+			content += `${relatedNotesData.relatedLearning}\n`;
 		}
 		if (relatedNotesData.relatedPicking) {
-			content += `### Quick Captures\n\n${relatedNotesData.relatedPicking}\n\n`;
+			content += `${relatedNotesData.relatedPicking}\n`;
 		}
 
-		return content;
+		return content.trim();
 	}
 }

@@ -109,7 +109,7 @@ This page contains {{strokeCount}} handwriting strokes.
 
 ---
 
-## Related Notes
+## Notes
 
 {{relatedNotesContent}}
 
@@ -124,7 +124,7 @@ This page contains {{strokeCount}} handwriting strokes.
 *Add your tasks here*
 
 ---
-#daily-note #Viwoods/daily #date/{{dateSlug}}`,
+#{{date}}`,
 
 		// Meeting module templates
 		"viwoods-meeting-note.md": `**Created:** {{createTime}}
