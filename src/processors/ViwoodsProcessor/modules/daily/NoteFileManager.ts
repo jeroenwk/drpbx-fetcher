@@ -19,7 +19,7 @@ export class NoteFileManager {
 		content: string
 	): Promise<{ notePath: string; wasExisting: boolean }> {
 		const dailyNotesFolder = config.dailyNotesFolder;
-		const notePath = FileUtils.joinPath(dailyNotesFolder, `${dateString}.md`);
+		const notePath = FileUtils.joinPath(dailyNotesFolder, `Daily note ${dateString}.md`);
 		const noteExists = await context.vault.adapter.exists(notePath);
 
 		if (noteExists) {
@@ -49,20 +49,20 @@ export class NoteFileManager {
 			const existingContent = await context.vault.adapter.read(notePath);
 
 			// Daily notes don't need merge logic for images since ImageCacheBuster handles it
-			// Just regenerate the Related Notes section
+			// Just regenerate the Tasks & Notes section (specifically the related notes list)
 			let merged = existingContent;
 
-			// Replace "Related Notes" section with new content
-			const relatedNotesStart = merged.indexOf('## Related Notes');
-			const nextSectionStart = merged.indexOf('\n---\n', relatedNotesStart);
+			// Replace "Tasks & Notes" section with new content
+			const tasksNotesStart = merged.indexOf('## Tasks & Notes');
+			const nextSectionStart = merged.indexOf('\n---\n', tasksNotesStart);
 
-			if (relatedNotesStart !== -1 && nextSectionStart !== -1) {
-				const newRelatedNotesStart = newContent.indexOf('## Related Notes');
-				const newNextSectionStart = newContent.indexOf('\n---\n', newRelatedNotesStart);
+			if (tasksNotesStart !== -1 && nextSectionStart !== -1) {
+				const newTasksNotesStart = newContent.indexOf('## Tasks & Notes');
+				const newNextSectionStart = newContent.indexOf('\n---\n', newTasksNotesStart);
 
-				if (newRelatedNotesStart !== -1 && newNextSectionStart !== -1) {
-					const newRelatedNotesSection = newContent.substring(newRelatedNotesStart, newNextSectionStart + 5); // Include "---\n"
-					merged = merged.substring(0, relatedNotesStart) + newRelatedNotesSection + merged.substring(nextSectionStart + 5);
+				if (newTasksNotesStart !== -1 && newNextSectionStart !== -1) {
+					const newTasksNotesSection = newContent.substring(newTasksNotesStart, newNextSectionStart + 5); // Include "---\n"
+					merged = merged.substring(0, tasksNotesStart) + newTasksNotesSection + merged.substring(nextSectionStart + 5);
 				}
 			}
 

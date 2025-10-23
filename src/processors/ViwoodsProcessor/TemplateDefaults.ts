@@ -103,20 +103,14 @@ This page contains {{strokeCount}} handwriting strokes.
 #Viwoods/paper #note/{{noteSlug}} #page/{{pageNumber}}`,
 
 		// Daily module templates
-		"viwoods-daily-note.md": `# Daily note {{date}}
-
-**Created:** {{createTime}}
+		"viwoods-daily-note.md": `**Created:** {{createTime}}
 **Modified:** {{modifiedTime}}
 
 ---
 
-## Notes
+## Tasks & Notes
 
 {{relatedNotesContent}}
-
----
-
-## Tasks & Notes
 
 *Add additional tasks here*
 
