@@ -68,17 +68,22 @@ export class NoteFileManager {
 			// Extract new images from new content
 			const newImagesMatch = newContent.match(/!\[\[resources\/[^\]]+\]\]/g);
 			if (newImagesMatch && newImagesMatch.length > 0) {
-				// Remove old images from merged content
-				merged = merged.replace(/!\[\[resources\/[^\]]+\]\]/g, '');
+				// Remove old images and surrounding blank lines from merged content
+				merged = merged.replace(/!\[\[resources\/[^\]]+\]\](\n\n)?/g, '');
 
 				// Find the ## Tasks & Notes section and add new images at the end
 				const finalTasksNotesStart = merged.indexOf('## Tasks & Notes');
 				const finalSeparator = merged.indexOf('\n---\n', finalTasksNotesStart);
 
 				if (finalTasksNotesStart !== -1 && finalSeparator !== -1) {
+					// Clean up multiple consecutive newlines before inserting images
+					let beforeSeparator = merged.substring(0, finalSeparator);
+					// Replace 3 or more newlines with just 2 (one blank line)
+					beforeSeparator = beforeSeparator.replace(/\n{3,}/g, '\n\n');
+
 					// Insert images before the final separator
 					const imagesText = '\n' + newImagesMatch.join('\n\n') + '\n';
-					merged = merged.substring(0, finalSeparator) + imagesText + merged.substring(finalSeparator);
+					merged = beforeSeparator + imagesText + merged.substring(finalSeparator);
 				}
 			}
 
