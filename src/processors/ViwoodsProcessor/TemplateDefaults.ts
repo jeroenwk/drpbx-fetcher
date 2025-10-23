@@ -108,11 +108,13 @@ This page contains {{strokeCount}} handwriting strokes.
 
 ---
 
-## Tasks & Notes
+## Related Notes
 
 {{relatedNotesContent}}
 
-*Add additional tasks here*
+*Add additional tasks / notes here*
+
+## Tasks & Notes
 
 {{pageImages}}
 

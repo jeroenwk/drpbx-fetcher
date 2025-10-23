@@ -48,21 +48,24 @@ export class NoteFileManager {
 		try {
 			const existingContent = await context.vault.adapter.read(notePath);
 
-			// Daily notes don't need merge logic for images since ImageCacheBuster handles it
-			// Just regenerate the Tasks & Notes section (specifically the related notes list)
+			// Daily notes: only replace the "## Related Notes" section
+			// This preserves user content in "## Tasks & Notes" section
 			let merged = existingContent;
 
-			// Replace "Tasks & Notes" section with new content
-			const tasksNotesStart = merged.indexOf('## Tasks & Notes');
-			const nextSectionStart = merged.indexOf('\n---\n', tasksNotesStart);
+			// Find the "## Related Notes" section in existing content
+			const relatedNotesStart = merged.indexOf('## Related Notes');
+			const nextSectionStart = merged.indexOf('\n## ', relatedNotesStart + 1); // Find next ## heading
 
-			if (tasksNotesStart !== -1 && nextSectionStart !== -1) {
-				const newTasksNotesStart = newContent.indexOf('## Tasks & Notes');
-				const newNextSectionStart = newContent.indexOf('\n---\n', newTasksNotesStart);
+			if (relatedNotesStart !== -1 && nextSectionStart !== -1) {
+				// Find the same section in new content
+				const newRelatedNotesStart = newContent.indexOf('## Related Notes');
+				const newNextSectionStart = newContent.indexOf('\n## ', newRelatedNotesStart + 1);
 
-				if (newTasksNotesStart !== -1 && newNextSectionStart !== -1) {
-					const newTasksNotesSection = newContent.substring(newTasksNotesStart, newNextSectionStart + 5); // Include "---\n"
-					merged = merged.substring(0, tasksNotesStart) + newTasksNotesSection + merged.substring(nextSectionStart + 5);
+				if (newRelatedNotesStart !== -1 && newNextSectionStart !== -1) {
+					// Extract the new Related Notes section (including the heading, up to but not including next heading)
+					const newRelatedNotesSection = newContent.substring(newRelatedNotesStart, newNextSectionStart);
+					// Replace old section with new section
+					merged = merged.substring(0, relatedNotesStart) + newRelatedNotesSection + merged.substring(nextSectionStart);
 				}
 			}
 
