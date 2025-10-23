@@ -69,7 +69,7 @@ Points: {{pointCount}}
 ---
 
 {{screenshotSections}}
-#scribbling #note/{{noteSlug}} #{{date}}`,
+#scribbling #{{date}}`,
 		"viwoods-paper-page.md": `# {{noteName}} - Page {{pageNumber}}
 
 **Created:** {{createTime}}
@@ -149,7 +149,7 @@ This page contains {{strokeCount}} handwriting strokes.
 *Add meeting summary here*
 
 ---
-#Viwoods/meeting #meeting #{{noteSlug}} #{{date}}`,
+#meeting #{{date}}`,
 
 		// Picking module templates
 		"viwoods-picking-capture.md": `# {{noteName}}
@@ -185,7 +185,7 @@ This page contains {{strokeCount}} handwriting strokes.
 
 ---
 
-#memo #{{noteSlug}}{{todoTag}} #{{date}}`,
+#memo{{todoTag}} #{{date}}`,
 
 		// Legacy template (deprecated)
 		"viwoods-page.md": `# {{noteTitle}} - Page {{pageNumber}}
