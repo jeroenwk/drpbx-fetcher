@@ -23,21 +23,22 @@ This plugin automatically fetches and processes files from your Dropbox folders 
 - **🔐 Secure OAuth 2.0** authentication with PKCE
 - **🛡️ Privacy-first** - No data sent to third-party servers
 
-## 🎉 New in v0.2.160: Daily Note Template Improvements
-The latest update improves daily note organization and merge logic to better preserve your content:
+## 🎉 New in v0.2.164: Simplified Tag Structure with Date Tags
 
-### ✨ Daily Note Features
-- **Separate Sections**: Distinct `## Related Notes` and `## Tasks & Notes` sections for better organization
-- **User Content Preservation**: Your custom tasks, notes, and modifications are preserved during re-fetch
-- **Smart Image Updates**: Page images automatically update while preserving user-added content
-- **Note Type Prefixes**: Related notes show their type (e.g., `- Paper: [[note]]`, `- Memo: [[note]]`, `- Meeting: [[note]]`)
-- **Clean Formatting**: Improved spacing and removed blank line accumulation
+### 🏷️ Streamlined Tag Organization
+The latest update simplifies tags across all modules and adds consistent date-based tagging:
 
-### 🔧 Technical Improvements
-- **Fixed Metadata Bug**: Meeting and Memo notes now correctly save to their own metadata files (not Paper's)
-- **Enhanced Merge Logic**: Only replaces Related Notes section and images, preserving all other content
-- **Better Newline Handling**: Cleans up multiple consecutive newlines during merge
-- **Module Separation**: Each module (Paper, Meeting, Memo) maintains its own metadata file
+- **Paper Notes**: Now tagged with `#scribbling #YYYY-MM-DD` for cleaner organization
+- **Meeting Notes**: Simplified to `#meeting #YYYY-MM-DD`
+- **Memo Notes**: Tagged as `#memo #YYYY-MM-DD` (with optional `#todo` tag)
+- **Picking Captures**: Simplified to `#picking #YYYY-MM-DD`
+- **Learning Highlights/Annotations**: Now include date tags for better temporal organization
+
+### ✨ Benefits
+- **Date-Based Queries**: Easily find all notes from a specific date across all modules
+- **Cleaner Footers**: Removed redundant slug-based tags for simpler organization
+- **Consistent Structure**: All modules follow the same date tagging pattern
+- **Better Searchability**: Date tags make it easy to filter and organize your notes chronologically
 
 ## 🎉 New in v0.2.130: Complete Memo Module
 

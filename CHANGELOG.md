@@ -5,6 +5,22 @@ All notable changes to the Dropbox Fetcher plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.164] - 2025-10-23
+
+### 🏷️ Tag Structure Improvements
+- **Simplified Tags**: Streamlined tag structure across all Viwoods modules for better organization
+- **Date Tags**: Added consistent date tags (`#YYYY-MM-DD`) to all module footers (Paper, Meeting, Memo, Picking, Learning)
+- **Paper Module**: Tags simplified to `#scribbling #{{date}}`
+- **Meeting Module**: Tags simplified to `#meeting #{{date}}`
+- **Memo Module**: Tags simplified to `#memo{{todoTag}} #{{date}}`
+- **Picking Module**: Tags simplified to `#picking #{{date}}`
+- **Learning Module**: Added date tags to EPUB highlights and annotations
+
+### 🔧 Technical Improvements
+- **MemoProcessor**: Fixed date parameter passing to template renderer for proper date tag generation
+- **Template Consistency**: All modules now follow the same date tagging pattern as Daily notes
+- **Cleaner Footers**: Removed redundant slug-based tags for simplified tag structure
+
 ## [0.2.142] - 2025-10-22
 
 ### 🎉 Major New Feature: Complete Daily Module Implementation with Cross-Referencing
