@@ -24,7 +24,7 @@ Points: {{pointCount}}
 *Add your thoughts here*
 
 ---
-#highlight #Viwoods/{{noteSlug}}`,
+#highlight #Viwoods/{{noteSlug}} #{{date}}`,
 		"viwoods-annotation.md": `## {{noteTitle}} - Annotation
 
 **Page:** {{pageNumber}}/{{totalPages}}
@@ -42,7 +42,7 @@ Points: {{pointCount}}
 *Add your thoughts here*
 
 ---
-#annotation #Viwoods/{{noteSlug}}`,
+#annotation #Viwoods/{{noteSlug}} #{{date}}`,
 		"viwoods-epub-annotation.md": `## {{bookName}}
 
 **Location:** {{location}}
@@ -59,7 +59,7 @@ Points: {{pointCount}}
 *Add your thoughts here*
 
 ---
-#annotation #book #{{bookSlug}}`,
+#annotation #book #{{bookSlug}} #{{date}}`,
 
 		// Paper module templates
 		"viwoods-paper-note.md": `**Created:** {{createTime}}
@@ -149,7 +149,7 @@ This page contains {{strokeCount}} handwriting strokes.
 *Add meeting summary here*
 
 ---
-#scribbling #meeting #{{noteSlug}} #{{date}}`,
+#Viwoods/meeting #meeting #{{noteSlug}} #{{date}}`,
 
 		// Picking module templates
 		"viwoods-picking-capture.md": `# {{noteName}}
@@ -163,7 +163,7 @@ This page contains {{strokeCount}} handwriting strokes.
 {{screenshotSections}}
 
 ---
-#scribbling #capture/{{noteSlug}} #{{date}}`,
+#Viwoods/picking #capture/{{noteSlug}} #{{date}}`,
 
 		// Memo module templates
 		"viwoods-memo.md": `**Created:** {{created}}
@@ -185,7 +185,7 @@ This page contains {{strokeCount}} handwriting strokes.
 
 ---
 
-#scribbling #memo #{{noteSlug}}{{todoTag}} #{{date}}`,
+#memo #{{noteSlug}}{{todoTag}} #{{date}}`,
 
 		// Legacy template (deprecated)
 		"viwoods-page.md": `# {{noteTitle}} - Page {{pageNumber}}
