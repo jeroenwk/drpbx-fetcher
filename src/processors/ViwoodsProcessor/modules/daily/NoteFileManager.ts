@@ -48,24 +48,37 @@ export class NoteFileManager {
 		try {
 			const existingContent = await context.vault.adapter.read(notePath);
 
-			// Daily notes: only replace the "## Related Notes" section
-			// This preserves user content in "## Tasks & Notes" section
+			// Strategy: Replace Related Notes section, and replace images in Tasks & Notes while preserving user content
 			let merged = existingContent;
 
-			// Find the "## Related Notes" section in existing content
+			// 1. Replace ## Related Notes section
 			const relatedNotesStart = merged.indexOf('## Related Notes');
-			const nextSectionStart = merged.indexOf('\n## ', relatedNotesStart + 1); // Find next ## heading
+			const tasksNotesStart = merged.indexOf('## Tasks & Notes', relatedNotesStart);
 
-			if (relatedNotesStart !== -1 && nextSectionStart !== -1) {
-				// Find the same section in new content
-				const newRelatedNotesStart = newContent.indexOf('## Related Notes');
-				const newNextSectionStart = newContent.indexOf('\n## ', newRelatedNotesStart + 1);
+			const newRelatedNotesStart = newContent.indexOf('## Related Notes');
+			const newTasksNotesStart = newContent.indexOf('## Tasks & Notes', newRelatedNotesStart);
 
-				if (newRelatedNotesStart !== -1 && newNextSectionStart !== -1) {
-					// Extract the new Related Notes section (including the heading, up to but not including next heading)
-					const newRelatedNotesSection = newContent.substring(newRelatedNotesStart, newNextSectionStart);
-					// Replace old section with new section
-					merged = merged.substring(0, relatedNotesStart) + newRelatedNotesSection + merged.substring(nextSectionStart);
+			if (relatedNotesStart !== -1 && tasksNotesStart !== -1 && newRelatedNotesStart !== -1 && newTasksNotesStart !== -1) {
+				// Replace Related Notes section
+				const newRelatedNotesSection = newContent.substring(newRelatedNotesStart, newTasksNotesStart);
+				merged = merged.substring(0, relatedNotesStart) + newRelatedNotesSection + merged.substring(tasksNotesStart);
+			}
+
+			// 2. Replace images in Tasks & Notes section (they start with ![[resources/)
+			// Extract new images from new content
+			const newImagesMatch = newContent.match(/!\[\[resources\/[^\]]+\]\]/g);
+			if (newImagesMatch && newImagesMatch.length > 0) {
+				// Remove old images from merged content
+				merged = merged.replace(/!\[\[resources\/[^\]]+\]\]/g, '');
+
+				// Find the ## Tasks & Notes section and add new images at the end
+				const finalTasksNotesStart = merged.indexOf('## Tasks & Notes');
+				const finalSeparator = merged.indexOf('\n---\n', finalTasksNotesStart);
+
+				if (finalTasksNotesStart !== -1 && finalSeparator !== -1) {
+					// Insert images before the final separator
+					const imagesText = '\n' + newImagesMatch.join('\n\n') + '\n';
+					merged = merged.substring(0, finalSeparator) + imagesText + merged.substring(finalSeparator);
 				}
 			}
 
