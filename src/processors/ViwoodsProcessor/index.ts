@@ -49,7 +49,7 @@ export class ViwoodsProcessor implements FileProcessor {
 	 * Called lazily on first use
 	 */
 	private initializeMetadataManager(context: ProcessorContext, paperConfig: PaperModuleConfig): void {
-		if (this.metadataManager) return;
+		// Always reinitialize to ensure correct path for each module
 
 		// Store metadata in Paper resources folder as markdown with YAML frontmatter
 		const metadataPath = `${paperConfig.notesFolder}/resources/viwoodsNoteMetadata.md`;
@@ -85,7 +85,7 @@ export class ViwoodsProcessor implements FileProcessor {
 	 * Initialize metadata manager for memo notes
 	 */
 	private initializeMemoMetadataManager(context: ProcessorContext, memoConfig: MemoModuleConfig): void {
-		if (this.metadataManager) return;
+		// Always reinitialize to ensure correct path for each module
 
 		// Store metadata in Memo resources folder as markdown with YAML frontmatter
 		const metadataPath = `${memoConfig.memosFolder}/resources/viwoodsNoteMetadata.md`;
@@ -121,7 +121,7 @@ export class ViwoodsProcessor implements FileProcessor {
 	 * Initialize metadata manager for meeting notes
 	 */
 	private initializeMeetingMetadataManager(context: ProcessorContext, meetingConfig: MeetingModuleConfig): void {
-		if (this.metadataManager) return;
+		// Always reinitialize to ensure correct path for each module
 
 		// Store metadata in Meeting resources folder as markdown with YAML frontmatter
 		const metadataPath = `${meetingConfig.meetingsFolder}/resources/viwoodsNoteMetadata.md`;
