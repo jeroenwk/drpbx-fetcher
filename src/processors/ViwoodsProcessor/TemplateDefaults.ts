@@ -116,13 +116,11 @@ This page contains {{strokeCount}} handwriting strokes.
 
 ---
 
-## Journal
+## Tasks & Notes
+
+*Add additional tasks here*
 
 {{pageImages}}
-
-## Tasks
-
-*Add your tasks here*
 
 ---
 #daily-note #{{date}}`,
