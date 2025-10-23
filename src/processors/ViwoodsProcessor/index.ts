@@ -26,7 +26,7 @@ import {
 } from "./ViwoodsTypes";
 import { LearningProcessor } from "./modules/LearningProcessor";
 import { PaperProcessor } from "./modules/PaperProcessor";
-import { DailyProcessor } from "./modules/DailyProcessor";
+import { DailyProcessor } from "./modules/daily";
 import { MeetingProcessor } from "./modules/MeetingProcessor";
 import { PickingProcessor } from "./modules/PickingProcessor";
 import { MemoProcessor } from "./modules/MemoProcessor";

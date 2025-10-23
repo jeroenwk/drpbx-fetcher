@@ -1,7 +1,6 @@
 import { Vault } from "obsidian";
 import { StreamLogger } from "./StreamLogger";
 import { MetadataManager } from "./MetadataManager";
-import { ViwoodsNoteMetadata } from "../models/Settings";
 import { ViwoodsProcessorConfig } from "../processors/ViwoodsProcessor/ViwoodsTypes";
 
 /**
@@ -51,7 +50,10 @@ export class CrossReferenceManager {
 		const endOfDay = new Date(date);
 		endOfDay.setHours(23, 59, 59, 999);
 
-		await StreamLogger.log(`[CrossReferenceManager] Finding notes for date: ${date.toISOString().split('T')[0]}`);
+		const dateString = date.toISOString().split('T')[0];
+		await StreamLogger.log(`[CrossReferenceManager] Finding notes for date: ${dateString}`);
+		await StreamLogger.log(`[CrossReferenceManager] Start of day: ${startOfDay.toISOString()} (${startOfDay.getTime()})`);
+		await StreamLogger.log(`[CrossReferenceManager] End of day: ${endOfDay.toISOString()} (${endOfDay.getTime()})`);
 
 		// Query Paper notes
 		if (viwoodsConfig.paper.enabled) {
@@ -153,8 +155,12 @@ export class CrossReferenceManager {
 				const creationTime = noteMetadata.creationTime || noteMetadata.lastModified;
 
 				if (!creationTime) {
+					await StreamLogger.log(`[CrossReferenceManager] Skipping ${notePath} - no timestamp`);
 					continue; // Skip notes without timestamps
 				}
+
+				const creationDate = new Date(creationTime);
+				await StreamLogger.log(`[CrossReferenceManager] Note ${notePath} created: ${creationDate.toISOString()} (${creationTime})`);
 
 				// Check if creation time falls within the date range
 				if (creationTime >= startOfDay.getTime() && creationTime <= endOfDay.getTime()) {
@@ -164,6 +170,9 @@ export class CrossReferenceManager {
 						name: noteName,
 						creationTime: creationTime,
 					});
+					await StreamLogger.log(`[CrossReferenceManager] MATCH: ${noteName} matches date range`);
+				} else {
+					await StreamLogger.log(`[CrossReferenceManager] No match: ${this.extractNoteName(notePath)} not in date range`);
 				}
 			}
 
