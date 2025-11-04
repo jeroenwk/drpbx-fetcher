@@ -4,13 +4,19 @@
 export class TemplateDefaults {
 	private static templates: Record<string, string> = {
 		// Learning module templates
-		"viwoods-highlight.md": `## {{noteTitle}}
-
-**Page:** {{pageNumber}}/{{totalPages}}
-**Date:** {{date:YYYY-MM-DD}}
-**Source:** [Open Note]({{sourceLink}})
-
+		"viwoods-highlight.md": `---
+created: {{date:YYYY-MM-DD}}
+page: {{pageNumber}}/{{totalPages}}
+source: "{{noteTitle}}"
+tags:
+  - highlight
+  - Viwoods/{{noteSlug}}
+  - {{date}}
 ---
+
+## {{noteTitle}}
+
+**Source:** [Open Note]({{sourceLink}})
 
 ![[{{pageImagePath}}]]
 
@@ -21,17 +27,20 @@ Points: {{pointCount}}
 
 ### Notes
 
-*Add your thoughts here*
-
+*Add your thoughts here*`,
+		"viwoods-annotation.md": `---
+created: {{date:YYYY-MM-DD}}
+page: {{pageNumber}}/{{totalPages}}
+source: "{{noteTitle}}"
+tags:
+  - annotation
+  - Viwoods/{{noteSlug}}
+  - {{date}}
 ---
-#highlight #Viwoods/{{noteSlug}} #{{date}}`,
-		"viwoods-annotation.md": `## {{noteTitle}} - Annotation
 
-**Page:** {{pageNumber}}/{{totalPages}}
-**Date:** {{date:YYYY-MM-DD}}
+## {{noteTitle}} - Annotation
+
 **Source:** [Open Note]({{sourceLink}})
-
----
 
 ### Text Content
 
@@ -39,27 +48,28 @@ Points: {{pointCount}}
 
 ### Notes
 
-*Add your thoughts here*
-
+*Add your thoughts here*`,
+		"viwoods-epub-annotation.md": `---
+created: {{dateAnnotated}}
+location: "{{location}}"
+page: {{pageNumber}}/{{totalPages}}
+source: "{{bookName}}"
+tags:
+  - annotation
+  - book
+  - {{bookSlug}}
+  - {{date}}
 ---
-#annotation #Viwoods/{{noteSlug}} #{{date}}`,
-		"viwoods-epub-annotation.md": `## {{bookName}}
 
-**Location:** {{location}}
-**Page:** {{pageNumber}}/{{totalPages}}
-**Date:** {{dateAnnotated}}
+## {{bookName}}
+
 **Source:** {{sourceInfo}}
-
----
 
 ![[{{annotationImagePath}}]]
 
 ### Notes
 
-*Add your thoughts here*
-
----
-#annotation #book #{{bookSlug}} #{{date}}`,
+*Add your thoughts here*`,
 
 		// Paper module templates
 		"viwoods-paper-note.md": `---
@@ -105,10 +115,14 @@ This page contains {{strokeCount}} handwriting strokes.
 #Viwoods/paper #note/{{noteSlug}} #page/{{pageNumber}}`,
 
 		// Daily module templates
-		"viwoods-daily-note.md": `**Created:** {{createTime}}
-**Modified:** {{modifiedTime}}
-
+		"viwoods-daily-note.md": `---
+created: {{createTime}}
+modified: {{modifiedTime}}
+tags:
+  - daily-note
+  - {{date}}
 ---
+
 ## Related Notes
 
 {{relatedNotesContent}}
@@ -117,17 +131,17 @@ This page contains {{strokeCount}} handwriting strokes.
 
 *Add additional tasks / notes here*
 
-{{pageImages}}
-
----
-#daily-note #{{date}}`,
+{{pageImages}}`,
 
 		// Meeting module templates
-		"viwoods-meeting-note.md": `**Created:** {{createTime}}
-**Modified:** {{modifiedTime}}
-**Meeting Date:** {{meetingDate}}
-**Total Pages:** {{totalPages}}
-
+		"viwoods-meeting-note.md": `---
+created: {{createTime}}
+modified: {{modifiedTime}}
+meeting_date: {{meetingDate}}
+total_pages: {{totalPages}}
+tags:
+  - meeting
+  - {{date}}
 ---
 
 ## Attendees
@@ -148,31 +162,31 @@ This page contains {{strokeCount}} handwriting strokes.
 
 ## Summary
 
-*Add meeting summary here*
-
----
-#meeting #{{date}}`,
+*Add meeting summary here*`,
 
 		// Picking module templates
-		"viwoods-picking-capture.md": `# {{noteName}}
-
-**Captured:** {{createTime}}
-**Type:** Quick Capture
-**Total Items:** {{totalPages}}
-
+		"viwoods-picking-capture.md": `---
+created: {{createTime}}
+type: Quick Capture
+total_items: {{totalPages}}
+tags:
+  - picking
+  - {{date}}
 ---
 
-{{screenshotSections}}
+# {{noteName}}
 
----
-#picking #{{date}}`,
+{{screenshotSections}}`,
 
 		// Memo module templates
-		"viwoods-memo.md": `**Created:** {{created}}
-**Modified:** {{modified}}
-**Type:** {{memoType}}
+		"viwoods-memo.md": `---
+created: {{created}}
+modified: {{modified}}
+type: {{memoType}}
 {{reminderLine}}
-
+tags:
+  - memo{{todoTag}}
+  - {{date}}
 ---
 
 ## Content
@@ -183,11 +197,7 @@ This page contains {{strokeCount}} handwriting strokes.
 
 ## Notes
 
-*Add your notes here*
-
----
-
-#memo{{todoTag}} #{{date}}`,
+*Add your notes here*`,
 
 		// Legacy template (deprecated)
 		"viwoods-page.md": `# {{noteTitle}} - Page {{pageNumber}}
