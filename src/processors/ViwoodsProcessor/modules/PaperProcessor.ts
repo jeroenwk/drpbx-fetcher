@@ -264,9 +264,16 @@ export class PaperProcessor {
 
 			// Build screenshot sections manually (for new files)
 			let screenshotSections = "";
-			for (const screenshotPath of screenshotPaths) {
+			for (let i = 0; i < screenshotPaths.length; i++) {
+				const screenshotPath = screenshotPaths[i];
 				// Get just the filename with resources/ prefix for wiki-style links
 				const relativePath = screenshotPath.split("/").slice(-2).join("/");
+
+				// Add page break before additional pages (page 2+)
+				if (i > 0) {
+					screenshotSections += `___\n\n`;
+				}
+
 				screenshotSections += `![[${relativePath}]]\n\n### Notes\n\n*Add your notes here*\n\n`;
 			}
 
