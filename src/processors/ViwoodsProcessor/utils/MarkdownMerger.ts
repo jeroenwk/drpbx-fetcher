@@ -37,69 +37,43 @@ export class MarkdownMerger {
 	static parseMarkdown(content: string): ParsedMarkdown {
 		const lines = content.split("\n");
 
-		// Find all page sections by looking for image embeds
-		// Pattern: ![[resources/...]] or ![[anything]]
-		// Also support HTML column layout: <div style="...">![[...]]</div>
+		// Find all page sections by looking for image embeds in tables or standalone
+		// Pattern: | ![[resources/...]] | notes | or ![[...]]
 		const imageEmbedPattern = /^!\[\[(.+?)\]\]\s*$/;
-		const htmlImagePattern = /<div[^>]*>!\[\[(.+?)\]\]<\/div>/;
+		const tableRowPattern = /^\|\s*!\[\[(.+?)\]\]\s*\|\s*(.+?)\s*\|$/;
 		const pages: PageSection[] = [];
 		let header = "";
 		let footer = "";
 		let currentPage: PageSection | null = null;
 		const headerLines: string[] = [];
 		let isInHeader = true;
-		let inHtmlBlock = false;
-		let htmlBlockLines: string[] = [];
 
 		for (let i = 0; i < lines.length; i++) {
 			const line = lines[i];
 			const match = line.match(imageEmbedPattern);
-			const htmlMatch = line.match(htmlImagePattern);
+			const tableMatch = line.match(tableRowPattern);
 
-			// Check for HTML block start
-			if (line.includes('<div style="display: flex;')) {
-				inHtmlBlock = true;
-				htmlBlockLines = [line];
-				continue;
-			}
-
-			// If in HTML block, accumulate lines until we find the closing div
-			if (inHtmlBlock) {
-				htmlBlockLines.push(line);
-
-				// Check if this is the closing div for the flex container
-				if (line === '</div>') {
-					// Found complete HTML block - extract image and user content
-					const htmlContent = htmlBlockLines.join("\n");
-					const imageMatch = htmlContent.match(/!\[\[(.+?)\]\]/);
-
-					if (imageMatch) {
-						// Save previous page if any
-						if (currentPage) {
-							pages.push(currentPage);
-						}
-
-						// Extract user content from the second div (notes column)
-						const notesMatch = htmlContent.match(/<div style="flex: 1;">\s*([\s\S]*?)\s*<\/div>\s*<\/div>/);
-						const userContent = notesMatch ? notesMatch[1].trim() : "";
-
-						currentPage = {
-							pageNumber: pages.length + 1,
-							imageEmbed: `![[${imageMatch[1]}]]`,
-							userContent: userContent,
-						};
-						isInHeader = false;
-					}
-
-					inHtmlBlock = false;
-					htmlBlockLines = [];
-					continue;
+			if (tableMatch) {
+				// Found a table row with image - this is a page section
+				if (currentPage) {
+					// Save previous page
+					pages.push(currentPage);
 				}
-				continue;
-			}
 
-			if (match || htmlMatch) {
-				// Found an image embed - this starts a new page section
+				// Extract image path and user content from table
+				const imagePath = tableMatch[1];
+				const userContent = tableMatch[2]
+					.replace(/<br\s*\/?>/gi, '\n') // Convert <br> to newlines
+					.trim();
+
+				currentPage = {
+					pageNumber: pages.length + 1,
+					imageEmbed: `![[${imagePath}]]`,
+					userContent: userContent,
+				};
+				isInHeader = false;
+			} else if (match) {
+				// Found standalone image embed - this starts a new page section
 				if (currentPage) {
 					// Save previous page
 					pages.push(currentPage);
@@ -112,8 +86,8 @@ export class MarkdownMerger {
 					userContent: "",
 				};
 				isInHeader = false;
-			} else if (currentPage) {
-				// We're in a page section - accumulate user content
+			} else if (currentPage && !line.startsWith("___") && line.trim() !== "") {
+				// We're in a page section - accumulate user content (skip separator lines)
 				currentPage.userContent += (currentPage.userContent ? "\n" : "") + line;
 			} else if (isInHeader) {
 				// Before first page - this is header
@@ -253,23 +227,19 @@ export class MarkdownMerger {
 			parts.push("");
 		}
 
-		// Add page sections with column layout
+		// Add page sections with table layout
 		for (const page of pages) {
-			// Use HTML column layout for new format
-			parts.push('<div style="display: flex; gap: 20px; align-items: flex-start;">');
-			parts.push(`<div style="flex: 0 0 60%;">${page.imageEmbed}</div>`);
-			parts.push('<div style="flex: 1;">');
-			parts.push("");
-			if (page.userContent.trim()) {
-				parts.push(page.userContent);
+			// Convert user content to single line with <br> for line breaks
+			let userContent = page.userContent.trim();
+			if (!userContent) {
+				userContent = "### Notes<br><br>*Add your notes here*";
 			} else {
-				parts.push("### Notes");
-				parts.push("");
-				parts.push("*Add your notes here*");
+				// Replace newlines with <br> for table cell
+				userContent = userContent.replace(/\n/g, '<br>');
 			}
-			parts.push("");
-			parts.push("</div>");
-			parts.push("</div>");
+
+			// Create table row
+			parts.push(`| ${page.imageEmbed} | ${userContent} |`);
 			parts.push("");
 			parts.push("___");
 			parts.push("");
