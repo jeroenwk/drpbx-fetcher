@@ -267,7 +267,7 @@ export class PaperProcessor {
 			for (const screenshotPath of screenshotPaths) {
 				// Get just the filename with resources/ prefix for wiki-style links
 				const relativePath = screenshotPath.split("/").slice(-2).join("/");
-				screenshotSections += `![[${relativePath}]]\n\n### Notes\n\n*Add your notes here*\n\n---\n\n`;
+				screenshotSections += `<div style="display: flex; gap: 20px; align-items: flex-start;">\n<div style="flex: 0 0 60%;">![[${relativePath}]]</div>\n<div style="flex: 1;">\n\n### Notes\n\n*Add your notes here*\n\n</div>\n</div>\n\n___\n\n`;
 			}
 
 			// Generate or merge note file

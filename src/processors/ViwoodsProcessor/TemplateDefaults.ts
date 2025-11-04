@@ -65,11 +65,11 @@ Points: {{pointCount}}
 		"viwoods-paper-note.md": `**Created:** {{createTime}}
 **Modified:** {{modifiedTime}}
 **Total Pages:** {{totalPages}}
+#scribbling #{{date}}
 
----
+___
 
-{{screenshotSections}}
-#scribbling #{{date}}`,
+{{screenshotSections}}`,
 		"viwoods-paper-page.md": `# {{noteName}} - Page {{pageNumber}}
 
 **Created:** {{createTime}}

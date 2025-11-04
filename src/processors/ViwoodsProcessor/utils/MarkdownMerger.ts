@@ -39,19 +39,66 @@ export class MarkdownMerger {
 
 		// Find all page sections by looking for image embeds
 		// Pattern: ![[resources/...]] or ![[anything]]
+		// Also support HTML column layout: <div style="...">![[...]]</div>
 		const imageEmbedPattern = /^!\[\[(.+?)\]\]\s*$/;
+		const htmlImagePattern = /<div[^>]*>!\[\[(.+?)\]\]<\/div>/;
 		const pages: PageSection[] = [];
 		let header = "";
 		let footer = "";
 		let currentPage: PageSection | null = null;
 		const headerLines: string[] = [];
 		let isInHeader = true;
+		let inHtmlBlock = false;
+		let htmlBlockLines: string[] = [];
 
 		for (let i = 0; i < lines.length; i++) {
 			const line = lines[i];
 			const match = line.match(imageEmbedPattern);
+			const htmlMatch = line.match(htmlImagePattern);
 
-			if (match) {
+			// Check for HTML block start
+			if (line.includes('<div style="display: flex;')) {
+				inHtmlBlock = true;
+				htmlBlockLines = [line];
+				continue;
+			}
+
+			// If in HTML block, accumulate lines until we find the closing div
+			if (inHtmlBlock) {
+				htmlBlockLines.push(line);
+
+				// Check if this is the closing div for the flex container
+				if (line === '</div>') {
+					// Found complete HTML block - extract image and user content
+					const htmlContent = htmlBlockLines.join("\n");
+					const imageMatch = htmlContent.match(/!\[\[(.+?)\]\]/);
+
+					if (imageMatch) {
+						// Save previous page if any
+						if (currentPage) {
+							pages.push(currentPage);
+						}
+
+						// Extract user content from the second div (notes column)
+						const notesMatch = htmlContent.match(/<div style="flex: 1;">\s*([\s\S]*?)\s*<\/div>\s*<\/div>/);
+						const userContent = notesMatch ? notesMatch[1].trim() : "";
+
+						currentPage = {
+							pageNumber: pages.length + 1,
+							imageEmbed: `![[${imageMatch[1]}]]`,
+							userContent: userContent,
+						};
+						isInHeader = false;
+					}
+
+					inHtmlBlock = false;
+					htmlBlockLines = [];
+					continue;
+				}
+				continue;
+			}
+
+			if (match || htmlMatch) {
 				// Found an image embed - this starts a new page section
 				if (currentPage) {
 					// Save previous page
@@ -172,7 +219,7 @@ export class MarkdownMerger {
 				mergedPages.push({
 					pageNumber: newPage.pageNumber,
 					imageEmbed: `![[${newPage.imagePath}]]`,
-					userContent: "\n\n### Notes\n\n*Add your notes here*\n\n---",
+					userContent: "### Notes\n\n*Add your notes here*",
 				});
 
 				StreamLogger.log("[MarkdownMerger] Added new page", {
@@ -206,12 +253,25 @@ export class MarkdownMerger {
 			parts.push("");
 		}
 
-		// Add page sections
+		// Add page sections with column layout
 		for (const page of pages) {
-			parts.push(page.imageEmbed);
+			// Use HTML column layout for new format
+			parts.push('<div style="display: flex; gap: 20px; align-items: flex-start;">');
+			parts.push(`<div style="flex: 0 0 60%;">${page.imageEmbed}</div>`);
+			parts.push('<div style="flex: 1;">');
+			parts.push("");
 			if (page.userContent.trim()) {
 				parts.push(page.userContent);
+			} else {
+				parts.push("### Notes");
+				parts.push("");
+				parts.push("*Add your notes here*");
 			}
+			parts.push("");
+			parts.push("</div>");
+			parts.push("</div>");
+			parts.push("");
+			parts.push("___");
 			parts.push("");
 		}
 
