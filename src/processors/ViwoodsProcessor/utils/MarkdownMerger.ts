@@ -37,10 +37,9 @@ export class MarkdownMerger {
 	static parseMarkdown(content: string): ParsedMarkdown {
 		const lines = content.split("\n");
 
-		// Find all page sections by looking for image embeds in tables or standalone
-		// Pattern: | ![[resources/...]] | notes | or ![[...]]
+		// Find all page sections by looking for image embeds
+		// Pattern: ![[resources/...]] or ![[anything]]
 		const imageEmbedPattern = /^!\[\[(.+?)\]\]\s*$/;
-		const tableRowPattern = /^\|\s*!\[\[(.+?)\]\]\s*\|\s*(.+?)\s*\|$/;
 		const pages: PageSection[] = [];
 		let header = "";
 		let footer = "";
@@ -51,29 +50,9 @@ export class MarkdownMerger {
 		for (let i = 0; i < lines.length; i++) {
 			const line = lines[i];
 			const match = line.match(imageEmbedPattern);
-			const tableMatch = line.match(tableRowPattern);
 
-			if (tableMatch) {
-				// Found a table row with image - this is a page section
-				if (currentPage) {
-					// Save previous page
-					pages.push(currentPage);
-				}
-
-				// Extract image path and user content from table
-				const imagePath = tableMatch[1];
-				const userContent = tableMatch[2]
-					.replace(/<br\s*\/?>/gi, '\n') // Convert <br> to newlines
-					.trim();
-
-				currentPage = {
-					pageNumber: pages.length + 1,
-					imageEmbed: `![[${imagePath}]]`,
-					userContent: userContent,
-				};
-				isInHeader = false;
-			} else if (match) {
-				// Found standalone image embed - this starts a new page section
+			if (match) {
+				// Found an image embed - this starts a new page section
 				if (currentPage) {
 					// Save previous page
 					pages.push(currentPage);
@@ -86,8 +65,8 @@ export class MarkdownMerger {
 					userContent: "",
 				};
 				isInHeader = false;
-			} else if (currentPage && !line.startsWith("___") && line.trim() !== "") {
-				// We're in a page section - accumulate user content (skip separator lines)
+			} else if (currentPage) {
+				// We're in a page section - accumulate user content
 				currentPage.userContent += (currentPage.userContent ? "\n" : "") + line;
 			} else if (isInHeader) {
 				// Before first page - this is header
@@ -193,7 +172,7 @@ export class MarkdownMerger {
 				mergedPages.push({
 					pageNumber: newPage.pageNumber,
 					imageEmbed: `![[${newPage.imagePath}]]`,
-					userContent: "### Notes\n\n*Add your notes here*",
+					userContent: "\n\n### Notes\n\n*Add your notes here*",
 				});
 
 				StreamLogger.log("[MarkdownMerger] Added new page", {
@@ -227,21 +206,12 @@ export class MarkdownMerger {
 			parts.push("");
 		}
 
-		// Add page sections with table layout
+		// Add page sections
 		for (const page of pages) {
-			// Convert user content to single line with <br> for line breaks
-			let userContent = page.userContent.trim();
-			if (!userContent) {
-				userContent = "### Notes<br><br>*Add your notes here*";
-			} else {
-				// Replace newlines with <br> for table cell
-				userContent = userContent.replace(/\n/g, '<br>');
+			parts.push(page.imageEmbed);
+			if (page.userContent.trim()) {
+				parts.push(page.userContent);
 			}
-
-			// Create table row
-			parts.push(`| ${page.imageEmbed} | ${userContent} |`);
-			parts.push("");
-			parts.push("___");
 			parts.push("");
 		}
 
