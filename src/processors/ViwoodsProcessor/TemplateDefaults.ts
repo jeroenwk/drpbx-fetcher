@@ -66,10 +66,9 @@ Points: {{pointCount}}
 created: {{createTime}}
 modified: {{modifiedTime}}
 total_pages: {{totalPages}}
----
-
-#scribbling #{{date}}
-
+tags:
+  - scribbling
+  - {{date}}
 ---
 
 {{screenshotSections}}`,
