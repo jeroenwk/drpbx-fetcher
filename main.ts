@@ -724,9 +724,10 @@ export default class DrpbxFetcherPlugin extends Plugin {
                   sizeMB: (file.size / (1024 * 1024)).toFixed(2),
                   chunkSizeMB: (this.settings.chunkSizeBytes / (1024 * 1024)).toFixed(2)
                 });
-                // Safe: path_lower is always defined for FileMetadata after filtering entries by .tag === "file"
+                // Use path_display (case-sensitive) instead of path_lower for Dropbox API
+                // path_display is always defined for FileMetadata after filtering entries by .tag === "file"
                 uint8Array = await this.downloadFileInChunks(
-                  file.path_lower!, // eslint-disable-line @typescript-eslint/no-non-null-assertion
+                  file.path_display!, // eslint-disable-line @typescript-eslint/no-non-null-assertion
                   file.size,
                   this.settings.chunkSizeBytes
                 );
