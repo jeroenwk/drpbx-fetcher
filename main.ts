@@ -761,7 +761,9 @@ export default class DrpbxFetcherPlugin extends Plugin {
               console.log(`Downloading: ${file.path_display}`);
 
               let uint8Array: Uint8Array;
-              const useChunkedDownload = file.size >= this.settings.chunkedDownloadThreshold;
+              // Disable chunked downloads on iOS due to Range request issues
+              // Use regular SDK download which works reliably on iOS
+              const useChunkedDownload = !PlatformHelper.isIOS() && file.size >= this.settings.chunkedDownloadThreshold;
 
               if (useChunkedDownload) {
                 StreamLogger.log(`[DrpbxFetcher] Using chunked download for large file`, {
