@@ -244,18 +244,30 @@ export default class DrpbxFetcherPlugin extends Plugin {
           }
         });
 
-        const response = await requestUrl({
-          url: downloadUrl,
-          method: requestMethod,
-          headers,
-        });
+        let response;
+        try {
+          response = await requestUrl({
+            url: downloadUrl,
+            method: requestMethod,
+            headers,
+          });
 
-        StreamLogger.log(`[DrpbxFetcher] Chunk download response`, {
-          chunkNumber,
-          status: response.status,
-          statusText: response.status.toString(),
-          headers: response.headers
-        });
+          StreamLogger.log(`[DrpbxFetcher] Chunk download response`, {
+            chunkNumber,
+            status: response.status,
+            statusText: response.status.toString(),
+            headers: response.headers
+          });
+        } catch (error) {
+          // Log the full error details including response body
+          StreamLogger.error(`[DrpbxFetcher] requestUrl threw error`, {
+            chunkNumber,
+            error,
+            errorString: String(error),
+            errorMessage: error instanceof Error ? error.message : 'Unknown error'
+          });
+          throw error;
+        }
 
         if (response.status !== 206 && response.status !== 200) {
           throw new Error(`Chunk download failed with status ${response.status}`);
@@ -393,18 +405,30 @@ export default class DrpbxFetcherPlugin extends Plugin {
             }
           });
 
-          const response = await requestUrl({
-            url: downloadUrl,
-            method: requestMethod,
-            headers,
-          });
+          let response;
+          try {
+            response = await requestUrl({
+              url: downloadUrl,
+              method: requestMethod,
+              headers,
+            });
 
-          StreamLogger.log(`[DrpbxFetcher] Chunk download to disk response`, {
-            chunkNumber,
-            status: response.status,
-            statusText: response.status.toString(),
-            headers: response.headers
-          });
+            StreamLogger.log(`[DrpbxFetcher] Chunk download to disk response`, {
+              chunkNumber,
+              status: response.status,
+              statusText: response.status.toString(),
+              headers: response.headers
+            });
+          } catch (error) {
+            // Log the full error details including response body
+            StreamLogger.error(`[DrpbxFetcher] requestUrl threw error (disk)`, {
+              chunkNumber,
+              error,
+              errorString: String(error),
+              errorMessage: error instanceof Error ? error.message : 'Unknown error'
+            });
+            throw error;
+          }
 
           if (response.status !== 206 && response.status !== 200) {
             throw new Error(`Chunk download failed with status ${response.status}`);
