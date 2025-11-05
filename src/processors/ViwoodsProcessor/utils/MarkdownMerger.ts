@@ -103,7 +103,19 @@ export class MarkdownMerger {
 	private static updateHeader(header: string, modifiedTime: Date, totalPages: number): string {
 		const lines = header.split('\n');
 		const updatedLines = lines.map(line => {
-			// Update Modified date
+			// Update modified date in frontmatter
+			if (line.startsWith('modified:')) {
+				const formatted = modifiedTime.toISOString()
+					.replace('T', ' ')
+					.replace(/:\d{2}\.\d{3}Z$/, '')
+					.substring(0, 16);
+				return `modified: ${formatted}`;
+			}
+			// Update total_pages in frontmatter
+			if (line.startsWith('total_pages:')) {
+				return `total_pages: ${totalPages}`;
+			}
+			// Legacy format support
 			if (line.startsWith('**Modified:**')) {
 				const formatted = modifiedTime.toISOString()
 					.replace('T', ' ')
@@ -111,7 +123,6 @@ export class MarkdownMerger {
 					.substring(0, 16);
 				return `**Modified:** ${formatted}`;
 			}
-			// Update Total Pages
 			if (line.startsWith('**Total Pages:**')) {
 				return `**Total Pages:** ${totalPages}`;
 			}
@@ -172,7 +183,7 @@ export class MarkdownMerger {
 				mergedPages.push({
 					pageNumber: newPage.pageNumber,
 					imageEmbed: `![[${newPage.imagePath}]]`,
-					userContent: "\n\n### Notes\n\n*Add your notes here*\n\n---",
+					userContent: "\n\n### Notes\n\n*Add your notes here*",
 				});
 
 				StreamLogger.log("[MarkdownMerger] Added new page", {
@@ -206,8 +217,16 @@ export class MarkdownMerger {
 			parts.push("");
 		}
 
-		// Add page sections
-		for (const page of pages) {
+		// Add page sections with page breaks before additional pages
+		for (let i = 0; i < pages.length; i++) {
+			const page = pages[i];
+
+			// Add page break before additional pages (page 2+)
+			if (i > 0) {
+				parts.push("___");
+				parts.push("");
+			}
+
 			parts.push(page.imageEmbed);
 			if (page.userContent.trim()) {
 				parts.push(page.userContent);
