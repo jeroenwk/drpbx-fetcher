@@ -214,17 +214,16 @@ export default class DrpbxFetcherPlugin extends Plugin {
         // Make direct HTTP request with Range header
         // We need to bypass the Dropbox SDK and use direct API calls for Range support
 
-        // Mobile fix: Dropbox API requires specific Content-Type headers
-        // Mobile requestUrl may automatically add "application/x-www-form-urlencoded" for POST
-        // but Dropbox expects "application/octet-stream" or "text/plain; charset=dropbox-cors-hack"
+        // For Dropbox file download with Range headers, we need specific headers
         const headers: Record<string, string> = {
           "Authorization": `Bearer ${accessToken}`,
           "Dropbox-API-Arg": JSON.stringify({ path: filePath }),
           "Range": `bytes=${start}-${end}`,
         };
 
-        // Set Content-Type for all mobile platforms (Android and iOS)
-        if (PlatformHelper.isAndroid() || PlatformHelper.isIOS()) {
+        // iOS doesn't need Content-Type for Range requests (no body sent)
+        // Android needs it to override the default application/x-www-form-urlencoded
+        if (PlatformHelper.isAndroid()) {
           headers["Content-Type"] = "application/octet-stream";
         }
 
@@ -385,17 +384,16 @@ export default class DrpbxFetcherPlugin extends Plugin {
         try {
           // Make direct HTTP request with Range header
 
-          // Mobile fix: Dropbox API requires specific Content-Type headers
-          // Mobile requestUrl may automatically add "application/x-www-form-urlencoded" for POST
-          // but Dropbox expects "application/octet-stream" or "text/plain; charset=dropbox-cors-hack"
+          // For Dropbox file download with Range headers, we need specific headers
           const headers: Record<string, string> = {
             "Authorization": `Bearer ${accessToken}`,
             "Dropbox-API-Arg": JSON.stringify({ path: filePath }),
             "Range": `bytes=${start}-${end}`,
           };
 
-          // Set Content-Type for all mobile platforms (Android and iOS)
-          if (PlatformHelper.isAndroid() || PlatformHelper.isIOS()) {
+          // iOS doesn't need Content-Type for Range requests (no body sent)
+          // Android needs it to override the default application/x-www-form-urlencoded
+          if (PlatformHelper.isAndroid()) {
             headers["Content-Type"] = "application/octet-stream";
           }
 
