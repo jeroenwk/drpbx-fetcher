@@ -214,16 +214,17 @@ export default class DrpbxFetcherPlugin extends Plugin {
         // Make direct HTTP request with Range header
         // We need to bypass the Dropbox SDK and use direct API calls for Range support
 
-        // Android fix: Dropbox API requires specific Content-Type headers
-        // Android's requestUrl automatically adds "application/x-www-form-urlencoded" for POST
-        // but Dropbox expects "application/octet-stream" or "text/plain"
+        // Mobile fix: Dropbox API requires specific Content-Type headers
+        // Mobile requestUrl may automatically add "application/x-www-form-urlencoded" for POST
+        // but Dropbox expects "application/octet-stream" or "text/plain; charset=dropbox-cors-hack"
         const headers: Record<string, string> = {
           "Authorization": `Bearer ${accessToken}`,
           "Dropbox-API-Arg": JSON.stringify({ path: filePath }),
           "Range": `bytes=${start}-${end}`,
         };
 
-        if (PlatformHelper.isAndroid()) {
+        // Set Content-Type for all mobile platforms (Android and iOS)
+        if (PlatformHelper.isAndroid() || PlatformHelper.isIOS()) {
           headers["Content-Type"] = "application/octet-stream";
         }
 
@@ -362,14 +363,17 @@ export default class DrpbxFetcherPlugin extends Plugin {
         try {
           // Make direct HTTP request with Range header
 
-          // Android fix: Dropbox API requires specific Content-Type headers
+          // Mobile fix: Dropbox API requires specific Content-Type headers
+          // Mobile requestUrl may automatically add "application/x-www-form-urlencoded" for POST
+          // but Dropbox expects "application/octet-stream" or "text/plain; charset=dropbox-cors-hack"
           const headers: Record<string, string> = {
             "Authorization": `Bearer ${accessToken}`,
             "Dropbox-API-Arg": JSON.stringify({ path: filePath }),
             "Range": `bytes=${start}-${end}`,
           };
 
-          if (PlatformHelper.isAndroid()) {
+          // Set Content-Type for all mobile platforms (Android and iOS)
+          if (PlatformHelper.isAndroid() || PlatformHelper.isIOS()) {
             headers["Content-Type"] = "application/octet-stream";
           }
 
