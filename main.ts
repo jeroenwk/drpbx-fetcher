@@ -228,13 +228,15 @@ export default class DrpbxFetcherPlugin extends Plugin {
         }
 
         const downloadUrl = "https://content.dropboxapi.com/2/files/download";
-        const requestMethod = "POST";
+        // iOS: Try GET for Range requests instead of POST
+        const requestMethod = PlatformHelper.isIOS() ? "GET" : "POST";
 
         // Log the request details (mask most of the token for security)
         StreamLogger.log(`[DrpbxFetcher] Chunk download request`, {
           url: downloadUrl,
           method: requestMethod,
           chunkNumber,
+          platform: PlatformHelper.isIOS() ? "iOS" : (PlatformHelper.isAndroid() ? "Android" : "Desktop"),
           headers: {
             "Authorization": `Bearer ${accessToken.substring(0, 10)}...${accessToken.substring(accessToken.length - 4)}`,
             "Dropbox-API-Arg": headers["Dropbox-API-Arg"],
@@ -398,13 +400,15 @@ export default class DrpbxFetcherPlugin extends Plugin {
           }
 
           const downloadUrl = "https://content.dropboxapi.com/2/files/download";
-          const requestMethod = "POST";
+          // iOS: Try GET for Range requests instead of POST
+          const requestMethod = PlatformHelper.isIOS() ? "GET" : "POST";
 
           // Log the request details (mask most of the token for security)
           StreamLogger.log(`[DrpbxFetcher] Chunk download to disk request`, {
             url: downloadUrl,
             method: requestMethod,
             chunkNumber,
+            platform: PlatformHelper.isIOS() ? "iOS" : (PlatformHelper.isAndroid() ? "Android" : "Desktop"),
             headers: {
               "Authorization": `Bearer ${accessToken.substring(0, 10)}...${accessToken.substring(accessToken.length - 4)}`,
               "Dropbox-API-Arg": headers["Dropbox-API-Arg"],
