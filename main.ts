@@ -260,12 +260,22 @@ export default class DrpbxFetcherPlugin extends Plugin {
           });
         } catch (error) {
           // Log the full error details including response body
-          StreamLogger.error(`[DrpbxFetcher] requestUrl threw error`, {
+          const errorObj: Record<string, unknown> = {
             chunkNumber,
             error,
             errorString: String(error),
             errorMessage: error instanceof Error ? error.message : 'Unknown error'
-          });
+          };
+
+          // Try to extract response body from error
+          if (error && typeof error === 'object') {
+            const err = error as Record<string, unknown>;
+            if (err.text) errorObj.errorText = err.text;
+            if (err.json) errorObj.errorJson = err.json;
+            if (err.arrayBuffer) errorObj.hasArrayBuffer = true;
+          }
+
+          StreamLogger.error(`[DrpbxFetcher] requestUrl threw error`, errorObj);
           throw error;
         }
 
@@ -421,12 +431,22 @@ export default class DrpbxFetcherPlugin extends Plugin {
             });
           } catch (error) {
             // Log the full error details including response body
-            StreamLogger.error(`[DrpbxFetcher] requestUrl threw error (disk)`, {
+            const errorObj: Record<string, unknown> = {
               chunkNumber,
               error,
               errorString: String(error),
               errorMessage: error instanceof Error ? error.message : 'Unknown error'
-            });
+            };
+
+            // Try to extract response body from error
+            if (error && typeof error === 'object') {
+              const err = error as Record<string, unknown>;
+              if (err.text) errorObj.errorText = err.text;
+              if (err.json) errorObj.errorJson = err.json;
+              if (err.arrayBuffer) errorObj.hasArrayBuffer = true;
+            }
+
+            StreamLogger.error(`[DrpbxFetcher] requestUrl threw error (disk)`, errorObj);
             throw error;
           }
 
