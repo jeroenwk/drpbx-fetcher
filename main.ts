@@ -226,13 +226,18 @@ export default class DrpbxFetcherPlugin extends Plugin {
         });
 
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
         StreamLogger.error(`[DrpbxFetcher] Chunk download failed`, {
           chunkNumber,
+          totalChunks,
           start,
           end,
-          error: errorMessage
+          chunkBytes: end - start + 1,
+          downloadedSoFar: downloadedBytes,
+          filePath,
+          error: error
         });
+
+        const errorMessage = error instanceof Error ? error.message : String(error);
         throw new Error(`Failed to download chunk ${chunkNumber}/${totalChunks}: ${errorMessage}`);
       }
     }
@@ -329,15 +334,22 @@ export default class DrpbxFetcherPlugin extends Plugin {
           });
 
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          StreamLogger.error(`[DrpbxFetcher] Chunk download failed`, {
+          StreamLogger.error(`[DrpbxFetcher] Chunk download to disk failed`, {
             chunkNumber,
+            totalChunks,
             start,
             end,
-            error: errorMessage
+            chunkBytes: end - start + 1,
+            downloadedSoFar: downloadedBytes,
+            filePath,
+            tempPath,
+            error: error
           });
+
           // Clean up partial temp file on error
           await tempFileManager.delete(tempPath);
+
+          const errorMessage = error instanceof Error ? error.message : String(error);
           throw new Error(`Failed to download chunk ${chunkNumber}/${totalChunks}: ${errorMessage}`);
         }
       }
@@ -556,6 +568,15 @@ export default class DrpbxFetcherPlugin extends Plugin {
               if (willBeProcessed && processor) {
                 const fileId = file.id; // Unique Dropbox file ID
 
+                // VERBOSE: Log file ID for all note files
+                console.log(`[VERBOSE] Note file ID: ${fileId} (file: ${file.name})`);
+                StreamLogger.log(`[DrpbxFetcher] Note file ID`, {
+                  fileName: file.name,
+                  fileId: fileId,
+                  size: file.size,
+                  path: file.path_display
+                });
+
                 if (this.settings.processedFiles[fileId] === file.size) {
                   // File already processed with same size - skip to preserve user edits
                   skippedProcessors++;
@@ -648,8 +669,11 @@ export default class DrpbxFetcherPlugin extends Plugin {
                   const fileId = file.id;
 
                   try {
+                      // VERBOSE: Log file ID at processing start
+                      console.log(`[VERBOSE] Processing note file with ID: ${fileId} (file: ${file.name})`);
                       StreamLogger.log(`[DrpbxFetcher] Starting processor...`, {
                         fileName: file.name,
+                        fileId: fileId,
                         processor: processor.name
                       });
                       const templateResolver = new TemplateResolver(this.app.vault);
@@ -668,6 +692,7 @@ export default class DrpbxFetcherPlugin extends Plugin {
                       );
                       StreamLogger.log(`[DrpbxFetcher] Processor completed`, {
                         fileName: file.name,
+                        fileId: fileId,
                         success: result.success,
                         createdFiles: result.createdFiles?.length || 0
                       });
@@ -678,7 +703,14 @@ export default class DrpbxFetcherPlugin extends Plugin {
                         // Track successful processing
                         this.settings.processedFiles[fileId] = file.size;
                         await this.saveSettings();
-                        console.log(`✓ Processed: ${result.createdFiles.length} files created`);
+                        console.log(`✓ Processed: ${result.createdFiles.length} files created (fileId: ${fileId})`);
+                        // VERBOSE: Log successful tracking
+                        console.log(`[VERBOSE] Tracked successful processing: fileId=${fileId}, size=${file.size}`);
+                        StreamLogger.log(`[DrpbxFetcher] Tracked processed file`, {
+                          fileName: file.name,
+                          fileId: fileId,
+                          size: file.size
+                        });
                         if (result.warnings && result.warnings.length > 0) {
                           console.warn(`Warnings: ${result.warnings.join(", ")}`);
                           StreamLogger.warn(`[DrpbxFetcher] Processor warnings`, {
@@ -689,6 +721,7 @@ export default class DrpbxFetcherPlugin extends Plugin {
                         console.error(`✗ Processing failed: ${result.errors?.join(", ")}`);
                         StreamLogger.error(`[DrpbxFetcher] Processor failed`, {
                           fileName: file.name,
+                          fileId: fileId,
                           errors: result.errors
                         });
                       }
@@ -696,6 +729,7 @@ export default class DrpbxFetcherPlugin extends Plugin {
                       console.error(`Error processing file with ${processor.name}:`, procError);
                       StreamLogger.error(`[DrpbxFetcher] Processor exception`, {
                         fileName: file.name,
+                        fileId: fileId,
                         processor: processor.name,
                         error: procError instanceof Error ? procError.message : String(procError),
                         stack: procError instanceof Error ? procError.stack : undefined
@@ -742,7 +776,6 @@ export default class DrpbxFetcherPlugin extends Plugin {
             } catch (error) {
               const errorMessage = error instanceof Error ? error.message : String(error);
               const errorStatus = (error as { status?: number }).status;
-              const errorStack = error instanceof Error ? error.stack : undefined;
               const dropboxError = (error as { error?: unknown }).error;
 
               console.error(`Error syncing file ${file.path_display}:`, error);
@@ -754,9 +787,12 @@ export default class DrpbxFetcherPlugin extends Plugin {
               StreamLogger.error(`[DrpbxFetcher] File sync error`, {
                 fileName: file.name,
                 path: file.path_display,
-                error: errorMessage,
-                status: errorStatus,
-                stack: errorStack
+                fileSize: file.size,
+                fileSizeMB: (file.size / (1024 * 1024)).toFixed(2),
+                willUseChunkedDownload: file.size >= this.settings.chunkedDownloadThreshold,
+                chunkSizeBytes: this.settings.chunkSizeBytes,
+                platform: PlatformHelper.getPlatformName(),
+                error: error
               });
             }
           }
