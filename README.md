@@ -201,6 +201,51 @@ npm run test:coverage
 7. Run `npm run lint` to check ESLint
 8. Reload Obsidian (Ctrl/Cmd+R) to test your changes
 
+### Log Server for Debugging
+
+The plugin includes a development log server that receives and displays logs from the plugin in real-time:
+
+```bash
+# Start log server (shows all log levels)
+npm run log-server
+
+# Show only errors
+npm run log-server:errors
+
+# Show warnings and errors
+npm run log-server:warnings
+
+# Custom port
+npm run log-server:dev
+
+# Using direct node command (all levels)
+node log-server.js
+
+# Direct command with custom options
+node log-server.js --level error
+node log-server.js --port 3001 --level warn
+```
+
+**Important**: When passing arguments through npm scripts, you must use `--` to separate npm arguments from script arguments:
+
+```bash
+# ❌ Wrong - npm receives the arguments, not the script
+npm run log-server --level error
+
+# ✅ Correct - arguments passed to the script
+npm run log-server -- --level error
+
+# ✅ Or use pre-configured scripts
+npm run log-server:errors
+```
+
+The log server:
+- Displays colored, formatted logs in the terminal
+- Filters logs by level (debug, info, warn, error)
+- Saves all logs to `log.txt` in the project root
+- Shows timestamps and metadata for each log entry
+- Supports remote access for mobile device debugging
+
 ## Mobile Support (iOS/Android)
 
 **✅ This plugin now supports mobile devices!**

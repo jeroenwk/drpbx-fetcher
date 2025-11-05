@@ -74,12 +74,44 @@ export class StreamLogger {
    * Log an error message
    */
   static error(message: string, error?: unknown): void {
-    const errorData = error instanceof Error ? {
-      message: error.message,
-      stack: error.stack
-    } : error ? {
-      value: String(error)
-    } : undefined;
+    let errorData: unknown;
+
+    if (error instanceof Error) {
+      // Standard Error object
+      errorData = {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      };
+    } else if (error && typeof error === 'object') {
+      // Object with potential error properties
+      try {
+        // Try to serialize the object, extracting common error properties
+        const errorObj = error as Record<string, unknown>;
+        errorData = {
+          ...errorObj,
+          message: errorObj.message || String(error),
+          status: errorObj.status,
+          statusText: errorObj.statusText,
+          error: errorObj.error,
+          // Include JSON stringification as fallback
+          raw: JSON.stringify(error, null, 2)
+        };
+      } catch (e) {
+        // If serialization fails, fall back to string
+        errorData = {
+          value: String(error),
+          serializationError: e instanceof Error ? e.message : String(e)
+        };
+      }
+    } else if (error !== undefined && error !== null) {
+      // Primitive value
+      errorData = {
+        value: String(error)
+      };
+    } else {
+      errorData = undefined;
+    }
 
     this.getInstance().send("error", message, errorData);
   }

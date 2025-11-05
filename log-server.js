@@ -5,11 +5,14 @@
  * Receives logs via HTTP POST and displays them in the terminal
  *
  * Usage:
- *   node log-server.js [--port PORT]
+ *   node log-server.js [--port PORT] [--level LEVEL]
  *
  * Examples:
- *   node log-server.js                  # Default port 3000
- *   node log-server.js --port 3001      # Custom port
+ *   node log-server.js                     # Default port 3000, all levels
+ *   node log-server.js --port 3001         # Custom port
+ *   node log-server.js --level error       # Show only error logs
+ *   node log-server.js --level warn        # Show warn and error logs
+ *   node log-server.js --port 3001 --level error  # Custom port and error filter
  */
 
 const http = require('http');
@@ -83,21 +86,40 @@ console.error = function(...args) {
   writeToLogFile(message);
 };
 
+// Log level priority (higher number = more severe)
+const LOG_LEVELS = {
+  debug: 0,
+  info: 1,
+  warn: 2,
+  error: 3
+};
+
 // Parse command line arguments
 function parseArgs() {
   const args = process.argv.slice(2);
-  const port = 3000; // Default port
+  let port = 3000; // Default port
+  let minLevel = 'debug'; // Default: show all levels
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--port' && i + 1 < args.length) {
       const parsedPort = parseInt(args[i + 1], 10);
       if (!isNaN(parsedPort) && parsedPort > 0 && parsedPort <= 65535) {
-        return parsedPort;
+        port = parsedPort;
       }
+      i++; // Skip next arg
+    } else if (args[i] === '--level' && i + 1 < args.length) {
+      const level = args[i + 1].toLowerCase();
+      if (LOG_LEVELS.hasOwnProperty(level)) {
+        minLevel = level;
+      } else {
+        console.error(`${colors.red}Invalid level: ${args[i + 1]}. Valid levels: debug, info, warn, error${colors.reset}`);
+        process.exit(1);
+      }
+      i++; // Skip next arg
     }
   }
 
-  return port;
+  return { port, minLevel };
 }
 
 // Get all network interfaces with their IP addresses
@@ -136,8 +158,17 @@ function getNetworkInterfaces() {
 }
 
 // Format log message with colors
-function formatLog(logData) {
+// Returns false if the log should be filtered out based on level
+function formatLog(logData, minLevel) {
   const { timestamp, level, message, data, meta } = logData;
+
+  // Filter based on minimum level
+  const logLevel = LOG_LEVELS[level] !== undefined ? LOG_LEVELS[level] : 0;
+  const minLevelValue = LOG_LEVELS[minLevel] !== undefined ? LOG_LEVELS[minLevel] : 0;
+
+  if (logLevel < minLevelValue) {
+    return false; // Skip this log
+  }
 
   // Color based on log level
   let levelColor;
@@ -195,10 +226,12 @@ function formatLog(logData) {
     const indentedData = dataStr.split('\n').map(line => `  ${colors.gray}│${colors.reset} ${line}`).join('\n');
     console.log(indentedData);
   }
+
+  return true; // Log was displayed
 }
 
 // Create HTTP server
-function createServer(port) {
+function createServer(port, minLevel) {
   const server = http.createServer((req, res) => {
     // Enable CORS for all origins
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -223,7 +256,7 @@ function createServer(port) {
       req.on('end', () => {
         try {
           const logData = JSON.parse(body);
-          formatLog(logData);
+          formatLog(logData, minLevel);
 
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: true }));
@@ -247,6 +280,7 @@ function createServer(port) {
     console.log(`${colors.bright}${colors.green}  Dropbox Fetcher Log Server${colors.reset}`);
     console.log(`${colors.bright}${colors.green}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}`);
     console.log(`${colors.cyan}  Listening on port:${colors.reset} ${colors.bright}${port}${colors.reset}`);
+    console.log(`${colors.cyan}  Log level filter:${colors.reset} ${colors.bright}${minLevel}${colors.reset} ${colors.dim}(and above)${colors.reset}`);
     console.log();
     console.log(`${colors.cyan}  Available on:${colors.reset}`);
     console.log(`    ${colors.dim}•${colors.reset} http://localhost:${port} ${colors.dim}(local)${colors.reset}`);
@@ -286,9 +320,9 @@ function createServer(port) {
 }
 
 // Start server
-const port = parseArgs();
+const { port, minLevel } = parseArgs();
 
 // Initialize log file before starting server
 initLogFile();
 
-createServer(port);
+createServer(port, minLevel);

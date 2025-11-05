@@ -41,7 +41,11 @@ export default class DrpbxFetcherPlugin extends Plugin {
     } as unknown as Response;
   }
 
-  private async getDropboxClient(): Promise<Dropbox> {
+  /**
+   * Ensures we have a fresh access token by refreshing if needed
+   * Returns the current valid access token
+   */
+  private async ensureFreshAccessToken(): Promise<string> {
     if (!this.settings.clientId) {
       throw new Error("Dropbox client ID not set. Please set it in the plugin settings.");
     }
@@ -49,6 +53,11 @@ export default class DrpbxFetcherPlugin extends Plugin {
     // If we have a refresh token, use it to get a new access token
     if (this.settings.refreshToken) {
       try {
+        StreamLogger.log("[DrpbxFetcher] Refreshing access token", {
+          hasRefreshToken: !!this.settings.refreshToken,
+          hasClientId: !!this.settings.clientId
+        });
+
         const response = await requestUrl({
           url: "https://api.dropbox.com/oauth2/token",
           method: "POST",
@@ -66,11 +75,29 @@ export default class DrpbxFetcherPlugin extends Plugin {
           const data = response.json;
           this.settings.accessToken = data.access_token;
           await this.saveSettings();
+          StreamLogger.log("[DrpbxFetcher] Access token refreshed successfully");
+        } else {
+          StreamLogger.error("[DrpbxFetcher] Failed to refresh access token", {
+            status: response.status,
+            statusText: response.status.toString()
+          });
         }
       } catch (error) {
-        console.error("Error refreshing access token:", error);
+        StreamLogger.error("[DrpbxFetcher] Error refreshing access token", { error });
+        throw error;
       }
     }
+
+    if (!this.settings.accessToken) {
+      throw new Error("No valid Dropbox access token available. Please authenticate through the plugin settings.");
+    }
+
+    return this.settings.accessToken;
+  }
+
+  private async getDropboxClient(): Promise<Dropbox> {
+    // Ensure we have a fresh token
+    await this.ensureFreshAccessToken();
 
     if (!this.settings.accessToken) {
       throw new Error("No valid Dropbox access token available. Please authenticate through the plugin settings.");
@@ -157,6 +184,14 @@ export default class DrpbxFetcherPlugin extends Plugin {
       totalChunks: Math.ceil(fileSize / chunkSize)
     });
 
+    // Ensure we have a fresh access token before starting chunk downloads
+    const accessToken = await this.ensureFreshAccessToken();
+
+    StreamLogger.log(`[DrpbxFetcher] Using fresh access token for chunked download`, {
+      filePath,
+      tokenLength: accessToken?.length || 0
+    });
+
     // Create array to hold the complete file
     const completeFile = new Uint8Array(fileSize);
     let downloadedBytes = 0;
@@ -178,7 +213,6 @@ export default class DrpbxFetcherPlugin extends Plugin {
       try {
         // Make direct HTTP request with Range header
         // We need to bypass the Dropbox SDK and use direct API calls for Range support
-        const accessToken = this.settings.accessToken;
 
         // Android fix: Dropbox API requires specific Content-Type headers
         // Android's requestUrl automatically adds "application/x-www-form-urlencoded" for POST
@@ -273,6 +307,14 @@ export default class DrpbxFetcherPlugin extends Plugin {
       totalChunks: Math.ceil(fileSize / chunkSize)
     });
 
+    // Ensure we have a fresh access token before starting chunk downloads
+    const accessToken = await this.ensureFreshAccessToken();
+
+    StreamLogger.log(`[DrpbxFetcher] Using fresh access token for chunked download to disk`, {
+      filePath,
+      tokenLength: accessToken?.length || 0
+    });
+
     // Generate temp file path
     const tempPath = tempFileManager.getTempFilePath("download", "tmp");
     await tempFileManager.ensureTempDir();
@@ -296,7 +338,6 @@ export default class DrpbxFetcherPlugin extends Plugin {
 
         try {
           // Make direct HTTP request with Range header
-          const accessToken = this.settings.accessToken;
 
           // Android fix: Dropbox API requires specific Content-Type headers
           const headers: Record<string, string> = {
