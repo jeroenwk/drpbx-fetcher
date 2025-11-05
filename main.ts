@@ -227,10 +227,33 @@ export default class DrpbxFetcherPlugin extends Plugin {
           headers["Content-Type"] = "application/octet-stream";
         }
 
+        const downloadUrl = "https://content.dropboxapi.com/2/files/download";
+        const requestMethod = "POST";
+
+        // Log the request details (mask most of the token for security)
+        StreamLogger.log(`[DrpbxFetcher] Chunk download request`, {
+          url: downloadUrl,
+          method: requestMethod,
+          chunkNumber,
+          headers: {
+            "Authorization": `Bearer ${accessToken.substring(0, 10)}...${accessToken.substring(accessToken.length - 4)}`,
+            "Dropbox-API-Arg": headers["Dropbox-API-Arg"],
+            "Range": headers["Range"],
+            "Content-Type": headers["Content-Type"] || "(not set)"
+          }
+        });
+
         const response = await requestUrl({
-          url: "https://content.dropboxapi.com/2/files/download",
-          method: "POST",
+          url: downloadUrl,
+          method: requestMethod,
           headers,
+        });
+
+        StreamLogger.log(`[DrpbxFetcher] Chunk download response`, {
+          chunkNumber,
+          status: response.status,
+          statusText: response.status.toString(),
+          headers: response.headers
         });
 
         if (response.status !== 206 && response.status !== 200) {
@@ -350,10 +373,33 @@ export default class DrpbxFetcherPlugin extends Plugin {
             headers["Content-Type"] = "application/octet-stream";
           }
 
+          const downloadUrl = "https://content.dropboxapi.com/2/files/download";
+          const requestMethod = "POST";
+
+          // Log the request details (mask most of the token for security)
+          StreamLogger.log(`[DrpbxFetcher] Chunk download to disk request`, {
+            url: downloadUrl,
+            method: requestMethod,
+            chunkNumber,
+            headers: {
+              "Authorization": `Bearer ${accessToken.substring(0, 10)}...${accessToken.substring(accessToken.length - 4)}`,
+              "Dropbox-API-Arg": headers["Dropbox-API-Arg"],
+              "Range": headers["Range"],
+              "Content-Type": headers["Content-Type"] || "(not set)"
+            }
+          });
+
           const response = await requestUrl({
-            url: "https://content.dropboxapi.com/2/files/download",
-            method: "POST",
+            url: downloadUrl,
+            method: requestMethod,
             headers,
+          });
+
+          StreamLogger.log(`[DrpbxFetcher] Chunk download to disk response`, {
+            chunkNumber,
+            status: response.status,
+            statusText: response.status.toString(),
+            headers: response.headers
           });
 
           if (response.status !== 206 && response.status !== 200) {
