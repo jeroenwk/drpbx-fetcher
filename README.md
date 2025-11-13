@@ -23,22 +23,20 @@ This plugin automatically fetches and processes files from your Dropbox folders 
 - **🔐 Secure OAuth 2.0** authentication with PKCE
 - **🛡️ Privacy-first** - No data sent to third-party servers
 
-## 🎉 New in v0.2.164: Simplified Tag Structure with Date Tags
+## 🎉 New in v0.2.181: iOS Fixes & Frontmatter Properties
 
-### 🏷️ Streamlined Tag Organization
-The latest update simplifies tags across all modules and adds consistent date-based tagging:
+### 🍎 iOS Platform Improvements
+The latest update brings better iOS compatibility and enhanced note organization:
 
-- **Paper Notes**: Now tagged with `#scribbling #YYYY-MM-DD` for cleaner organization
-- **Meeting Notes**: Simplified to `#meeting #YYYY-MM-DD`
-- **Memo Notes**: Tagged as `#memo #YYYY-MM-DD` (with optional `#todo` tag)
-- **Picking Captures**: Simplified to `#picking #YYYY-MM-DD`
-- **Learning Highlights/Annotations**: Now include date tags for better temporal organization
+- **iOS Download Fix**: Disabled chunked downloads on iOS, using SDK-based downloads for better reliability
+- **Range Request Fixes**: Resolved HTTP method and header issues for iOS Range requests
+- **Better Error Logging**: Enhanced debugging with verbose error logging and response body capture
 
-### ✨ Benefits
-- **Date-Based Queries**: Easily find all notes from a specific date across all modules
-- **Cleaner Footers**: Removed redundant slug-based tags for simpler organization
-- **Consistent Structure**: All modules follow the same date tagging pattern
-- **Better Searchability**: Date tags make it easy to filter and organize your notes chronologically
+### 🏷️ Frontmatter Properties Enhancement
+- **Obsidian Properties**: All Viwoods modules now include proper frontmatter properties
+- **Tag Structure**: Tags moved to frontmatter properties for better Obsidian integration
+- **Page Breaks**: Added page breaks between images in Paper notes for improved organization
+- **Better Metadata**: Consistent property structure across all modules (Paper, Meeting, Memo, Daily, Picking, Learning)
 
 ## 🎉 New in v0.2.130: Complete Memo Module
 

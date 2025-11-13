@@ -5,6 +5,26 @@ All notable changes to the Dropbox Fetcher plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.181] - 2025-01-13
+
+### 🍎 iOS Platform Fixes
+- **Disabled Chunked Downloads on iOS**: iOS platform now uses SDK-based download method instead of HTTP Range requests due to compatibility issues
+- **iOS Range Request Fixes**: Fixed HTTP method and header issues with iOS Range requests (GET instead of POST, removed Content-Type header)
+
+### 🏷️ Frontmatter Properties Enhancement
+- **All Viwoods Modules**: Added Obsidian frontmatter properties to all Viwoods modules (Paper, Meeting, Memo, Daily, Picking, Learning)
+- **Paper Template Layout Update**: Tags moved to frontmatter properties with proper structure
+- **Page Break Support**: Added page breaks between images in Paper notes for better organization
+
+### 🔧 Debugging and Logging
+- **Enhanced Error Logging**: Added verbose error logging to capture response bodies for better debugging
+- **Chunk Download Logging**: Added detailed logging for chunk download requests and responses
+- **Case-Sensitive Paths**: Fixed path handling to use case-sensitive `path_display` for chunked downloads
+
+### 🔐 Authentication Improvements
+- **Fresh Access Tokens**: Ensured fresh access tokens are used for chunked downloads on iOS
+- **Note File ID Logging**: Added verbose logging for note file IDs during processing
+
 ## [0.2.164] - 2025-10-23
 
 ### 🏷️ Tag Structure Improvements
