@@ -1,5 +1,5 @@
 import { StreamLogger } from "../../../../utils/StreamLogger";
-import { CrossReferenceManager } from "../../../../utils/CrossReferenceManager";
+import { CrossReferenceManager } from "../../utils/CrossReferenceManager";
 import { ProcessorContext } from "../../../types";
 import { FileTypeMapping } from "../../../../models/Settings";
 import { ViwoodsProcessorConfig } from "../../ViwoodsTypes";

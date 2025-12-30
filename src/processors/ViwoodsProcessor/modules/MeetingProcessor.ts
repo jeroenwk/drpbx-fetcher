@@ -12,14 +12,16 @@ import {
 	PageListFileInfo,
 	PageResource,
 	ResourceType,
-	DailyModuleConfig
+	DailyModuleConfig,
+	ViwoodsProcessorConfig,
+	getViwoodsAttachmentsFolder
 } from "../ViwoodsTypes";
 import { TemplateDefaults } from "../TemplateDefaults";
 import { ImageCacheBuster } from "../../../utils/ImageCacheBuster";
 import { MarkdownMerger, ImageUpdateMapping } from "../utils/MarkdownMerger";
-import { MetadataManager } from "../../../utils/MetadataManager";
-import { NoteRenameHandler } from "../../../utils/NoteRenameHandler";
-import { CrossReferenceManager } from "../../../utils/CrossReferenceManager";
+import { MetadataManager } from "../utils/MetadataManager";
+import { NoteRenameHandler } from "../utils/NoteRenameHandler";
+import { CrossReferenceManager } from "../utils/CrossReferenceManager";
 
 /**
  * Handles processing of Meeting module notes (meeting notes)
@@ -35,7 +37,8 @@ export class MeetingProcessor {
 		metadata: FileMetadata,
 		config: MeetingModuleConfig,
 		context: ProcessorContext,
-		metadataManager: MetadataManager
+		metadataManager: MetadataManager,
+		viwoodsConfig: ViwoodsProcessorConfig
 	): Promise<ProcessorResult> {
 		StreamLogger.log(`[MeetingProcessor.process] Starting Meeting module processing`);
 		const createdFiles: string[] = [];
@@ -95,9 +98,10 @@ export class MeetingProcessor {
 			// Ensure output folders exist
 			await FileUtils.ensurePath(context.vault, noteOutputFolder);
 
-			// Create resources subfolder inside the note folder
-			const resourcesFolder = FileUtils.joinPath(noteOutputFolder, "resources");
-			await FileUtils.ensurePath(context.vault, resourcesFolder);
+			// Use Viwoods attachments folder (with fallback to global)
+			const attachmentsFolder = getViwoodsAttachmentsFolder(config, viwoodsConfig, context);
+			await FileUtils.ensurePath(context.vault, attachmentsFolder);
+			const resourcesFolder = attachmentsFolder; // Alias for compatibility with existing code
 
 			// Extract pages metadata
 			const pages = pageListFile
@@ -266,8 +270,8 @@ export class MeetingProcessor {
 			for (let i = 0; i < screenshotPaths.length; i++) {
 				const screenshotPath = screenshotPaths[i];
 				const pageNum = i + 1;
-				// Get just the filename with resources/ prefix for wiki-style links
-				const relativePath = screenshotPath.split("/").slice(-2).join("/");
+				// Use full path for wiki-style links (now in attachments folder)
+				const relativePath = screenshotPath;
 				screenshotSections += `## Page ${pageNum}
 
 ![[${relativePath}]]
@@ -277,7 +281,6 @@ export class MeetingProcessor {
 *Add your notes here*
 
 ---
-
 `;
 			}
 

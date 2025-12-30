@@ -199,6 +199,26 @@ export class DrpbxFetcherSettingTab extends PluginSettingTab {
           })
       );
 
+    // File organization settings
+    containerEl.createEl("h3", { text: "File Organization Settings" });
+    containerEl.createEl("p", {
+      text: "Configure where non-markdown files (images, PDFs, source files) are stored.",
+      cls: "setting-item-description"
+    });
+
+    new Setting(containerEl)
+      .setName("Attachments folder")
+      .setDesc("Global folder for non-markdown files (images, PDFs, source files, etc.). Each processor can override this setting in its configuration.")
+      .addText((text) =>
+        text
+          .setPlaceholder("Attachments")
+          .setValue(this.plugin.settings.attachmentsFolder)
+          .onChange(async (value) => {
+            this.plugin.settings.attachmentsFolder = value || "Attachments";
+            await this.plugin.saveSettings();
+          })
+      );
+
     // Logging settings
     containerEl.createEl("h3", { text: "Logging Settings" });
 
@@ -429,9 +449,10 @@ export class DrpbxFetcherSettingTab extends PluginSettingTab {
           })
         );
 
-      // Only show "Edit Extension" button for non-viwoods processors
-      // Viwoods processor handles multiple extensions internally
-      if (mapping.processorType !== "viwoods") {
+      // Only show "Edit Extension" button for processors that handle single extensions
+      // Processors with multiExtension capability handle multiple extensions internally
+      const capabilities = processor?.getCapabilities?.();
+      if (!capabilities?.multiExtension) {
         setting.addButton((button) =>
           button.setButtonText("Edit Extension").onClick(() => {
             this.editExtension(mapping);
@@ -612,7 +633,8 @@ export class DrpbxFetcherSettingTab extends PluginSettingTab {
           // Refresh settings display
           this.display();
         }
-      }
+      },
+      this.plugin
     );
     modal.open();
   }

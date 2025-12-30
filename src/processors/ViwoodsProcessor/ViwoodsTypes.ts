@@ -26,6 +26,21 @@ export const PACKAGE_TO_MODULE: Record<string, ViwoodsModuleType> = {
 };
 
 /**
+ * Metadata for tracking Viwoods note processing
+ */
+export interface ViwoodsNoteMetadata {
+	noteId: string; // Viwoods internal note ID (from NoteFileInfo.json - stable across renames)
+	dropboxFileId: string; // Dropbox file ID (changes on rename)
+	lastModified: number; // Last modified timestamp
+	notePath: string; // Path to markdown file in vault
+	creationTime?: number; // Creation timestamp (for date-based cross-referencing)
+	pages: Array<{
+		page: number;
+		image: string; // Current image path
+	}>;
+}
+
+/**
  * Common configuration for all modules
  */
 export interface BaseModuleConfig {
@@ -35,6 +50,7 @@ export interface BaseModuleConfig {
 	includeMetadata?: boolean;
 	includeThumbnail?: boolean;
 	extractImages?: boolean;
+	attachmentsFolder?: string; // Optional override for global attachments folder
 }
 
 /**
@@ -112,6 +128,9 @@ export interface ViwoodsProcessorConfig extends ProcessorConfig {
 	meeting: MeetingModuleConfig;
 	picking: PickingModuleConfig;
 	memo: MemoModuleConfig;
+
+	// Viwoods-specific attachments folder (overrides global attachmentsFolder for Viwoods modules)
+	viwoodsAttachmentsFolder?: string;
 
 	// Legacy fields for backwards compatibility (deprecated)
 	/** @deprecated Use learning.highlightsFolder instead */
@@ -425,4 +444,29 @@ export interface FolderFileInfo {
 	totalPageSize: number;
 	uniqueId: string;
 	userId: string;
+}
+
+/**
+ * Resolve the attachments folder for a Viwoods module
+ * Hierarchy: module override > viwoodsAttachmentsFolder > global attachmentsFolder
+ * @param moduleConfig Module-specific configuration (may contain attachmentsFolder override)
+ * @param viwoodsConfig Full Viwoods processor configuration (contains viwoodsAttachmentsFolder)
+ * @param context Processing context (contains global plugin settings)
+ * @returns The attachments folder path
+ */
+export function getViwoodsAttachmentsFolder<T extends { attachmentsFolder?: string }>(
+	moduleConfig: T,
+	viwoodsConfig: ViwoodsProcessorConfig,
+	context: { pluginSettings: { attachmentsFolder?: string } }
+): string {
+	// 1. Check module-specific override first
+	if (moduleConfig.attachmentsFolder) {
+		return moduleConfig.attachmentsFolder;
+	}
+	// 2. Check Viwoods-specific attachments folder
+	if (viwoodsConfig.viwoodsAttachmentsFolder) {
+		return viwoodsConfig.viwoodsAttachmentsFolder;
+	}
+	// 3. Fall back to global setting
+	return context.pluginSettings.attachmentsFolder || "Attachments";
 }

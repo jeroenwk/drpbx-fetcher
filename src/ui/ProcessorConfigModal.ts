@@ -1,5 +1,6 @@
-import { App, Modal, Setting, Notice } from "obsidian";
+import { App, Modal, Setting, Notice, TextComponent } from "obsidian";
 import { FileProcessor, ProcessorConfig, ConfigField } from "../processors/types";
+import type DrpbxFetcherPlugin from "../../main";
 
 /**
  * Modal for configuring file processor settings
@@ -11,20 +12,50 @@ export class ProcessorConfigModal extends Modal {
 	private onSave: (newConfig: ProcessorConfig) => Promise<void>;
 	private formValues: Record<string, unknown> = {};
 	private validationErrors: string[] = [];
+	private plugin: DrpbxFetcherPlugin;
+	// Track module-level attachmentsFolder text components for dynamic placeholder updates
+	private moduleAttachmentsFields: Array<{ fieldKey: string; textComponent: TextComponent; field: ConfigField }> = [];
 
 	constructor(
 		app: App,
 		processor: FileProcessor,
 		currentConfig: ProcessorConfig,
-		onSave: (newConfig: ProcessorConfig) => Promise<void>
+		onSave: (newConfig: ProcessorConfig) => Promise<void>,
+		plugin: DrpbxFetcherPlugin
 	) {
 		super(app);
 		this.processor = processor;
 		this.currentConfig = currentConfig;
 		this.onSave = onSave;
+		this.plugin = plugin;
 
-		// Initialize form values with deep copy of current config to preserve nested structure
-		this.formValues = JSON.parse(JSON.stringify(currentConfig));
+		// Get default config and merge with current config to handle new fields
+		const defaultConfig = processor.getDefaultConfig();
+		const mergedConfig = this.mergeConfigs(defaultConfig, currentConfig);
+
+		// Initialize form values with deep copy of merged config
+		this.formValues = JSON.parse(JSON.stringify(mergedConfig));
+	}
+
+	/**
+	 * Merge default config with current config to handle newly added fields
+	 * Current config values take precedence, but missing fields get defaults
+	 */
+	private mergeConfigs(defaultConfig: ProcessorConfig, currentConfig: ProcessorConfig): ProcessorConfig {
+		const merged: Record<string, unknown> = { ...defaultConfig };
+
+		const deepMerge = (target: Record<string, unknown>, source: Record<string, unknown>): void => {
+			for (const key of Object.keys(source)) {
+				if (key in target && typeof target[key] === 'object' && typeof source[key] === 'object' && !Array.isArray(target[key]) && !Array.isArray(source[key])) {
+					deepMerge(target[key] as Record<string, unknown>, source[key] as Record<string, unknown>);
+				} else {
+					target[key] = source[key];
+				}
+			}
+		};
+
+		deepMerge(merged, currentConfig);
+		return merged as ProcessorConfig;
 	}
 
 	onOpen(): void {
@@ -46,19 +77,18 @@ export class ProcessorConfigModal extends Modal {
 		const schema = this.processor.getConfigSchema();
 		const formContainer = contentEl.createDiv("processor-config-form");
 
-		// Group fields by their group property
+		// Group fields by their group property, but also track ungrouped fields
 		const groupedFields = this.groupFields(schema.fields);
+		const ungroupedFields = schema.fields.filter(f => !f.group);
 
-		if (groupedFields.size === 0) {
-			// No grouped fields, render all directly
-			for (const field of schema.fields) {
-				this.renderField(formContainer, field);
-			}
-		} else {
-			// Render grouped fields with collapsible sections
-			for (const [groupName, fields] of groupedFields.entries()) {
-				this.renderGroup(formContainer, groupName, fields);
-			}
+		// Render ungrouped fields first (e.g., viwoodsAttachmentsFolder)
+		for (const field of ungroupedFields) {
+			this.renderField(formContainer, field);
+		}
+
+		// Then render grouped fields with collapsible sections
+		for (const [groupName, fields] of groupedFields.entries()) {
+			this.renderGroup(formContainer, groupName, fields);
 		}
 
 		// Validation errors container
@@ -211,17 +241,86 @@ export class ProcessorConfigModal extends Modal {
 		field: ConfigField,
 		currentValue: string
 	): void {
+		// Determine placeholder based on field type
+		let placeholder = field.placeholder || "Folder path";
+
+		// Check if this is an attachmentsFolder field (module-level or processor-level)
+		// Use case-insensitive check to handle both "attachmentsFolder" and "AttachmentsFolder"
+		if (field.key.toLowerCase().endsWith('attachmentsfolder')) {
+			// For attachmentsFolder fields, show the fallback value as placeholder
+			// Hierarchy: module override > viwoodsAttachmentsFolder > global attachmentsFolder
+
+			// If field is empty or has default value, show fallback as placeholder
+			const isUsingDefault = currentValue === (field.defaultValue || "");
+			const globalFolder = this.plugin.settings.attachmentsFolder || "Attachments";
+
+			if (!currentValue || isUsingDefault) {
+				if (field.key === 'viwoodsAttachmentsFolder') {
+					// For the main viwoodsAttachmentsFolder field, show global attachments folder
+					placeholder = globalFolder;
+				} else {
+					// For module-level overrides, show what they fall back to
+					const viwoodsFolder = this.getNestedValue(this.formValues, 'viwoodsAttachmentsFolder') as string;
+					if (viwoodsFolder && viwoodsFolder.trim()) {
+						// Use viwoodsAttachmentsFolder value if set (even if it's the default)
+						placeholder = viwoodsFolder;
+					} else {
+						// Fall back to global attachments folder only if viwoodsAttachmentsFolder is empty
+						placeholder = globalFolder;
+					}
+				}
+			} else {
+				// Field has a custom value - show generic placeholder
+				placeholder = "Folder path";
+			}
+		}
+
 		setting.addText((text) => {
 			text
-				.setPlaceholder(field.placeholder || "Folder path")
+				.setPlaceholder(placeholder)
 				.setValue(currentValue || "")
 				.onChange((value) => {
 					this.setNestedValue(this.formValues, field.key, value);
+
+					// If viwoodsAttachmentsFolder changed, update module-level placeholders
+					if (field.key === 'viwoodsAttachmentsFolder') {
+						this.updateModuleAttachmentsPlaceholders(value || undefined);
+					}
 				});
 
 			// Add folder icon
 			text.inputEl.style.paddingRight = "2rem";
+
+			// Track module-level attachmentsFolder fields for dynamic placeholder updates
+			// Use case-insensitive check to handle both "attachmentsFolder" and "AttachmentsFolder"
+			if (field.key.toLowerCase().endsWith('attachmentsfolder') && field.key !== 'viwoodsAttachmentsFolder') {
+				this.moduleAttachmentsFields.push({ fieldKey: field.key, textComponent: text, field });
+			}
 		});
+	}
+
+	/**
+	 * Update placeholders on all module-level attachmentsFolder fields
+	 * Called when viwoodsAttachmentsFolder value changes
+	 */
+	private updateModuleAttachmentsPlaceholders(viwoodsFolderValue: string | undefined): void {
+		// Use viwoodsAttachmentsFolder value if set (even if it's the default)
+		// Only fall back to global attachments folder if viwoodsAttachmentsFolder is empty
+		let newPlaceholder: string;
+		if (viwoodsFolderValue && viwoodsFolderValue.trim()) {
+			newPlaceholder = viwoodsFolderValue;
+		} else {
+			newPlaceholder = this.plugin.settings.attachmentsFolder || "Attachments";
+		}
+
+		for (const { fieldKey, textComponent, field } of this.moduleAttachmentsFields) {
+			// Only update if the field doesn't have a custom value set
+			const currentValue = this.getNestedValue(this.formValues, fieldKey) as string;
+			const isFieldUsingDefault = currentValue === (field.defaultValue || "");
+			if (!currentValue || isFieldUsingDefault) {
+				textComponent.setPlaceholder(newPlaceholder);
+			}
+		}
 	}
 
 	private renderFileField(
@@ -372,5 +471,7 @@ export class ProcessorConfigModal extends Modal {
 	onClose(): void {
 		const { contentEl } = this;
 		contentEl.empty();
+		// Clear tracked fields to avoid memory leaks
+		this.moduleAttachmentsFields = [];
 	}
 }

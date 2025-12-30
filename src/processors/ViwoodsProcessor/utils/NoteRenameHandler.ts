@@ -1,8 +1,8 @@
 import { Vault, TFile } from "obsidian";
-import { ViwoodsNoteMetadata } from "../models/Settings";
+import { ViwoodsNoteMetadata } from "../ViwoodsTypes";
 import { MetadataManager } from "./MetadataManager";
-import { StreamLogger } from "./StreamLogger";
-import { FileUtils } from "./FileUtils";
+import { StreamLogger } from "../../../utils/StreamLogger";
+import { FileUtils } from "../../../utils/FileUtils";
 
 /**
  * Result of rename operation
@@ -83,7 +83,7 @@ export class NoteRenameHandler {
 				for (const page of existingMetadata.pages) {
 					const oldImagePath = page.image;
 
-					// Check if this image follows paper pattern: resources/{slug}-page-{N}-{timestamp}.png
+					// Check if this image follows paper pattern: {folder}/{slug}-page-{N}-{timestamp}.png
 					const paperImageMatch = oldImagePath.match(/^(.+\/)([^/]+)-page-(\d+)-(\d+)(\.\w+)$/);
 					if (paperImageMatch) {
 						const [, dir, slug, pageNum, timestamp, ext] = paperImageMatch;
@@ -117,7 +117,7 @@ export class NoteRenameHandler {
 						}
 					}
 
-					// Check if this image follows memo pattern: resources/{slug}-image-{timestamp}.png
+					// Check if this image follows memo pattern: {folder}/{slug}-image-{timestamp}.png
 					const memoImageMatch = oldImagePath.match(/^(.+\/)([^/]+)-image-(\d+)(\.\w+)$/);
 					if (memoImageMatch) {
 						const [, dir, slug, timestamp, ext] = memoImageMatch;
@@ -271,7 +271,7 @@ export class NoteRenameHandler {
 	/**
 	 * Clean up old timestamped variants of a memo image
 	 * @param vault Obsidian Vault instance
-	 * @param basePath Base path without timestamp (e.g., "folder/resources/image")
+	 * @param basePath Base path without timestamp (e.g., "Attachments/image")
 	 */
 	private static async cleanupOldImageVariants(
 		vault: Vault,

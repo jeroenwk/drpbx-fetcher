@@ -64,12 +64,12 @@ export class NoteFileManager {
 				merged = merged.substring(0, relatedNotesStart) + newRelatedNotesSection + merged.substring(tasksNotesStart);
 			}
 
-			// 2. Replace images in Tasks & Notes section (they start with ![[resources/)
+			// 2. Replace images in Tasks & Notes section (wiki-style image embeds)
 			// Extract new images from new content
-			const newImagesMatch = newContent.match(/!\[\[resources\/[^\]]+\]\]/g);
+			const newImagesMatch = newContent.match(/!\[\[[^\]]+\.(png|jpg|jpeg|gif|webp)\]\]/gi);
 			if (newImagesMatch && newImagesMatch.length > 0) {
 				// Remove old images and surrounding blank lines from merged content
-				merged = merged.replace(/!\[\[resources\/[^\]]+\]\](\n\n)?/g, '');
+				merged = merged.replace(/!\[\[[^\]]+\.(png|jpg|jpeg|gif|webp)\]\](\n\n)?/gi, '');
 
 				// Find the ## Tasks & Notes section and add new images at the end
 				const finalTasksNotesStart = merged.indexOf('## Tasks & Notes');

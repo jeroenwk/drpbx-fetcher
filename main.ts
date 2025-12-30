@@ -1039,6 +1039,7 @@ export default class DrpbxFetcherPlugin extends Plugin {
       platform,
     });
     StreamLogger.log("[DrpbxFetcher] Plugin loading...");
+    console.log(`%c[DrpbxFetcher] VERSION: ${version}`, "font-weight: bold; color: #0066cc; font-size: 14px;");
     StreamLogger.log("[DrpbxFetcher] User Agent", { userAgent: navigator.userAgent });
 
     // Register file processors

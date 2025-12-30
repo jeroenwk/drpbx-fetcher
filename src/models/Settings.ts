@@ -20,21 +20,6 @@ export interface FileTypeMapping {
 }
 
 /**
- * Metadata for tracking Viwoods note processing
- */
-export interface ViwoodsNoteMetadata {
-	noteId: string; // Viwoods internal note ID (from NoteFileInfo.json - stable across renames)
-	dropboxFileId: string; // Dropbox file ID (changes on rename)
-	lastModified: number; // Last modified timestamp
-	notePath: string; // Path to markdown file in vault
-	creationTime?: number; // Creation timestamp (for date-based cross-referencing)
-	pages: Array<{
-		page: number;
-		image: string; // Current image path
-	}>;
-}
-
-/**
  * Main plugin settings
  */
 export interface DrpbxFetcherSettings {
@@ -62,6 +47,8 @@ export interface DrpbxFetcherSettings {
 	chunkedDownloadThreshold: number; // File size threshold to use chunked download (default: 10MB)
 	// Viwoods note metadata removed - now stored in separate file
 	// viwoodsNoteMetadata: Record<string, ViwoodsNoteMetadata>; // Key: markdown file path
+	// Attachments folder for non-markdown files
+	attachmentsFolder: string; // Global attachments folder for non-markdown files (default: "Attachments")
 }
 
 /**
@@ -86,4 +73,5 @@ export const DEFAULT_SETTINGS: DrpbxFetcherSettings = {
 	chunkSizeBytes: 2 * 1024 * 1024, // 2 MB chunks
 	chunkedDownloadThreshold: 10 * 1024 * 1024, // Use chunked download for files >10 MB
 	// viwoodsNoteMetadata removed - stored in separate file
+	attachmentsFolder: "Attachments", // Global attachments folder for non-markdown files
 };

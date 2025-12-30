@@ -8,6 +8,7 @@ import {
 	FileMetadata,
 	ValidationResult,
 	ConfigSchema,
+	getAttachmentsFolder,
 } from "./types";
 
 /**
@@ -32,14 +33,14 @@ export class DefaultProcessor implements FileProcessor {
 			const pathParts = originalPath.split("/");
 			const filename = pathParts[pathParts.length - 1];
 
-			// Determine output path
-			const outputFolder = (config.outputFolder as string) || "";
+			// Use global attachments folder for binary files
+			const attachmentsFolder = getAttachmentsFolder(config, context);
 			const sanitizedFilename = FileUtils.sanitizeFilename(filename);
-			const outputPath = FileUtils.joinPath(outputFolder, sanitizedFilename);
+			const outputPath = FileUtils.joinPath(attachmentsFolder, sanitizedFilename);
 
 			// Ensure parent directory exists
-			if (outputFolder) {
-				await FileUtils.ensurePath(context.vault, outputFolder);
+			if (attachmentsFolder) {
+				await FileUtils.ensurePath(context.vault, attachmentsFolder);
 			}
 
 			// Write file
@@ -70,9 +71,7 @@ export class DefaultProcessor implements FileProcessor {
 	}
 
 	getDefaultConfig(): ProcessorConfig {
-		return {
-			outputFolder: "",
-		};
+		return {};
 	}
 
 	getDefaultTemplates(): Record<string, string> {
@@ -84,13 +83,13 @@ export class DefaultProcessor implements FileProcessor {
 		return {
 			fields: [
 				{
-					key: "outputFolder",
-					label: "Output Folder",
-					description: "Folder where files will be saved (relative to vault root)",
+					key: "attachmentsFolder",
+					label: "Attachments Folder",
+					description: "Override global attachments folder for unmatched file types",
 					type: "folder",
 					required: false,
 					defaultValue: "",
-					placeholder: "Leave empty for vault root",
+					placeholder: "Leave empty to use global setting",
 				},
 			],
 		};

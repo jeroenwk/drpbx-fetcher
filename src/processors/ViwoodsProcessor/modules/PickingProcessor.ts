@@ -5,7 +5,7 @@ import { StreamingZipUtils } from "../../../utils/StreamingZipUtils";
 import { StreamLogger } from "../../../utils/StreamLogger";
 import { TemplateEngine } from "../../templates/TemplateEngine";
 import { ProcessorContext, ProcessorResult, FileMetadata } from "../../types";
-import { PickingModuleConfig, NotesBean, NoteList } from "../ViwoodsTypes";
+import { PickingModuleConfig, NotesBean, NoteList, ViwoodsProcessorConfig, getViwoodsAttachmentsFolder } from "../ViwoodsTypes";
 import { TemplateDefaults } from "../TemplateDefaults";
 import { ImageCompositor } from "../ImageCompositor";
 import { ImageCacheBuster } from "../../../utils/ImageCacheBuster";
@@ -23,7 +23,8 @@ export class PickingProcessor {
 		originalPath: string,
 		metadata: FileMetadata,
 		config: PickingModuleConfig,
-		context: ProcessorContext
+		context: ProcessorContext,
+		viwoodsConfig: ViwoodsProcessorConfig
 	): Promise<ProcessorResult> {
 		await StreamLogger.log(`[PickingProcessor.process] Starting Picking module processing`);
 		const createdFiles: string[] = [];
@@ -67,13 +68,16 @@ export class PickingProcessor {
 
 			// Determine output folders
 			// Notes go to outputFolder (Viwoods/Picking)
-			// Resources go to outputFolder/resources (Viwoods/Picking/resources)
+			// Resources (images) go to global attachments folder
 			const notesFolder = config.outputFolder || "Viwoods/Picking";
-			const resourcesFolder = FileUtils.joinPath(notesFolder, "resources");
 
 			// Ensure output folders exist
 			await FileUtils.ensurePath(context.vault, notesFolder);
-			await FileUtils.ensurePath(context.vault, resourcesFolder);
+
+			// Use Viwoods attachments folder (with fallback to global)
+			const attachmentsFolder = getViwoodsAttachmentsFolder(config, viwoodsConfig, context);
+			await FileUtils.ensurePath(context.vault, attachmentsFolder);
+			const resourcesFolder = attachmentsFolder; // Alias for compatibility with existing code
 
 			// Extract note list if available
 			const noteList = noteListFile
@@ -168,8 +172,8 @@ export class PickingProcessor {
 			// Build screenshot sections manually
 			let screenshotSections = "";
 			for (const compositePath of compositePaths) {
-				// Get just the filename with resources/ prefix for wiki-style links
-				const relativePath = compositePath.split("/").slice(-2).join("/");
+				// Use full path for wiki-style links (now in attachments folder)
+				const relativePath = compositePath;
 				screenshotSections += `![[${relativePath}]]\n\n### Notes\n\n*Add your notes here*\n\n---\n\n`;
 			}
 

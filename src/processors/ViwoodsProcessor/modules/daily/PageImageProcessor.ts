@@ -4,7 +4,7 @@ import { FileUtils } from "../../../../utils/FileUtils";
 import { StreamingZipUtils } from "../../../../utils/StreamingZipUtils";
 import { StreamLogger } from "../../../../utils/StreamLogger";
 import { ImageCacheBuster } from "../../../../utils/ImageCacheBuster";
-import { NoteListEntry } from "../../ViwoodsTypes";
+import { NoteListEntry, DailyModuleConfig, ViwoodsProcessorConfig, getViwoodsAttachmentsFolder } from "../../ViwoodsTypes";
 
 export interface PageImageData {
 	pageImages: string[];
@@ -66,7 +66,9 @@ export class PageImageProcessor {
 		vault: Vault,
 		dailyNotesFolder: string,
 		dateSlug: string,
-		noteList: NoteListEntry[]
+		noteList: NoteListEntry[],
+		config: DailyModuleConfig,
+		viwoodsConfig: ViwoodsProcessorConfig
 	): Promise<PageImageData> {
 		const pageImages: string[] = [];
 		const warnings: string[] = [];
@@ -74,9 +76,10 @@ export class PageImageProcessor {
 		try {
 			StreamLogger.log(`[PageImageProcessor.processPageImages] Starting page image processing`);
 
-			// Create resources subfolder
-			const resourcesFolder = FileUtils.joinPath(dailyNotesFolder, "resources");
-			await FileUtils.ensurePath(vault, resourcesFolder);
+			// Use Viwoods attachments folder for binary images
+			const attachmentsFolder = getViwoodsAttachmentsFolder(config, viwoodsConfig, { vault } as any);
+			await FileUtils.ensurePath(vault, attachmentsFolder);
+			const resourcesFolder = attachmentsFolder; // Alias for compatibility with existing code
 
 			const totalPages = noteList?.length || 0;
 			StreamLogger.log(`[PageImageProcessor.processPageImages] Found ${totalPages} pages`);
@@ -162,9 +165,8 @@ export class PageImageProcessor {
 				imageData
 			);
 
-			// Add wiki link with relative path from daily note to image
-			const relativePath = result.newPath.replace(`${dailyNotesFolder}/`, '');
-			const imageLink = `![[${relativePath}]]`;
+			// Use full path for wiki-style links (now in attachments folder)
+			const imageLink = `![[${result.newPath}]]`;
 
 			return {
 				success: true,

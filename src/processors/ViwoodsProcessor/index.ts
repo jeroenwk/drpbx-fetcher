@@ -1,7 +1,7 @@
 import { StreamingZipUtils } from "../../utils/StreamingZipUtils";
 import { StreamLogger } from "../../utils/StreamLogger";
-import { MetadataManager } from "../../utils/MetadataManager";
-import { ViwoodsNoteMetadata } from "../../models/Settings";
+import { MetadataManager } from "./utils/MetadataManager";
+import { ViwoodsNoteMetadata } from "./ViwoodsTypes";
 import {
 	FileProcessor,
 	ProcessorConfig,
@@ -51,8 +51,8 @@ export class ViwoodsProcessor implements FileProcessor {
 	private initializeMetadataManager(context: ProcessorContext, paperConfig: PaperModuleConfig): void {
 		// Always reinitialize to ensure correct path for each module
 
-		// Store metadata in Paper resources folder as markdown with YAML frontmatter
-		const metadataPath = `${paperConfig.notesFolder}/resources/viwoodsNoteMetadata.md`;
+		// Store metadata in Paper module root as markdown with YAML frontmatter
+		const metadataPath = `${paperConfig.notesFolder}/viwoodsNoteMetadata.md`;
 
 		this.metadataManager = new MetadataManager(
 			metadataPath,
@@ -69,10 +69,9 @@ export class ViwoodsProcessor implements FileProcessor {
 			async (data: Record<string, ViwoodsNoteMetadata>) => {
 				// Save metadata to markdown file with YAML frontmatter
 				const markdown = MetadataManager.toMarkdown(data);
-				// Ensure resources folder exists
-				const resourcesFolder = `${paperConfig.notesFolder}/resources`;
+				// Ensure parent folder exists
 				try {
-					await context.vault.createFolder(resourcesFolder);
+					await context.vault.createFolder(paperConfig.notesFolder);
 				} catch (error) {
 					// Folder might already exist
 				}
@@ -87,8 +86,8 @@ export class ViwoodsProcessor implements FileProcessor {
 	private initializeMemoMetadataManager(context: ProcessorContext, memoConfig: MemoModuleConfig): void {
 		// Always reinitialize to ensure correct path for each module
 
-		// Store metadata in Memo resources folder as markdown with YAML frontmatter
-		const metadataPath = `${memoConfig.memosFolder}/resources/viwoodsNoteMetadata.md`;
+		// Store metadata in Memo module root as markdown with YAML frontmatter
+		const metadataPath = `${memoConfig.memosFolder}/viwoodsNoteMetadata.md`;
 
 		this.metadataManager = new MetadataManager(
 			metadataPath,
@@ -105,10 +104,9 @@ export class ViwoodsProcessor implements FileProcessor {
 			async (data: Record<string, ViwoodsNoteMetadata>) => {
 				// Save metadata to markdown file with YAML frontmatter
 				const markdown = MetadataManager.toMarkdown(data);
-				// Ensure resources folder exists
-				const resourcesFolder = `${memoConfig.memosFolder}/resources`;
+				// Ensure parent folder exists
 				try {
-					await context.vault.createFolder(resourcesFolder);
+					await context.vault.createFolder(memoConfig.memosFolder);
 				} catch (error) {
 					// Folder might already exist
 				}
@@ -123,8 +121,8 @@ export class ViwoodsProcessor implements FileProcessor {
 	private initializeMeetingMetadataManager(context: ProcessorContext, meetingConfig: MeetingModuleConfig): void {
 		// Always reinitialize to ensure correct path for each module
 
-		// Store metadata in Meeting resources folder as markdown with YAML frontmatter
-		const metadataPath = `${meetingConfig.meetingsFolder}/resources/viwoodsNoteMetadata.md`;
+		// Store metadata in Meeting module root as markdown with YAML frontmatter
+		const metadataPath = `${meetingConfig.meetingsFolder}/viwoodsNoteMetadata.md`;
 
 		this.metadataManager = new MetadataManager(
 			metadataPath,
@@ -141,10 +139,9 @@ export class ViwoodsProcessor implements FileProcessor {
 			async (data: Record<string, ViwoodsNoteMetadata>) => {
 				// Save metadata to markdown file with YAML frontmatter
 				const markdown = MetadataManager.toMarkdown(data);
-				// Ensure resources folder exists
-				const resourcesFolder = `${meetingConfig.meetingsFolder}/resources`;
+				// Ensure parent folder exists
 				try {
-					await context.vault.createFolder(resourcesFolder);
+					await context.vault.createFolder(meetingConfig.meetingsFolder);
 				} catch (error) {
 					// Folder might already exist
 				}
@@ -211,7 +208,8 @@ export class ViwoodsProcessor implements FileProcessor {
 						originalPath,
 						metadata,
 						viwoodsConfig.learning,
-						context
+						context,
+						viwoodsConfig
 					);
 					break;
 
@@ -243,7 +241,8 @@ export class ViwoodsProcessor implements FileProcessor {
 						metadata,
 						viwoodsConfig.paper,
 						context,
-						this.metadataManager
+						this.metadataManager,
+						viwoodsConfig
 					);
 					// Save metadata after successful Paper processing
 					if (result.success && this.metadataManager) {
@@ -266,7 +265,8 @@ export class ViwoodsProcessor implements FileProcessor {
 						originalPath,
 						metadata,
 						viwoodsConfig.daily,
-						context
+						context,
+						viwoodsConfig
 					);
 					break;
 
@@ -298,7 +298,8 @@ export class ViwoodsProcessor implements FileProcessor {
 						metadata,
 						viwoodsConfig.meeting,
 						context,
-						this.metadataManager
+						this.metadataManager,
+						viwoodsConfig
 					);
 					// Save metadata after successful Meeting processing
 					if (result.success && this.metadataManager) {
@@ -321,7 +322,8 @@ export class ViwoodsProcessor implements FileProcessor {
 						originalPath,
 						metadata,
 						viwoodsConfig.picking,
-						context
+						context,
+						viwoodsConfig
 					);
 					break;
 
@@ -353,7 +355,8 @@ export class ViwoodsProcessor implements FileProcessor {
 						metadata,
 						viwoodsConfig.memo,
 						context,
-						this.metadataManager
+						this.metadataManager,
+						viwoodsConfig
 					);
 					// Save metadata after successful Memo processing
 					if (result.success && this.metadataManager) {
@@ -580,6 +583,8 @@ export class ViwoodsProcessor implements FileProcessor {
 
 	getDefaultConfig(): ViwoodsProcessorConfig {
 		return {
+			// Viwoods-specific attachments folder (overrides global for all Viwoods modules)
+			viwoodsAttachmentsFolder: "Attachments/Viwoods",
 			learning: {
 				enabled: true,
 				outputFolder: "Viwoods/Learning",
@@ -726,9 +731,29 @@ export class ViwoodsProcessor implements FileProcessor {
 		return this.supportedExtensions.includes(fileExtension.toLowerCase());
 	}
 
+	getCapabilities(): { multiExtension: boolean; customPlaceholder: { field: string } } {
+		return {
+			multiExtension: true, // Viwoods handles .note files for all modules
+			customPlaceholder: {
+				field: 'viwoodsAttachmentsFolder'
+			}
+		};
+	}
+
 	getConfigSchema(): ConfigSchema {
 		return {
 			fields: [
+				// Viwoods-global settings
+				{
+					key: "viwoodsAttachmentsFolder",
+					label: "Viwoods Attachments Folder",
+					description: "Folder for all Viwoods module binary files (images, EPUBs, etc.). Can be overridden per module. Default: Attachments/Viwoods",
+					type: "folder",
+					required: false,
+					defaultValue: "Attachments/Viwoods",
+					group: undefined,
+				},
+
 				// Learning Module
 				{
 					key: "learning.enabled",
@@ -813,6 +838,16 @@ export class ViwoodsProcessor implements FileProcessor {
 					group: "Learning",
 					groupToggleKey: "learning.enabled",
 				},
+				{
+					key: "learning.attachmentsFolder",
+					label: "Attachments Folder Override",
+					description: "Override global attachments folder for annotation images (empty = use global setting)",
+					type: "folder",
+					required: false,
+					defaultValue: "",
+					group: "Learning",
+					groupToggleKey: "learning.enabled",
+				},
 
 				// Paper Module
 				{
@@ -851,6 +886,16 @@ export class ViwoodsProcessor implements FileProcessor {
 					group: "Paper",
 					groupToggleKey: "paper.enabled",
 				},
+				{
+					key: "paper.attachmentsFolder",
+					label: "Attachments Folder Override",
+					description: "Override global attachments folder for page images (empty = use global setting)",
+					type: "folder",
+					required: false,
+					defaultValue: "",
+					group: "Paper",
+					groupToggleKey: "paper.enabled",
+				},
 
 				// Daily Module
 				{
@@ -868,6 +913,16 @@ export class ViwoodsProcessor implements FileProcessor {
 					type: "folder",
 					required: false,
 					defaultValue: "Viwoods/Daily",
+					group: "Daily",
+					groupToggleKey: "daily.enabled",
+				},
+				{
+					key: "daily.attachmentsFolder",
+					label: "Attachments Folder Override",
+					description: "Override global attachments folder for page images (empty = use global setting)",
+					type: "folder",
+					required: false,
+					defaultValue: "",
 					group: "Daily",
 					groupToggleKey: "daily.enabled",
 				},
@@ -891,6 +946,16 @@ export class ViwoodsProcessor implements FileProcessor {
 					group: "Meeting",
 					groupToggleKey: "meeting.enabled",
 				},
+				{
+					key: "meeting.attachmentsFolder",
+					label: "Attachments Folder Override",
+					description: "Override global attachments folder for page images (empty = use global setting)",
+					type: "folder",
+					required: false,
+					defaultValue: "",
+					group: "Meeting",
+					groupToggleKey: "meeting.enabled",
+				},
 
 				// Picking Module
 				{
@@ -911,6 +976,16 @@ export class ViwoodsProcessor implements FileProcessor {
 					group: "Picking",
 					groupToggleKey: "picking.enabled",
 				},
+				{
+					key: "picking.attachmentsFolder",
+					label: "Attachments Folder Override",
+					description: "Override global attachments folder for composite images (empty = use global setting)",
+					type: "folder",
+					required: false,
+					defaultValue: "",
+					group: "Picking",
+					groupToggleKey: "picking.enabled",
+				},
 
 				// Memo Module
 				{
@@ -928,6 +1003,16 @@ export class ViwoodsProcessor implements FileProcessor {
 					type: "folder",
 					required: false,
 					defaultValue: "Viwoods/Memo",
+					group: "Memo",
+					groupToggleKey: "memo.enabled",
+				},
+				{
+					key: "memo.attachmentsFolder",
+					label: "Attachments Folder Override",
+					description: "Override global attachments folder for memo images (empty = use global setting)",
+					type: "folder",
+					required: false,
+					defaultValue: "",
 					group: "Memo",
 					groupToggleKey: "memo.enabled",
 				},

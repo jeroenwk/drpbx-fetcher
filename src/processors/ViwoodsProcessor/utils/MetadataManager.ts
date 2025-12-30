@@ -1,5 +1,5 @@
-import { ViwoodsNoteMetadata } from "../models/Settings";
-import { StreamLogger } from "./StreamLogger";
+import { ViwoodsNoteMetadata } from "../ViwoodsTypes";
+import { StreamLogger } from "../../../utils/StreamLogger";
 
 /**
  * Manages Viwoods note metadata in a markdown file with YAML frontmatter

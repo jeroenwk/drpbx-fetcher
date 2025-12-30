@@ -38,7 +38,7 @@ export class MarkdownMerger {
 		const lines = content.split("\n");
 
 		// Find all page sections by looking for image embeds
-		// Pattern: ![[resources/...]] or ![[anything]]
+		// Pattern: ![[Attachments/...]] or ![[any full path]]
 		const imageEmbedPattern = /^!\[\[(.+?)\]\]\s*$/;
 		const pages: PageSection[] = [];
 		let header = "";
@@ -243,8 +243,8 @@ export class MarkdownMerger {
 	}
 
 	/**
-	 * Extract the relative image path from a wiki-style embed
-	 * Example: "![[resources/note-page-1.png]]" -> "resources/note-page-1.png"
+	 * Extract the image path from a wiki-style embed
+	 * Example: "![[Attachments/note-page-1.png]]" -> "Attachments/note-page-1.png"
 	 */
 	static extractImagePath(embed: string): string | null {
 		const match = embed.match(/!\[\[(.+?)\]\]/);

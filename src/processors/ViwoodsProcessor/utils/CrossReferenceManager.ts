@@ -1,7 +1,7 @@
 import { Vault } from "obsidian";
-import { StreamLogger } from "./StreamLogger";
+import { StreamLogger } from "../../../utils/StreamLogger";
 import { MetadataManager } from "./MetadataManager";
-import { ViwoodsProcessorConfig } from "../processors/ViwoodsProcessor/ViwoodsTypes";
+import { ViwoodsProcessorConfig } from "../ViwoodsTypes";
 
 /**
  * Related note information
@@ -59,7 +59,7 @@ export class CrossReferenceManager {
 		if (viwoodsConfig.paper.enabled) {
 			const paperNotes = await this.queryModuleMetadata(
 				vault,
-				`${viwoodsConfig.paper.notesFolder}/resources/viwoodsNoteMetadata.md`,
+				`${viwoodsConfig.paper.notesFolder}/viwoodsNoteMetadata.md`,
 				startOfDay,
 				endOfDay,
 				'paper'
@@ -71,7 +71,7 @@ export class CrossReferenceManager {
 		if (viwoodsConfig.meeting.enabled) {
 			const meetingNotes = await this.queryModuleMetadata(
 				vault,
-				`${viwoodsConfig.meeting.meetingsFolder}/resources/viwoodsNoteMetadata.md`,
+				`${viwoodsConfig.meeting.meetingsFolder}/viwoodsNoteMetadata.md`,
 				startOfDay,
 				endOfDay,
 				'meeting'
@@ -83,7 +83,7 @@ export class CrossReferenceManager {
 		if (viwoodsConfig.memo.enabled) {
 			const memoNotes = await this.queryModuleMetadata(
 				vault,
-				`${viwoodsConfig.memo.memosFolder}/resources/viwoodsNoteMetadata.md`,
+				`${viwoodsConfig.memo.memosFolder}/viwoodsNoteMetadata.md`,
 				startOfDay,
 				endOfDay,
 				'memo'
@@ -95,7 +95,7 @@ export class CrossReferenceManager {
 		if (viwoodsConfig.learning.enabled) {
 			const learningNotes = await this.queryModuleMetadata(
 				vault,
-				`${viwoodsConfig.learning.annotationsFolder}/resources/viwoodsNoteMetadata.md`,
+				`${viwoodsConfig.learning.annotationsFolder}/viwoodsNoteMetadata.md`,
 				startOfDay,
 				endOfDay,
 				'learning'
@@ -107,7 +107,7 @@ export class CrossReferenceManager {
 		if (viwoodsConfig.picking.enabled) {
 			const pickingNotes = await this.queryModuleMetadata(
 				vault,
-				`${viwoodsConfig.picking.capturesFolder}/resources/viwoodsNoteMetadata.md`,
+				`${viwoodsConfig.picking.capturesFolder}/viwoodsNoteMetadata.md`,
 				startOfDay,
 				endOfDay,
 				'picking'

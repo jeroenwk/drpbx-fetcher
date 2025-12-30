@@ -2,7 +2,7 @@ import { ZipReader } from "@zip.js/zip.js";
 import { StreamingZipUtils } from "../../../../utils/StreamingZipUtils";
 import { StreamLogger } from "../../../../utils/StreamLogger";
 import { ProcessorContext, ProcessorResult, FileMetadata } from "../../../types";
-import { DailyModuleConfig } from "../../ViwoodsTypes";
+import { DailyModuleConfig, ViwoodsProcessorConfig } from "../../ViwoodsTypes";
 import { NotesBeanHandler } from "./NotesBeanHandler";
 import { PageImageProcessor } from "./PageImageProcessor";
 import { RelatedNotesManager } from "./RelatedNotesManager";
@@ -23,7 +23,8 @@ export class DailyProcessor {
 		originalPath: string,
 		metadata: FileMetadata,
 		config: DailyModuleConfig,
-		context: ProcessorContext
+		context: ProcessorContext,
+		viwoodsConfig: ViwoodsProcessorConfig
 	): Promise<ProcessorResult> {
 		StreamLogger.log(`[DailyProcessor.process] Starting Daily module processing`);
 		StreamLogger.log(`[DailyProcessor.process] Original filename: ${originalPath}`);
@@ -70,7 +71,9 @@ export class DailyProcessor {
 				context.vault,
 				config.dailyNotesFolder,
 				dateSlug,
-				noteList
+				noteList,
+				config,
+				viwoodsConfig
 			);
 
 			warnings.push(...pageImageData.warnings);

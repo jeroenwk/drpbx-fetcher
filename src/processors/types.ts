@@ -90,6 +90,25 @@ export interface TemplateResolver {
 }
 
 /**
+ * Processor capability flags for UI customization
+ * Allows processors to declare special behaviors without hardcoded checks
+ */
+export interface ProcessorCapabilities {
+	/**
+	 * Processor handles multiple extensions internally
+	 * If true, the "Edit Extension" button will be hidden in settings UI
+	 */
+	multiExtension?: boolean;
+
+	/**
+	 * Custom placeholder for a specific config field
+	 * Allows processors to indicate which field needs a dynamic placeholder
+	 * The UI code will look up the actual value from appropriate source
+	 */
+	customPlaceholder?: { field: string; value?: string };
+}
+
+/**
  * Core FileProcessor interface that all processors must implement
  */
 export interface FileProcessor {
@@ -182,4 +201,30 @@ export interface FileProcessor {
 		fileExtension: string,
 		config: ProcessorConfig
 	): boolean;
+
+	/**
+	 * Optional: Get processor capability flags for UI customization
+	 * Allows processors to declare special behaviors without hardcoded checks
+	 * @returns Processor capabilities
+	 */
+	getCapabilities?(): ProcessorCapabilities;
+}
+
+/**
+ * Resolve the attachments folder for a processor
+ * Checks processor-specific override first, then falls back to global setting
+ * @param config Processor configuration (may contain attachmentsFolder override)
+ * @param context Processing context (contains global plugin settings)
+ * @returns The attachments folder path
+ */
+export function getAttachmentsFolder<T extends { attachmentsFolder?: string }>(
+	config: T,
+	context: ProcessorContext
+): string {
+	// Check processor-specific override first
+	if (config.attachmentsFolder) {
+		return config.attachmentsFolder;
+	}
+	// Fall back to global setting
+	return context.pluginSettings.attachmentsFolder || "Attachments";
 }

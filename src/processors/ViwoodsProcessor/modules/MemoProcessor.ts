@@ -4,16 +4,21 @@ import { StreamLogger } from "../../../utils/StreamLogger";
 import { TemplateEngine } from "../../templates/TemplateEngine";
 import { ProcessorContext, ProcessorResult, FileMetadata } from "../../types";
 import { FileTypeMapping } from "../../../models/Settings";
-import { MemoModuleConfig, DailyModuleConfig } from "../ViwoodsTypes";
+import {
+	MemoModuleConfig,
+	DailyModuleConfig,
+	ViwoodsProcessorConfig,
+	ViwoodsNoteMetadata,
+	getViwoodsAttachmentsFolder
+} from "../ViwoodsTypes";
 import { StreamingZipUtils } from "../../../utils/StreamingZipUtils";
 import { FileUtils } from "../../../utils/FileUtils";
 import { TemplateDefaults } from "../TemplateDefaults";
 import { ImageCacheBuster } from "../../../utils/ImageCacheBuster";
-import { MetadataManager } from "../../../utils/MetadataManager";
-import { NoteRenameHandler } from "../../../utils/NoteRenameHandler";
-import { ViwoodsNoteMetadata } from "../../../models/Settings";
+import { MetadataManager } from "../utils/MetadataManager";
+import { NoteRenameHandler } from "../utils/NoteRenameHandler";
 import { MarkdownMerger } from "../utils/MarkdownMerger";
-import { CrossReferenceManager } from "../../../utils/CrossReferenceManager";
+import { CrossReferenceManager } from "../utils/CrossReferenceManager";
 
 interface MemoNotesBean {
 	counter: number;
@@ -185,7 +190,8 @@ export class MemoProcessor {
 		metadata: FileMetadata,
 		config: MemoModuleConfig,
 		context: ProcessorContext,
-		metadataManager: MetadataManager
+		metadataManager: MetadataManager,
+		viwoodsConfig: ViwoodsProcessorConfig
 	): Promise<ProcessorResult> {
 		StreamLogger.log(`[MemoProcessor.process] Starting memo processing for ${metadata.name}`);
 
@@ -284,9 +290,10 @@ export class MemoProcessor {
 			// Ensure output folders exist
 			await FileUtils.ensurePath(context.vault, noteOutputFolder);
 
-			// Create resources subfolder inside the note folder
-			const resourcesFolder = FileUtils.joinPath(noteOutputFolder, "resources");
-			await FileUtils.ensurePath(context.vault, resourcesFolder);
+			// Use Viwoods attachments folder (with fallback to global)
+			const attachmentsFolder = getViwoodsAttachmentsFolder(config, viwoodsConfig, context);
+			await FileUtils.ensurePath(context.vault, attachmentsFolder);
+			const resourcesFolder = attachmentsFolder; // Alias for compatibility with existing code
 
 			// Process main image resource only
 			const mainImagePath = `${resourcesFolder}/${noteName}-image.png`;

@@ -5,7 +5,7 @@ import { StreamingZipUtils } from "../../../utils/StreamingZipUtils";
 import { StreamLogger } from "../../../utils/StreamLogger";
 import { TemplateEngine } from "../../templates/TemplateEngine";
 import { ProcessorContext, ProcessorResult } from "../../types";
-import { LearningModuleConfig, EpubHighlight, BookBean, ReadNoteBean } from "../ViwoodsTypes";
+import { LearningModuleConfig, EpubHighlight, BookBean, ReadNoteBean, ViwoodsProcessorConfig } from "../ViwoodsTypes";
 import { AnnotationProcessor } from "../AnnotationProcessor";
 
 /**
@@ -21,7 +21,8 @@ export class LearningProcessor {
 		originalPath: string,
 		metadata: files.FileMetadata,
 		config: LearningModuleConfig,
-		context: ProcessorContext
+		context: ProcessorContext,
+		viwoodsConfig: ViwoodsProcessorConfig
 	): Promise<ProcessorResult> {
 		await StreamLogger.log(`[LearningProcessor.process] Starting Learning module processing`);
 		const createdFiles: string[] = [];
@@ -264,7 +265,8 @@ export class LearningProcessor {
 								epubPath,
 								bookPath || metadata.name,  // Use bookPath from BookBean, fallback to metadata.name
 								config,
-								context
+								context,
+								viwoodsConfig
 							);
 							createdFiles.push(...files);
 						}

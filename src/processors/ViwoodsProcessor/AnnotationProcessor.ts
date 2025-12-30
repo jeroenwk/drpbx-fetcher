@@ -4,7 +4,8 @@ import { StreamingZipUtils } from "../../utils/StreamingZipUtils";
 import { StreamLogger } from "../../utils/StreamLogger";
 import { TemplateEngine } from "../templates/TemplateEngine";
 import { ProcessorContext } from "../types";
-import { LearningModuleConfig, ReadNoteBean } from "./ViwoodsTypes";
+import { getViwoodsAttachmentsFolder } from "./ViwoodsTypes";
+import { LearningModuleConfig, ReadNoteBean, ViwoodsProcessorConfig } from "./ViwoodsTypes";
 import { ImageCompositor } from "./ImageCompositor";
 import { TemplateDefaults } from "./TemplateDefaults";
 
@@ -24,7 +25,8 @@ export class AnnotationProcessor {
 		epubPath: string,
 		originalFilename: string,
 		config: LearningModuleConfig,
-		context: ProcessorContext
+		context: ProcessorContext,
+		viwoodsConfig: ViwoodsProcessorConfig
 	): Promise<string[]> {
 		const createdFiles: string[] = [];
 
@@ -58,8 +60,8 @@ export class AnnotationProcessor {
 				config.createCompositeImages !== false
 			);
 
-			// 4. Save composite image (preserve if exists to allow user modifications)
-			const imageFolder = config.annotationImagesFolder || config.annotationsFolder;
+			// 4. Save composite image to Viwoods attachments folder (with fallback to global)
+			const imageFolder = getViwoodsAttachmentsFolder(config, viwoodsConfig, context);
 			await FileUtils.ensurePath(context.vault, imageFolder);
 
 			const pageStr = String(annotation.pageIndex).padStart(3, '0');
