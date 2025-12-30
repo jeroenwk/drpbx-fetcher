@@ -828,6 +828,7 @@ export default class DrpbxFetcherPlugin extends Plugin {
                           app: this.app,
                           templateResolver,
                           pluginSettings: this.settings,
+                          basePath: localFolder,
                         }
                       );
                       StreamLogger.log(`[DrpbxFetcher] Processor completed`, {

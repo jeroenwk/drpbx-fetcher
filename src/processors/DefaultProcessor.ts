@@ -33,14 +33,25 @@ export class DefaultProcessor implements FileProcessor {
 			const pathParts = originalPath.split("/");
 			const filename = pathParts[pathParts.length - 1];
 
-			// Use global attachments folder for binary files
-			const attachmentsFolder = getAttachmentsFolder(config, context);
-			const sanitizedFilename = FileUtils.sanitizeFilename(filename);
-			const outputPath = FileUtils.joinPath(attachmentsFolder, sanitizedFilename);
+			// Determine output path based on file type
+			let outputPath: string;
 
-			// Ensure parent directory exists
-			if (attachmentsFolder) {
-				await FileUtils.ensurePath(context.vault, attachmentsFolder);
+			if (filename.endsWith('.md')) {
+				// Markdown files go directly to basePath (folder mapping location)
+				// If basePath is not set, fall back to root (same as original behavior for non-processed files)
+				const basePath = context.basePath || "";
+				const sanitizedFilename = FileUtils.sanitizeFilename(filename);
+				outputPath = FileUtils.joinPath(basePath, sanitizedFilename);
+			} else {
+				// Binary files go to attachments folder
+				const attachmentsFolder = getAttachmentsFolder(config, context);
+				const sanitizedFilename = FileUtils.sanitizeFilename(filename);
+				outputPath = FileUtils.joinPath(attachmentsFolder, sanitizedFilename);
+
+				// Ensure parent directory exists for binary files
+				if (attachmentsFolder) {
+					await FileUtils.ensurePath(context.vault, attachmentsFolder);
+				}
 			}
 
 			// Write file

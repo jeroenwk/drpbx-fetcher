@@ -26,6 +26,8 @@ export interface ProcessorContext {
 	app: App;
 	templateResolver: TemplateResolver;
 	pluginSettings: DrpbxFetcherSettings;
+	/** Base path from folder mapping where files should be written */
+	basePath?: string;
 }
 
 /**
