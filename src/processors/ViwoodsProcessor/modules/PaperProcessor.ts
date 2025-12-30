@@ -398,7 +398,9 @@ export class PaperProcessor {
 				StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Creating new note file: ${filepath}`);
 				const defaultTemplate = await TemplateDefaults.load("viwoods-paper-note.md");
 				const template = await context.templateResolver.resolve(config.noteTemplate, defaultTemplate);
-				const content = TemplateEngine.render(template, data, createTime);
+				const content = await TemplateEngine.render(template, data, context, {
+					createTime: createTime
+				});
 				await context.vault.create(filepath, content);
 			}
 

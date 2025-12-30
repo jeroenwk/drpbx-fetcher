@@ -49,7 +49,9 @@ export class TemplateRenderer {
 			const template = await context.templateResolver.resolve(config.template, defaultTemplate);
 
 			// Render template
-			const content = await TemplateEngine.render(template, variables, date);
+			const content = await TemplateEngine.render(template, variables, context, {
+				createTime: date
+			});
 
 			StreamLogger.log(`[TemplateRenderer.renderDailyNoteTemplate] Template rendered successfully`);
 

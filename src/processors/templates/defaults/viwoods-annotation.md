@@ -1,18 +1,18 @@
-## {{noteTitle}} - Annotation
+## <% tp.user.noteTitle %> - Annotation
 
-**Page:** {{pageNumber}}/{{totalPages}}
-**Date:** {{date:YYYY-MM-DD}}
-**Source:** [Open Note]({{sourceLink}})
+**Page:** <% tp.user.pageNumber %>/<% tp.user.totalPages %>
+**Date:** <% tp.date.now("YYYY-MM-DD") %>
+**Source:** [Open Note](<% tp.user.sourceLink %>)
 
 ---
 
 ### Text Content
 
-{{textContent}}
+<% tp.user.textContent %>
 
 ### Notes
 
 *Add your thoughts here*
 
 ---
-#annotation #Viwoods/{{noteSlug}}
+#annotation #Viwoods/<% tp.user.noteSlug %>

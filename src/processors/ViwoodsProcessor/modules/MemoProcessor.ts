@@ -366,7 +366,9 @@ export class MemoProcessor {
 					finalImagePath.replace(`${noteOutputFolder}/`, '') : '';
 
 				const templateContent = config.memoTemplate || await TemplateDefaults.load("viwoods-memo.md");
-				const markdownContent = TemplateEngine.render(templateContent, templateVariables, createTime);
+				const markdownContent = await TemplateEngine.render(templateContent, templateVariables, context, {
+					createTime: createTime
+				});
 
 				await context.vault.create(markdownPath, markdownContent);
 				StreamLogger.log(`[MemoProcessor.process] Created new memo markdown: ${markdownPath}`);

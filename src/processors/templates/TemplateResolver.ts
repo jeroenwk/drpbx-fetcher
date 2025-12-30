@@ -35,7 +35,23 @@ export class TemplateResolver implements ITemplateResolver {
 
 		// Try to load from vault
 		try {
-			const file = this.vault.getAbstractFileByPath(customPath);
+			let file = this.vault.getAbstractFileByPath(customPath);
+
+			// If file not found and path doesn't end with .md, try adding .md extension
+			if (!file && !customPath.endsWith('.md')) {
+				const pathWithExtension = `${customPath}.md`;
+				file = this.vault.getAbstractFileByPath(pathWithExtension);
+
+				// If found with .md extension, use that path for caching
+				if (file && "extension" in file) {
+					const content = await this.vault.read(file);
+					this.cache.set(customPath, content); // Cache with original path
+					this.cache.set(pathWithExtension, content); // Also cache with .md path
+					return content;
+				}
+			}
+
+			// Try original path
 			if (file && "extension" in file) {
 				const content = await this.vault.read(file);
 				this.cache.set(customPath, content);

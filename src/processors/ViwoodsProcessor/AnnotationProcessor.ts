@@ -165,7 +165,9 @@ export class AnnotationProcessor {
 			);
 
 			// Render markdown
-			let content = TemplateEngine.render(template, templateData, dateAnnotated);
+			let content = await TemplateEngine.render(template, templateData, context, {
+				createTime: dateAnnotated
+			});
 
 			// Add summary section if enabled and summary exists
 			if (config.includeSummaryInAnnotation !== false && annotation.sumary) {

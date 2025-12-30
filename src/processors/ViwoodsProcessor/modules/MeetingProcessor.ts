@@ -401,7 +401,9 @@ export class MeetingProcessor {
 				StreamLogger.log(`[MeetingProcessor.generateOrMergeNoteFile] Creating new note file: ${filepath}`);
 				const defaultTemplate = await TemplateDefaults.load("viwoods-meeting-note.md");
 				const template = await context.templateResolver.resolve(config.meetingTemplate, defaultTemplate);
-				const content = TemplateEngine.render(template, data, createTime);
+				const content = await TemplateEngine.render(template, data, context, {
+					createTime: createTime
+				});
 				await context.vault.create(filepath, content);
 			}
 

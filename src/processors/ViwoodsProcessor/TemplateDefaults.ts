@@ -1,71 +1,72 @@
 /**
  * Default templates for viwoods processor
+ * Using Templater syntax (<% %>) for template commands
  */
 export class TemplateDefaults {
 	private static templates: Record<string, string> = {
 		// Learning module templates
 		"viwoods-highlight.md": `---
-created: {{date:YYYY-MM-DD}}
-page: {{pageNumber}}/{{totalPages}}
-source: "{{noteTitle}}"
+created: <% tp.date.now("YYYY-MM-DD") %>
+page: <% tp.user.pageNumber %>/<% tp.user.totalPages %>
+source: "<% tp.user.noteTitle %>"
 tags:
   - highlight
-  - Viwoods/{{noteSlug}}
-  - {{date}}
+  - Viwoods/<% tp.user.noteSlug %>
+  - <% tp.date.now("YYYY-MM-DD") %>
 ---
 
-## {{noteTitle}}
+## <% tp.user.noteTitle %>
 
-**Source:** [Open Note]({{sourceLink}})
+**Source:** [Open Note](<% tp.user.sourceLink %>)
 
-![[{{pageImagePath}}]]
+![[<% tp.user.pageImagePath %>]]
 
 ### Handwriting Data
 
-Strokes: {{strokeCount}}
-Points: {{pointCount}}
+Strokes: <% tp.user.strokeCount %>
+Points: <% tp.user.pointCount %>
 
 ### Notes
 
 *Add your thoughts here*`,
 		"viwoods-annotation.md": `---
-created: {{date:YYYY-MM-DD}}
-page: {{pageNumber}}/{{totalPages}}
-source: "{{noteTitle}}"
+created: <% tp.date.now("YYYY-MM-DD") %>
+page: <% tp.user.pageNumber %>/<% tp.user.totalPages %>
+source: "<% tp.user.noteTitle %>"
 tags:
   - annotation
-  - Viwoods/{{noteSlug}}
-  - {{date}}
+  - Viwoods/<% tp.user.noteSlug %>
+  - <% tp.date.now("YYYY-MM-DD") %>
 ---
 
-## {{noteTitle}} - Annotation
+## <% tp.user.noteTitle %> - Annotation
 
-**Source:** [Open Note]({{sourceLink}})
+**Source:** [Open Note](<% tp.user.sourceLink %>)
 
 ### Text Content
 
-{{textContent}}
+<% tp.user.textContent %>
 
 ### Notes
 
 *Add your thoughts here*`,
 		"viwoods-epub-annotation.md": `---
-created: {{dateAnnotated}}
-location: "{{location}}"
-page: {{pageNumber}}/{{totalPages}}
-source: "{{bookName}}"
+created: <% tp.user.dateAnnotated %>
+location: "<% tp.user.location %>"
+page: <% tp.user.pageNumber %>/<% tp.user.totalPages %>
+source: "<% tp.user.bookName %>"
 tags:
   - annotation
   - book
-  - {{bookSlug}}
-  - {{date}}
+  - <% tp.user.bookSlug %>
+  - <% tp.date.now("YYYY-MM-DD") %>
 ---
 
-## {{bookName}}
+## <% tp.user.bookName %>
 
-**Source:** {{sourceInfo}}
+**Source:** <% tp.user.sourceInfo %>
 
-![[{{annotationImagePath}}]]
+![[<% tp.user.annotationImagePath %>]]
 
 ### Notes
 
@@ -73,75 +74,75 @@ tags:
 
 		// Paper module templates
 		"viwoods-paper-note.md": `---
-created: {{createTime}}
-modified: {{modifiedTime}}
-total_pages: {{totalPages}}
+created: <% tp.user.createTime %>
+modified: <% tp.user.modifiedTime %>
+total_pages: <% tp.user.totalPages %>
 tags:
   - scribbling
-  - {{date}}
+  - <% tp.date.now("YYYY-MM-DD") %>
 ---
 
-{{screenshotSections}}`,
-		"viwoods-paper-page.md": `# {{noteName}} - Page {{pageNumber}}
+<% tp.user.screenshotSections %>`,
+		"viwoods-paper-page.md": `# <% tp.user.noteName %> - Page <% tp.user.pageNumber %>
 
-**Created:** {{createTime}}
-**Modified:** {{modifiedTime}}
-**Page:** {{pageNumber}}/{{totalPages}}
-{{#if sourceLink}}**Source:** [{{noteName}}]({{sourceLink}}){{/if}}
+**Created:** <% tp.user.createTime %>
+**Modified:** <% tp.user.modifiedTime %>
+**Page:** <% tp.user.pageNumber %>/<% tp.user.totalPages %>
+<%* if (tp.user.sourceLink) { %>**Source:** [<% tp.user.noteName %>](<% tp.user.sourceLink %>)<%* } %>
 
 ---
 
 ## Page Content
 
-{{#if pageImagePath}}
-![[{{pageImagePath}}]]
-{{/if}}
+<%* if (tp.user.pageImagePath) { %>
+![[<% tp.user.pageImagePath %>]]
+<%* } %>
 
-{{#if screenshotPath}}
+<%* if (tp.user.screenshotPath) { %>
 ### Screenshot
-![[{{screenshotPath}}]]
-{{/if}}
+![[<% tp.user.screenshotPath %>]]
+<%* } %>
 
-{{#if hasHandwriting}}
+<%* if (tp.user.hasHandwriting) { %>
 ### Handwriting
-This page contains {{strokeCount}} handwriting strokes.
-{{/if}}
+This page contains <% tp.user.strokeCount %> handwriting strokes.
+<%* } %>
 
 ### Notes
 
 *Add your notes here*
 
 ---
-#Viwoods/paper #note/{{noteSlug}} #page/{{pageNumber}}`,
+#Viwoods/paper #note/<% tp.user.noteSlug %> #page/<% tp.user.pageNumber %>`,
 
 		// Daily module templates
 		"viwoods-daily-note.md": `---
-created: {{createTime}}
-modified: {{modifiedTime}}
+created: <% tp.user.createTime %>
+modified: <% tp.user.modifiedTime %>
 tags:
   - daily-note
-  - {{date}}
+  - <% tp.date.now("YYYY-MM-DD") %>
 ---
 
 ## Related Notes
 
-{{relatedNotesContent}}
+<% tp.user.relatedNotesContent %>
 
 ## Tasks & Notes
 
 *Add additional tasks / notes here*
 
-{{pageImages}}`,
+<% tp.user.pageImages %>`,
 
 		// Meeting module templates
 		"viwoods-meeting-note.md": `---
-created: {{createTime}}
-modified: {{modifiedTime}}
-meeting_date: {{meetingDate}}
-total_pages: {{totalPages}}
+created: <% tp.user.createTime %>
+modified: <% tp.user.modifiedTime %>
+meeting_date: <% tp.user.meetingDate %>
+total_pages: <% tp.user.totalPages %>
 tags:
   - meeting
-  - {{date}}
+  - <% tp.date.now("YYYY-MM-DD") %>
 ---
 
 ## Attendees
@@ -154,7 +155,7 @@ tags:
 
 ## Meeting Notes
 
-{{screenshotSections}}
+<% tp.user.screenshotSections %>
 
 ## Action Items
 
@@ -166,51 +167,51 @@ tags:
 
 		// Picking module templates
 		"viwoods-picking-capture.md": `---
-created: {{createTime}}
+created: <% tp.user.createTime %>
 type: Quick Capture
-total_items: {{totalPages}}
+total_items: <% tp.user.totalPages %>
 tags:
   - picking
-  - {{date}}
+  - <% tp.date.now("YYYY-MM-DD") %>
 ---
 
-# {{noteName}}
+# <% tp.user.noteName %>
 
-{{screenshotSections}}`,
+<% tp.user.screenshotSections %>`,
 
 		// Memo module templates
 		"viwoods-memo.md": `---
-created: {{created}}
-modified: {{modified}}
-type: {{memoType}}
-{{reminderLine}}
+created: <% tp.user.created %>
+modified: <% tp.user.modified %>
+type: <% tp.user.memoType %>
+<% tp.user.reminderLine %>
 tags:
-  - memo{{todoTag}}
-  - {{date}}
+  - memo<% tp.user.todoTag %>
+  - <% tp.date.now("YYYY-MM-DD") %>
 ---
 
 ## Content
 
-![[{{memoImagePath}}]]
+![[<% tp.user.memoImagePath %>]]
 
-{{memoContent}}
+<% tp.user.memoContent %>
 
 ## Notes
 
 *Add your notes here*`,
 
 		// Legacy template (deprecated)
-		"viwoods-page.md": `# {{noteTitle}} - Page {{pageNumber}}
+		"viwoods-page.md": `# <% tp.user.noteTitle %> - Page <% tp.user.pageNumber %>
 
-**Created:** {{createTime}}
-**Page:** {{pageNumber}}/{{totalPages}}
-**Source:** [{{noteName}}]({{sourceLink}})
+**Created:** <% tp.user.createTime %>
+**Page:** <% tp.user.pageNumber %>/<% tp.user.totalPages %>
+**Source:** [<% tp.user.noteName %>](<% tp.user.sourceLink %>)
 
 ---
 
 ## Page Content
 
-![[{{pageImagePath}}]]
+![[<% tp.user.pageImagePath %>]]
 
 ### Notes
 
@@ -218,7 +219,7 @@ tags:
 
 ---
 
-#Viwoods/{{noteSlug}} #page-{{pageNumber}}`,
+#Viwoods/<% tp.user.noteSlug %> #page-<% tp.user.pageNumber %>`,
 	};
 
 	public static load(name: string): Promise<string> {

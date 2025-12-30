@@ -222,7 +222,9 @@ export class PickingProcessor {
 		try {
 			const defaultTemplate = await TemplateDefaults.load("viwoods-picking-capture.md");
 			const template = await context.templateResolver.resolve(config.captureTemplate, defaultTemplate);
-			const content = TemplateEngine.render(template, data, createTime);
+			const content = await TemplateEngine.render(template, data, context, {
+				createTime: createTime
+			});
 
 			// Use the note name as filename
 			const filename = `${data.noteName}.md`;

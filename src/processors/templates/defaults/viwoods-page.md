@@ -1,14 +1,14 @@
-# {{noteTitle}} - Page {{pageNumber}}
+# <% tp.user.noteTitle %> - Page <% tp.user.pageNumber %>
 
-**Created:** {{createTime}}
-**Page:** {{pageNumber}}/{{totalPages}}
-**Source:** [{{noteName}}]({{sourceLink}})
+**Created:** <% tp.user.createTime %>
+**Page:** <% tp.user.pageNumber %>/<% tp.user.totalPages %>
+**Source:** [<% tp.user.noteName %>](<% tp.user.sourceLink %>)
 
 ---
 
 ## Page Content
 
-![[{{pageImagePath}}]]
+![[<% tp.user.pageImagePath %>]]
 
 ### Notes
 
@@ -16,4 +16,4 @@
 
 ---
 
-#Viwoods/{{noteSlug}} #page-{{pageNumber}}
+#Viwoods/<% tp.user.noteSlug %> #page-<% tp.user.pageNumber %>

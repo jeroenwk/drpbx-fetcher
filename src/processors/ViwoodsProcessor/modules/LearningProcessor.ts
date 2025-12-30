@@ -194,30 +194,32 @@ export class LearningProcessor {
 						highlightText: highlight.rawText,
 					};
 
-					const defaultTemplate = `## {{bookName}}
+					const defaultTemplate = `## <% tp.user.bookName %>
 
-**Location:** {{location}}
-**Page:** {{pageNumber}}/{{totalPages}}
-**Date highlighted:** {{dateHighlighted}}
-**Source:** {{sourceInfo}}
+**Location:** <% tp.user.location %>
+**Page:** <% tp.user.pageNumber %>/<% tp.user.totalPages %>
+**Date highlighted:** <% tp.user.dateHighlighted %>
+**Source:** <% tp.user.sourceInfo %>
 
 ---
 
-> {{highlightText}}
+> <% tp.user.highlightText %>
 
 ### Notes
 
 *Add your thoughts here*
 
 ---
-#highlight #book #{{bookSlug}} #{{date}}
+#highlight #book #<% tp.user.bookSlug %> #<% tp.date.now("YYYY-MM-DD") %>
 `;
 
 					const template = await context.templateResolver.resolve(
 						config.highlightTemplate,
 						defaultTemplate
 					);
-					const content = TemplateEngine.render(template, highlightData, dateHighlighted);
+					const content = await TemplateEngine.render(template, highlightData, context, {
+						createTime: dateHighlighted
+					});
 
 					const filename = `${bookSlug}-highlight-${i + 1}.md`;
 					const filepath = FileUtils.joinPath(config.highlightsFolder, filename);
