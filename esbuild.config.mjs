@@ -51,6 +51,9 @@ const context = await esbuild.context({
     platform: "browser", // Important for mobile compatibility
     define: {
         'process.env.NODE_ENV': JSON.stringify(prod ? 'production' : 'development')
+    },
+    loader: {
+        '.md': 'text' // Load .md files as text strings
     }
 });
 

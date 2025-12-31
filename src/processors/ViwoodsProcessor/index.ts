@@ -1,3 +1,4 @@
+import { Notice } from "obsidian";
 import { StreamingZipUtils } from "../../utils/StreamingZipUtils";
 import { StreamLogger } from "../../utils/StreamLogger";
 import { MetadataManager } from "./utils/MetadataManager";
@@ -653,11 +654,9 @@ export class ViwoodsProcessor implements FileProcessor {
 		return {
 			// Learning
 			highlight: templates["viwoods-highlight.md"] || "",
-			annotation: templates["viwoods-annotation.md"] || "",
 			epubAnnotation: templates["viwoods-epub-annotation.md"] || "",
 			// Paper
 			paperNote: templates["viwoods-paper-note.md"] || "",
-			paperPage: templates["viwoods-paper-page.md"] || "",
 			// Daily
 			dailyNote: templates["viwoods-daily-note.md"] || "",
 			// Meeting
@@ -666,8 +665,6 @@ export class ViwoodsProcessor implements FileProcessor {
 			pickingCapture: templates["viwoods-picking-capture.md"] || "",
 			// Memo
 			memo: templates["viwoods-memo.md"] || "",
-			// Legacy
-			page: templates["viwoods-page.md"] || "",
 		};
 	}
 
@@ -751,6 +748,15 @@ export class ViwoodsProcessor implements FileProcessor {
 					type: "folder",
 					required: false,
 					defaultValue: "Attachments/Viwoods",
+					group: undefined,
+				},
+				{
+					key: "exportTemplates",
+					label: "Export Templates",
+					description: "Export all default Viwoods templates to your vault's templates folder. Priority: Templater plugin folder > Templates core plugin folder > Templates. Exported to {folder}/Viwoods. Existing files will be overwritten.",
+					type: "button",
+					buttonText: "Export Templates",
+					buttonAction: "exportTemplates",
 					group: undefined,
 				},
 
@@ -1018,6 +1024,115 @@ export class ViwoodsProcessor implements FileProcessor {
 				},
 			],
 		};
+	}
+
+	/**
+	 * Handle button actions from configuration UI
+	 */
+	async handleButtonAction(action: string, context: ProcessorContext): Promise<void> {
+		if (action === "exportTemplates") {
+			await this.exportTemplatesToVault(context);
+		}
+	}
+
+	/**
+	 * Export all default Viwoods templates to vault's templates folder
+	 */
+	private async exportTemplatesToVault(context: ProcessorContext): Promise<void> {
+		try {
+			await StreamLogger.log("[ViwoodsProcessor.exportTemplatesToVault] Starting template export...");
+
+			// Priority order for templates folder:
+			// 1. Templater community plugin (if installed and configured)
+			// 2. Templates core plugin
+			// 3. Default "Templates" folder
+
+			let templatesFolder = "Templates";
+			let source = "default";
+
+			// Check for Templater community plugin first (priority)
+			const templaterPlugin = (context.app as unknown as {
+				plugins?: {
+					getPlugin?: (id: string) => {
+						settings?: { templates_folder?: string }
+					}
+				}
+			}).plugins?.getPlugin?.("templater-obsidian");
+
+			if (templaterPlugin?.settings?.templates_folder) {
+				templatesFolder = templaterPlugin.settings.templates_folder;
+				source = "Templater plugin";
+				await StreamLogger.log(`[ViwoodsProcessor.exportTemplatesToVault] Using Templater folder: ${templatesFolder}`);
+			} else {
+				// Fallback to Templates core plugin
+				const coreTemplatesPlugin = (context.app as unknown as {
+					internalPlugins?: {
+						getPluginById?: (id: string) => {
+							instance?: { options?: { folder?: string } }
+						}
+					}
+				}).internalPlugins?.getPluginById?.("templates");
+
+				if (coreTemplatesPlugin?.instance?.options?.folder) {
+					templatesFolder = coreTemplatesPlugin.instance.options.folder;
+					source = "Templates core plugin";
+					await StreamLogger.log(`[ViwoodsProcessor.exportTemplatesToVault] Using Templates core plugin folder: ${templatesFolder}`);
+				} else {
+					await StreamLogger.log(`[ViwoodsProcessor.exportTemplatesToVault] Using default folder: ${templatesFolder}`);
+				}
+			}
+
+			const viwoodsTemplatesFolder = `${templatesFolder}/Viwoods`;
+			await StreamLogger.log(`[ViwoodsProcessor.exportTemplatesToVault] Target folder: ${viwoodsTemplatesFolder} (source: ${source})`);
+
+			// Ensure the folder exists
+			try {
+				await context.vault.createFolder(viwoodsTemplatesFolder);
+			} catch (error) {
+				// Folder might already exist, that's fine
+				await StreamLogger.log(`[ViwoodsProcessor.exportTemplatesToVault] Folder already exists or created`);
+			}
+
+			// Get all default templates
+			const templates = this.getDefaultTemplates();
+			await StreamLogger.log(`[ViwoodsProcessor.exportTemplatesToVault] Found ${Object.keys(templates).length} templates`);
+
+			// Template filename mapping (internal name -> user-friendly name)
+			const templateNames: Record<string, string> = {
+				"highlight": "Highlight Template.md",
+				"epubAnnotation": "EPUB Annotation Template.md",
+				"paperNote": "Paper Note Template.md",
+				"dailyNote": "Daily Template.md",
+				"meetingNote": "Meeting Template.md",
+				"pickingCapture": "Picking Template.md",
+				"memo": "Memo Template.md",
+			};
+
+			let exportedCount = 0;
+
+			// Export each template
+			for (const [key, content] of Object.entries(templates)) {
+				// Get user-friendly name, fallback to key if not in mapping
+				const filename = templateNames[key] || `${key}.md`;
+				const filePath = `${viwoodsTemplatesFolder}/${filename}`;
+
+				await StreamLogger.log(`[ViwoodsProcessor.exportTemplatesToVault] Exporting: ${filePath}`);
+
+				// Write template (overwrite if exists)
+				await context.vault.adapter.write(filePath, content);
+				exportedCount++;
+			}
+
+			// Show success message to user
+			new Notice(`✓ Exported ${exportedCount} Viwoods templates to ${viwoodsTemplatesFolder}`);
+			await StreamLogger.log(`[ViwoodsProcessor.exportTemplatesToVault] Successfully exported ${exportedCount} templates`);
+
+		} catch (error) {
+			const err = error as Error;
+			new Notice(`❌ Failed to export templates: ${err.message}`);
+			await StreamLogger.error(`[ViwoodsProcessor.exportTemplatesToVault] Export failed:`, error);
+			throw error; // Re-throw so the modal can show the error
+		}
 	}
 }
 

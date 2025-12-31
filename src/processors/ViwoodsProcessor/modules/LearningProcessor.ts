@@ -7,6 +7,7 @@ import { TemplateEngine } from "../../templates/TemplateEngine";
 import { ProcessorContext, ProcessorResult } from "../../types";
 import { LearningModuleConfig, EpubHighlight, BookBean, ReadNoteBean, ViwoodsProcessorConfig } from "../ViwoodsTypes";
 import { AnnotationProcessor } from "../AnnotationProcessor";
+import { TemplateDefaults } from "../TemplateDefaults";
 
 /**
  * Handles processing of Learning module notes (EPUB/PDF annotations)
@@ -194,24 +195,7 @@ export class LearningProcessor {
 						highlightText: highlight.rawText,
 					};
 
-					const defaultTemplate = `## <% tp.user.bookName %>
-
-**Location:** <% tp.user.location %>
-**Page:** <% tp.user.pageNumber %>/<% tp.user.totalPages %>
-**Date highlighted:** <% tp.user.dateHighlighted %>
-**Source:** <% tp.user.sourceInfo %>
-
----
-
-> <% tp.user.highlightText %>
-
-### Notes
-
-*Add your thoughts here*
-
----
-#highlight #book #<% tp.user.bookSlug %> #<% tp.date.now("YYYY-MM-DD") %>
-`;
+					const defaultTemplate = await TemplateDefaults.load("viwoods-highlight.md");
 
 					const template = await context.templateResolver.resolve(
 						config.highlightTemplate,

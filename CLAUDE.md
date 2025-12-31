@@ -132,6 +132,7 @@ The settings tab includes:
 - When coding Viwoods processors always make sure you have read specs/VIWOODS_SPECIFICATION.md
 - data.json is the plugin configuration file in the plugin folder
 - log.txt in the root of the project can be analysed for debugging purposes
+- Template files (.md) for Viwoods modules are stored in their respective module folders (e.g., src/processors/ViwoodsProcessor/modules/learning/Highlight Template.md). They use Templater syntax and are bundled into the final build via esbuild's text loader.
 - never push a release to github without have updated the changelog and readme
 - when i say i want to test the changes, first commit, build and install the plugin
 - never use the any type in typescript

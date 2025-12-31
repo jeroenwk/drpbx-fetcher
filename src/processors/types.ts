@@ -48,7 +48,7 @@ export type FileMetadata = files.FileMetadata;
 /**
  * Configuration schema field types for UI generation
  */
-export type ConfigFieldType = "text" | "folder" | "file" | "boolean" | "number" | "select";
+export type ConfigFieldType = "text" | "folder" | "file" | "boolean" | "number" | "select" | "button";
 
 /**
  * Configuration schema field definition
@@ -64,6 +64,8 @@ export interface ConfigField {
 	options?: { value: string; label: string }[]; // For select type
 	group?: string; // Optional group name for organizing fields into collapsible sections
 	groupToggleKey?: string; // Key to check if group should be shown (e.g., "learning.enabled")
+	buttonText?: string; // For button type - text to display on the button
+	buttonAction?: string; // For button type - action identifier for the processor to handle
 }
 
 /**
@@ -210,6 +212,15 @@ export interface FileProcessor {
 	 * @returns Processor capabilities
 	 */
 	getCapabilities?(): ProcessorCapabilities;
+
+	/**
+	 * Optional: Handle button actions from configuration UI
+	 * Called when a button field is clicked in the processor configuration modal
+	 * @param action Action identifier from buttonAction field
+	 * @param context Processing context (vault, app, etc.)
+	 * @returns Promise that resolves when action is complete
+	 */
+	handleButtonAction?(action: string, context: ProcessorContext): Promise<void>;
 }
 
 /**

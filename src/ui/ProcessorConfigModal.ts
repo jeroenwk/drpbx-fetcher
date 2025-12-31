@@ -223,6 +223,10 @@ export class ProcessorConfigModal extends Modal {
 				this.renderSelectField(setting, field, currentValue as string);
 				break;
 
+			case "button":
+				this.renderButtonField(setting, field);
+				break;
+
 			case "text":
 			default:
 				this.renderTextField(setting, field, currentValue as string);
@@ -398,6 +402,35 @@ export class ProcessorConfigModal extends Modal {
 				.setValue(currentValue || "")
 				.onChange((value) => {
 					this.setNestedValue(this.formValues, field.key, value);
+				});
+		});
+	}
+
+	private renderButtonField(setting: Setting, field: ConfigField): void {
+		setting.addButton((button) => {
+			button
+				.setButtonText(field.buttonText || "Click")
+				.onClick(async () => {
+					if (field.buttonAction && this.processor.handleButtonAction) {
+						try {
+							// Create context for button action
+							const context = {
+								vault: this.app.vault,
+								app: this.app,
+								templateResolver: {
+									resolve: async () => "",
+									clearCache: () => {},
+								},
+								pluginSettings: this.plugin.settings,
+							};
+
+							await this.processor.handleButtonAction(field.buttonAction, context);
+						} catch (error) {
+							const err = error as Error;
+							new Notice(`Action failed: ${err.message}`);
+							console.error(`Button action '${field.buttonAction}' failed:`, error);
+						}
+					}
 				});
 		});
 	}
