@@ -18,10 +18,38 @@ This plugin automatically fetches and processes files from your Dropbox folders 
 - **🔄 Automatic rename detection** - Tracks renamed notes and updates markdown files automatically
 - **🆔 Smart identity tracking** - Uses internal note IDs to preserve user content across renames
 - **🖼️ Smart image management** - Cache-busting, automatic cleanup, and rename handling
-- **📋 Custom templates** - Customize markdown output with Obsidian-style templates
+- **📋 Custom templates** - Customize markdown output with Templater-compatible templates
+- **🎨 Template Export** - Export default templates to your vault for easy customization
 - **⏭️ Skip unchanged files** (based on file size)
 - **🔐 Secure OAuth 2.0** authentication with PKCE
 - **🛡️ Privacy-first** - No data sent to third-party servers
+
+## 🎉 New in v0.2.223: Template System Overhaul
+
+### 🎨 Templater Integration
+The latest update brings a complete template system redesign with Templater support:
+
+- **Templater Syntax**: All templates now use Templater syntax (`<% %>`) for dynamic content
+- **Separate Template Files**: Templates extracted to individual `.md` files for easy editing
+- **Export Feature**: New "Export Templates" button in Viwoods configuration
+- **Smart Folder Detection**: Automatically exports to Templater plugin folder (if installed), Templates core plugin folder, or "Templates" default
+- **YAML Frontmatter**: All templates use structured frontmatter for better metadata management
+- **7 Active Templates**: Streamlined from 9 to 7 templates (removed unused ones)
+
+### 📝 Available Templates
+- **Learning**: Highlight Template, EPUB Annotation Template
+- **Paper**: Note Template
+- **Daily**: Daily Template
+- **Meeting**: Meeting Template
+- **Picking**: Picking Template
+- **Memo**: Memo Template
+
+### ⚙️ How to Customize Templates
+1. Open Viwoods processor configuration (Settings → Dropbox Fetcher → Configure Viwoods)
+2. Click "Export Templates" button
+3. Templates will be exported to `{your-templates-folder}/Viwoods`
+4. Edit the templates using Templater syntax
+5. Configure custom template paths in processor settings to use your customized versions
 
 ## 🎉 New in v0.2.181: iOS Fixes & Frontmatter Properties
 

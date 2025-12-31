@@ -5,6 +5,34 @@ All notable changes to the Dropbox Fetcher plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.223] - 2025-01-02
+
+### 🎨 Template System Overhaul
+- **Templater Syntax Migration**: All Viwoods templates now use Templater syntax (`<% %>`) instead of hardcoded strings
+- **Separate Template Files**: Templates extracted to individual `.md` files in module folders for easy editing
+- **Export Templates Feature**: New "Export Templates" button in Viwoods processor configuration
+- **Smart Folder Detection**: Automatically exports to Templater plugin folder (priority), Templates core plugin folder, or "Templates" default
+- **YAML Frontmatter**: All templates now use consistent YAML frontmatter for structured metadata
+- **Build-time Bundling**: Templates bundled at build time using esbuild's text loader
+
+### 🧹 Template Cleanup
+- **Removed Unused Templates**: Eliminated 3 unused templates (annotation, paper-page, legacy page)
+- **Learning Module Refactor**: Migrated from inline hardcoded templates to TemplateDefaults system
+- **Template Count**: Reduced from 9 to 7 actively used templates
+
+### ⚙️ Configuration UI Enhancements
+- **Button Field Type**: Added new "button" type to processor configuration schema
+- **Custom Actions**: Processors can now handle button actions via `handleButtonAction()` method
+- **Viwoods-Specific Config**: Export functionality properly scoped to Viwoods processor (not global settings)
+
+### 📝 Templates Included
+- Learning: Highlight Template, EPUB Annotation Template
+- Paper: Note Template
+- Daily: Daily Template
+- Meeting: Meeting Template
+- Picking: Picking Template
+- Memo: Memo Template
+
 ## [0.2.181] - 2025-01-13
 
 ### 🍎 iOS Platform Fixes
