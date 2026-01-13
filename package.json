@@ -1,6 +1,6 @@
 {
   "name": "drpbx-fetcher",
-  "version": "0.2.236",
+  "version": "0.2.237",
   "description": "Fetch and process files from Dropbox folders to your Obsidian vault",
   "main": "dist/main.js",
   "scripts": {
@@ -18,7 +18,8 @@
     "log-server:warnings": "node log-server.js --level warn",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "test:reset": "./scripts/test-reset.sh"
   },
   "keywords": [
     "obsidian",
