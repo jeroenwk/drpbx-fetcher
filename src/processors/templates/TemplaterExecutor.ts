@@ -60,6 +60,32 @@ export class TemplaterExecutor {
 	}
 
 	/**
+	 * Execute combined template code that builds output via tR variable
+	 * This allows execution blocks to span multiple tokens and maintain scope
+	 *
+	 * @param code Complete template code (includes tR initialization)
+	 * @param context Templater context
+	 * @returns Final tR value
+	 */
+	async executeCombined(code: string, context: TemplaterContext): Promise<string> {
+		try {
+			// Create async function with tp in scope
+			// eslint-disable-next-line @typescript-eslint/no-implied-eval
+			const AsyncFunction = Object.getPrototypeOf(async function () {
+				// Empty function
+			}).constructor;
+
+			// Execute code - tR is declared inside the code
+			const fn = new AsyncFunction("tp", code);
+			const result = await fn(context.tp);
+
+			return result || "";
+		} catch (error) {
+			return this.handleError(error, code, "combined");
+		}
+	}
+
+	/**
 	 * Execute JavaScript code with tp context
 	 * @param code JavaScript code to execute
 	 * @param context Templater context

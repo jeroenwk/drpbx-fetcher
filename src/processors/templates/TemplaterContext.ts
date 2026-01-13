@@ -63,7 +63,7 @@ export class TemplaterContextBuilder {
 	 * @returns Complete TemplaterContext ready for template execution
 	 */
 	static build(
-		processorContext: ProcessorContext,
+		processorContext: ProcessorContext | undefined,
 		variables: Record<string, unknown>,
 		metadata?: {
 			filePath?: string;
@@ -73,11 +73,17 @@ export class TemplaterContextBuilder {
 			dropboxFileId?: string;
 		}
 	): TemplaterContext {
-		const { vault, app } = processorContext;
+		// If no processor context provided (test mode), create minimal mocks
+		const vault = processorContext?.vault ?? {
+			getFiles: () => [],
+			getAbstractFileByPath: () => null,
+		} as unknown as Vault;
+
+		const app = processorContext?.app ?? {} as unknown as App;
 
 		// Extract dropboxFileId from templateConfig if not in metadata
 		const dropboxFileId = metadata?.dropboxFileId ??
-			(processorContext.templateConfig?.dropboxFileId as string | undefined);
+			(processorContext?.templateConfig?.dropboxFileId as string | undefined);
 
 		// Create module instances
 		const dateModule = new DateModule();

@@ -15,6 +15,8 @@ export interface TemplateToken {
 	startPos: number;
 	/** End position in original template */
 	endPos: number;
+	/** Whether to right-trim leading whitespace from next text token */
+	rightTrim?: boolean;
 }
 
 /**
@@ -40,10 +42,11 @@ export class TemplaterParser {
 	parse(template: string): TemplateToken[] {
 		const tokens: TemplateToken[] = [];
 
-		// Regex to match Templater commands: <% ... %>, <%* ... %>, <%# ... %>
+		// Regex to match Templater commands: <% ... %>, <%* ... %>, <%# ... %>, <% ... -%>
 		// Captures: ([*#]?) - command type marker (*, #, or empty)
 		//           ([\s\S]+?) - command content (non-greedy, includes newlines)
-		const commandRegex = /<%\s*([*#]?)\s*([\s\S]+?)\s*%>/g;
+		//           (-?) - right-trim marker (dash before closing tag)
+		const commandRegex = /<%\s*([*#]?)\s*([\s\S]+?)\s*(-?)%>/g;
 
 		let lastIndex = 0;
 		let match: RegExpExecArray | null;
@@ -53,10 +56,16 @@ export class TemplaterParser {
 			const matchEnd = commandRegex.lastIndex;
 			const marker = match[1]; // *, #, or empty string
 			const content = match[2]; // The code/comment content
+			const rightTrim = match[3] === '-'; // Right-trim if dash is present
 
 			// Add any text before this command as a text token
-			if (matchStart > lastIndex) {
-				const textContent = template.substring(lastIndex, matchStart);
+			// If previous token had rightTrim, trim leading whitespace from this text
+			let textContent = template.substring(lastIndex, matchStart);
+			if (tokens.length > 0 && tokens[tokens.length - 1].rightTrim) {
+				textContent = textContent.replace(/^\s+/, '');
+			}
+
+			if (textContent.length > 0) {
 				tokens.push({
 					type: 'text',
 					content: textContent,
@@ -80,18 +89,24 @@ export class TemplaterParser {
 				type: tokenType,
 				content: content,
 				startPos: matchStart,
-				endPos: matchEnd
+				endPos: matchEnd,
+				rightTrim: rightTrim
 			});
 
 			lastIndex = matchEnd;
 		}
 
 		// Add any remaining text after the last command
-		if (lastIndex < template.length) {
-			const textContent = template.substring(lastIndex);
+		// If previous token had rightTrim, trim leading whitespace from this text
+		let remainingText = template.substring(lastIndex);
+		if (tokens.length > 0 && tokens[tokens.length - 1].rightTrim) {
+			remainingText = remainingText.replace(/^\s+/, '');
+		}
+
+		if (remainingText.length > 0) {
 			tokens.push({
 				type: 'text',
-				content: textContent,
+				content: remainingText,
 				startPos: lastIndex,
 				endPos: template.length
 			});

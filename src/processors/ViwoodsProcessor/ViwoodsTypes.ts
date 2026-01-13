@@ -317,6 +317,7 @@ export interface PageResource {
 export enum ResourceType {
 	MAIN_BITMAP = 1,
 	SCREENSHOT = 2,
+	AUDIO = 6,
 	PATH_DATA = 7,
 	ORDER_FILE = 8,
 	THUMBNAIL = 9,

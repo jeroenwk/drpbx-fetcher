@@ -1,7 +1,7 @@
 // Import template files directly as text (esbuild will bundle them)
 import highlightTemplate from "./modules/learning/Highlight Template.md";
 import epubAnnotationTemplate from "./modules/learning/EPUB Annotation Template.md";
-import paperNoteTemplate from "./modules/paper/Note Template.md";
+import paperNoteTemplate from "./modules/paper/Paper Template.md";
 import dailyTemplate from "./modules/daily/Daily Template.md";
 import meetingTemplate from "./modules/meeting/Meeting Template.md";
 import pickingTemplate from "./modules/picking/Picking Template.md";

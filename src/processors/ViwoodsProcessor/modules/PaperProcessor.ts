@@ -269,10 +269,28 @@ export class PaperProcessor {
 
 			// Extract audio files from the .note file
 			const audioFiles: Array<{ fileName: string; path: string; timestamp?: number }> = [];
-			const audioFilesInZip = allFiles.filter(f => f.startsWith("audio/") && (f.endsWith(".mp4") || f.endsWith(".mp3") || f.endsWith(".m4a") || f.endsWith(".wav")));
 
-			StreamLogger.log(`[PaperProcessor.process] Found ${audioFilesInZip.length} audio files in .note file`);
-			StreamLogger.log(`[PaperProcessor.process] Audio file paths in ZIP:`, { audioFilesInZip });
+			// First, try to use PageResource.json to identify audio resources (note-level audio has pid = noteId)
+			const audioResources = resources?.filter(
+				r => r.resourceType === ResourceType.AUDIO && r.pid === noteId
+			) || [];
+
+			StreamLogger.log(`[PaperProcessor.process] Found ${audioResources.length} audio resources in PageResource.json`);
+
+			// Extract audio files based on resource metadata
+			const audioFilesInZip: string[] = [];
+			if (audioResources.length > 0) {
+				// Use resource metadata to find audio files
+				for (const audioResource of audioResources) {
+					audioFilesInZip.push(`audio/${audioResource.fileName}`);
+				}
+				StreamLogger.log(`[PaperProcessor.process] Audio files from resources:`, { audioFilesInZip });
+			} else {
+				// Fallback: scan audio/ folder (backward compatibility)
+				const scannedAudioFiles = allFiles.filter(f => f.startsWith("audio/") && (f.endsWith(".mp4") || f.endsWith(".mp3") || f.endsWith(".m4a") || f.endsWith(".wav")));
+				audioFilesInZip.push(...scannedAudioFiles);
+				StreamLogger.log(`[PaperProcessor.process] Audio files from folder scan (fallback):`, { audioFilesInZip });
+			}
 
 			for (const audioFilePath of audioFilesInZip) {
 				try {
@@ -316,31 +334,6 @@ export class PaperProcessor {
 				}
 			}
 
-			// Build screenshot sections manually (for new files)
-			let screenshotSections = "";
-			for (let i = 0; i < screenshotPaths.length; i++) {
-				const screenshotPath = screenshotPaths[i];
-				// Use full path for wiki-style links (now in attachments folder)
-				const relativePath = screenshotPath;
-
-				// Add page break before additional pages (page 2+)
-				if (i > 0) {
-					screenshotSections += `___\n\n`;
-				}
-
-				screenshotSections += `![[${relativePath}]]\n\n### Notes\n\n`;
-
-				// Add audio embeddings under Notes heading for each page
-				if (audioFiles.length > 0) {
-					for (const audio of audioFiles) {
-						screenshotSections += `![[${audio.path}]]\n`;
-					}
-					screenshotSections += `\n`;
-				}
-
-				screenshotSections += `*Add your notes here*\n\n`;
-			}
-
 			// Generate or merge note file
 			const notePath = await this.generateOrMergeNoteFile(
 				context,
@@ -357,7 +350,7 @@ export class PaperProcessor {
 					modifiedTime: TemplateEngine.formatDate(modifiedTime, "YYYY-MM-DD HH:mm"),
 					lastModified: noteInfo.lastModifiedTime,
 					folderPath,
-					screenshotSections,
+					pages: pageImagePaths,
 					audioFiles,
 				},
 				createTime,
@@ -388,6 +381,16 @@ export class PaperProcessor {
 		}
 	}
 
+	/**
+	 * Generate or merge note file
+	 *
+	 * Two processing paths:
+	 * 1. NEW FILES: Use template with loops (explicit structure)
+	 * 2. EXISTING FILES: Use MarkdownMerger to preserve user content (bypasses template)
+	 *
+	 * The template-bypass for existing files is intentional - templates cannot handle
+	 * user content preservation as reliably as structured parsing + rebuilding.
+	 */
 	private static async generateOrMergeNoteFile(
 		context: ProcessorContext,
 		config: PaperModuleConfig,

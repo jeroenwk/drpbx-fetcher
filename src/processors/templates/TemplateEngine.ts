@@ -56,7 +56,7 @@ export class TemplateEngine {
 	static async render(
 		template: string,
 		variables: Record<string, unknown>,
-		context: ProcessorContext,
+		context?: ProcessorContext,
 		metadata?: {
 			filePath?: string;
 			content?: string;
@@ -79,46 +79,43 @@ export class TemplateEngine {
 		// Create executor
 		const executor = new TemplaterExecutor();
 
-		// Process each token and collect output
-		const outputs: string[] = [];
+		// Build combined code that accumulates output in tR variable
+		// This allows execution blocks to span multiple tokens and maintain scope
+		let combinedCode = 'let tR = "";\n';
 
 		for (const token of tokens) {
 			switch (token.type) {
-				case "text":
-					// Text tokens: output as-is
-					outputs.push(token.content);
+				case "text": {
+					// Escape special characters for template literal
+					const escaped = token.content
+						.replace(/\\/g, '\\\\')
+						.replace(/`/g, '\\`')
+						.replace(/\$/g, '\\$');
+					combinedCode += `tR += \`${escaped}\`;\n`;
 					break;
-
-				case "comment":
-					// Comment tokens: skip (don't output anything)
-					break;
+				}
 
 				case "dynamic":
-					// Dynamic commands: execute and output result
-					{
-						const result = await executor.executeDynamic(
-							token.content,
-							templaterContext
-						);
-						outputs.push(result);
-					}
+					// Dynamic commands: execute and append result to tR
+					combinedCode += `tR += String(${token.content});\n`;
 					break;
 
 				case "execution":
-					// Execution commands: execute and output tR value
-					{
-						const result = await executor.executeScript(
-							token.content,
-							templaterContext
-						);
-						outputs.push(result);
-					}
+					// Execution commands: execute as-is (can modify tR directly)
+					combinedCode += token.content + '\n';
+					break;
+
+				case "comment":
+					// Comments are ignored
 					break;
 			}
 		}
 
-		// Join all outputs to create final rendered template
-		return outputs.join("");
+		combinedCode += 'return tR;';
+
+		// Execute the combined code once with shared scope
+		const output = await executor.executeCombined(combinedCode, templaterContext);
+		return output;
 	}
 
 	/**

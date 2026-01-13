@@ -8,7 +8,7 @@ module.exports = {
     '!src/**/*.d.ts',
     '!src/**/index.ts',
   ],
-  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node', 'md'],
   transform: {
     '^.+\\.ts$': ['ts-jest', {
       tsconfig: {
@@ -19,5 +19,6 @@ module.exports = {
   },
   moduleNameMapper: {
     '^obsidian$': '<rootDir>/__tests__/__mocks__/obsidian.ts',
+    '\\.md$': '<rootDir>/__tests__/__mocks__/md.js',
   },
 };
