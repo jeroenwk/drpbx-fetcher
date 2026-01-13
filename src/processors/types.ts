@@ -28,6 +28,8 @@ export interface ProcessorContext {
 	pluginSettings: DrpbxFetcherSettings;
 	/** Base path from folder mapping where files should be written */
 	basePath?: string;
+	/** Optional template configuration passed to templates (e.g., dropboxFileId) */
+	templateConfig?: Record<string, unknown>;
 }
 
 /**

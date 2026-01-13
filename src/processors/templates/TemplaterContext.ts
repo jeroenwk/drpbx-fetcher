@@ -59,7 +59,7 @@ export class TemplaterContextBuilder {
 	 * Build a complete TemplaterContext for template execution
 	 * @param processorContext Processor context with vault, app, etc.
 	 * @param variables Custom variables to pass to template
-	 * @param metadata Optional file metadata (path, content, dates)
+	 * @param metadata Optional file metadata (path, content, dates, dropboxFileId)
 	 * @returns Complete TemplaterContext ready for template execution
 	 */
 	static build(
@@ -70,16 +70,22 @@ export class TemplaterContextBuilder {
 			content?: string;
 			createTime?: Date;
 			modifiedTime?: Date;
+			dropboxFileId?: string;
 		}
 	): TemplaterContext {
 		const { vault, app } = processorContext;
+
+		// Extract dropboxFileId from templateConfig if not in metadata
+		const dropboxFileId = metadata?.dropboxFileId ??
+			(processorContext.templateConfig?.dropboxFileId as string | undefined);
 
 		// Create module instances
 		const dateModule = new DateModule();
 		const fileModule = new FileModule(vault, app, metadata);
 		const configModule = new ConfigModule({
 			activeFile: metadata?.filePath,
-			runMode: "batch"
+			runMode: "batch",
+			dropboxFileId: dropboxFileId
 		});
 
 		// Create frontmatter proxy

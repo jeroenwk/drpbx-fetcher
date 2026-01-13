@@ -8,6 +8,7 @@ tags:
   - book
   - <% tp.user.bookSlug %>
   - <% tp.date.now("YYYY-MM-DD") %>
+dropbox_file_id: <% tp.config.dropbox_file_id %>
 ---
 
 ## <% tp.user.bookName %>

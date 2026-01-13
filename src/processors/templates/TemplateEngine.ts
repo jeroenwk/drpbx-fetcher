@@ -62,6 +62,7 @@ export class TemplateEngine {
 			content?: string;
 			createTime?: Date;
 			modifiedTime?: Date;
+			dropboxFileId?: string;
 		}
 	): Promise<string> {
 		// Parse template into tokens

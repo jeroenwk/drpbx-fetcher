@@ -12,13 +12,18 @@ export class ConfigModule {
 	/** Execution mode (e.g., "batch", "manual") */
 	run_mode: string;
 
+	/** Dropbox file ID for tracking processed files */
+	dropbox_file_id?: string;
+
 	constructor(metadata?: {
 		templateFile?: string;
 		activeFile?: string;
 		runMode?: string;
+		dropboxFileId?: string;
 	}) {
 		this.template_file = metadata?.templateFile;
 		this.active_file = metadata?.activeFile;
 		this.run_mode = metadata?.runMode || "batch";
+		this.dropbox_file_id = metadata?.dropboxFileId;
 	}
 }

@@ -6,6 +6,7 @@ total_pages: <% tp.user.totalPages %>
 tags:
   - meeting
   - <% tp.date.now("YYYY-MM-DD") %>
+dropbox_file_id: <% tp.config.dropbox_file_id %>
 ---
 
 ## Attendees

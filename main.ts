@@ -1,4 +1,4 @@
-import { Plugin, requestUrl, RequestUrlParam, RequestUrlResponse, TFolder, TFile } from "obsidian";
+import { Plugin, requestUrl, RequestUrlParam, RequestUrlResponse, TFolder, TFile, Notice } from "obsidian";
 import { Dropbox, files } from "dropbox";
 import { OAuthManager } from "./src/auth/OAuthManager";
 import { PlatformHelper } from "./src/utils/platform";
@@ -829,6 +829,9 @@ export default class DrpbxFetcherPlugin extends Plugin {
                           templateResolver,
                           pluginSettings: this.settings,
                           basePath: localFolder,
+                          templateConfig: {
+                            dropboxFileId: fileId
+                          }
                         }
                       );
                       StreamLogger.log(`[DrpbxFetcher] Processor completed`, {
@@ -1016,6 +1019,53 @@ export default class DrpbxFetcherPlugin extends Plugin {
     }
   }
 
+  /**
+   * Mark the currently active file as unprocessed
+   * Removes the file's Dropbox ID from processedFiles tracking
+   * so it will be re-fetched and re-processed on next sync
+   */
+  async markFileAsUnprocessed(): Promise<void> {
+    // 1. Get active file
+    const activeFile = this.app.workspace.getActiveFile();
+    if (!activeFile) {
+      new Notice("No active file");
+      return;
+    }
+
+    // 2. Read file content and parse frontmatter
+    const content = await this.app.vault.read(activeFile);
+    const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
+
+    if (!frontmatterMatch) {
+      new Notice("File has no YAML frontmatter");
+      return;
+    }
+
+    // 3. Parse YAML to get dropbox_file_id
+    const yamlContent = frontmatterMatch[1];
+    const fileIdMatch = yamlContent.match(/dropbox_file_id:\s*(.+)/);
+
+    if (!fileIdMatch) {
+      new Notice("File does not have a dropbox_file_id in frontmatter");
+      return;
+    }
+
+    const dropboxFileId = fileIdMatch[1].trim();
+
+    // 4. Check if file is in processedFiles
+    if (this.settings.processedFiles[dropboxFileId] === undefined) {
+      new Notice("File is not in processed files tracking (already unprocessed or never processed)");
+      return;
+    }
+
+    // 5. Remove from processedFiles
+    delete this.settings.processedFiles[dropboxFileId];
+    await this.saveSettings();
+
+    // 6. Show success notice
+    new Notice(`✓ Marked as unprocessed: ${activeFile.basename}`);
+  }
+
   async onload() {
     await this.loadSettings();
 
@@ -1075,6 +1125,15 @@ export default class DrpbxFetcherPlugin extends Plugin {
       name: "Fetch Dropbox files",
       callback: async () => {
         await this.syncFiles();
+      },
+    });
+
+    // Add command to mark file as unprocessed
+    this.addCommand({
+      id: "mark-file-as-unprocessed",
+      name: "Dropbox Fetcher: mark file as unprocessed",
+      callback: async () => {
+        await this.markFileAsUnprocessed();
       },
     });
 
