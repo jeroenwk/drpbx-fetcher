@@ -90,7 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Flat Folder Structure**: Daily notes stored directly in `Viwoods/Daily/` with YYYY-MM-DD naming
 - **Multi-Page Support**: All page images embedded sequentially in single markdown file
 - **Related Notes Sections**: Organized by module type (Paper Notes, Meeting Notes, Memos, etc.)
-- **Date Tags**: Automatic tagging with `#daily-note #Viwoods/daily #date/YYYYMMDD`
+- **Date Tags**: Automatic tagging with `#journal #Viwoods/daily #date/YYYYMMDD`
 - **No Manual Rebuild Needed**: Cross-references update automatically; users can re-sync to reset if needed
 
 ### 🏗️ Architecture Improvements

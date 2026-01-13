@@ -2,7 +2,7 @@
 created: <% tp.user.createTime %>
 modified: <% tp.user.modifiedTime %>
 tags:
-  - daily-note
+  - journal
   - <% tp.date.now("YYYY-MM-DD") %>
 ---
 
