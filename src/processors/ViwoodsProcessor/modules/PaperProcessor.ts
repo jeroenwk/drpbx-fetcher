@@ -49,6 +49,7 @@ export class PaperProcessor {
 			// Find JSON files
 			const allFiles = await StreamingZipUtils.listFiles(zipReader);
 			StreamLogger.log(`[PaperProcessor.process] Files in ZIP:`, { count: allFiles.length });
+			StreamLogger.log(`[PaperProcessor.process] All files in ZIP:`, { files: allFiles });
 
 			const noteFileInfoFile = allFiles.find(f => f.endsWith("_NoteFileInfo.json"));
 			const pageListFile = allFiles.find(f => f.endsWith("_PageListFileInfo.json"));
@@ -266,6 +267,55 @@ export class PaperProcessor {
 				}
 			}
 
+			// Extract audio files from the .note file
+			const audioFiles: Array<{ fileName: string; path: string; timestamp?: number }> = [];
+			const audioFilesInZip = allFiles.filter(f => f.startsWith("audio/") && (f.endsWith(".mp4") || f.endsWith(".mp3") || f.endsWith(".m4a") || f.endsWith(".wav")));
+
+			StreamLogger.log(`[PaperProcessor.process] Found ${audioFilesInZip.length} audio files in .note file`);
+			StreamLogger.log(`[PaperProcessor.process] Audio file paths in ZIP:`, { audioFilesInZip });
+
+			for (const audioFilePath of audioFilesInZip) {
+				try {
+					// Extract just the filename from the path (e.g., "audio/audio_1768309494844.mp4" -> "audio_1768309494844.mp4")
+					const pathParts = audioFilePath.split("/");
+					const audioFileName = pathParts[pathParts.length - 1];
+					StreamLogger.log(`[PaperProcessor.process] Processing audio file: ${audioFilePath} -> ${audioFileName}`);
+
+					const audioData = await StreamingZipUtils.extractFile(zipReader, audioFilePath);
+
+					if (audioData) {
+						StreamLogger.log(`[PaperProcessor.process] Audio data extracted, size: ${audioData.byteLength} bytes`);
+						// Use the audio filename (without the audio/ prefix)
+						const targetFileName = audioFileName;
+						const targetPath = FileUtils.joinPath(attachmentsFolder, targetFileName);
+
+						StreamLogger.log(`[PaperProcessor.process] Target audio path: ${targetPath}`);
+
+						const result = await ImageCacheBuster.updateImageWithCacheBust(
+							context.vault,
+							targetPath,
+							new Uint8Array(audioData.buffer)
+						);
+
+						StreamLogger.log(`[PaperProcessor.process] ImageCacheBuster result:`, { oldPath: result.oldPath, newPath: result.newPath });
+
+						createdFiles.push(result.newPath);
+						audioFiles.push({
+							fileName: audioFileName,
+							path: result.newPath,
+						});
+
+						StreamLogger.log(`[PaperProcessor.process] Extracted audio file: ${audioFileName} -> ${result.newPath}`);
+					} else {
+						StreamLogger.warn(`[PaperProcessor.process] Failed to extract audio data for: ${audioFilePath}`);
+					}
+				} catch (audioError) {
+					const err = audioError as Error;
+					warnings.push(`Failed to extract audio file ${audioFilePath}: ${err.message}`);
+					StreamLogger.warn(`[PaperProcessor.process] Failed to extract audio:`, err);
+				}
+			}
+
 			// Build screenshot sections manually (for new files)
 			let screenshotSections = "";
 			for (let i = 0; i < screenshotPaths.length; i++) {
@@ -278,7 +328,17 @@ export class PaperProcessor {
 					screenshotSections += `___\n\n`;
 				}
 
-				screenshotSections += `![[${relativePath}]]\n\n### Notes\n\n*Add your notes here*\n\n`;
+				screenshotSections += `![[${relativePath}]]\n\n### Notes\n\n`;
+
+				// Add audio embeddings under Notes heading for each page
+				if (audioFiles.length > 0) {
+					for (const audio of audioFiles) {
+						screenshotSections += `![[${audio.path}]]\n`;
+					}
+					screenshotSections += `\n`;
+				}
+
+				screenshotSections += `*Add your notes here*\n\n`;
 			}
 
 			// Generate or merge note file
@@ -298,6 +358,7 @@ export class PaperProcessor {
 					lastModified: noteInfo.lastModifiedTime,
 					folderPath,
 					screenshotSections,
+					audioFiles,
 				},
 				createTime,
 				modifiedTime,
@@ -347,6 +408,9 @@ export class PaperProcessor {
 			// Generate metadata key for settings
 			const metadataKey = MarkdownMerger.getMetadataKey(filepath);
 
+			// Extract audio files from data
+			const audioFiles = data.audioFiles as Array<{ fileName: string; path: string }> || [];
+
 			// Create metadata object
 			const metadata = {
 				noteId: data.noteId as string,
@@ -358,11 +422,13 @@ export class PaperProcessor {
 					page: p.pageNumber,
 					image: p.imagePath,
 				})),
+				audioFiles: audioFiles,
 			};
 
 			StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Created metadata for ${filepath}`, {
 				key: metadataKey,
 				pageImagePathsCount: pageImagePaths.length,
+				audioFilesCount: audioFiles.length,
 				pageImagePaths: pageImagePaths,
 				metadataPages: metadata.pages
 			});
@@ -378,21 +444,24 @@ export class PaperProcessor {
 				StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Merging existing file: ${filepath}`, {
 					pageCount: pageImagePaths.length,
 					imageUpdates: imageUpdates.length,
+					audioFilesCount: audioFiles.length,
 					hasMetadata: !!existingMetadata,
 				});
 
 				const existingContent = await context.vault.read(existingFile);
 
 				// Always merge to preserve user content and update metadata
+				// Include audio files in the merge - they will be added under the Notes section
 				const mergedContent = MarkdownMerger.merge(
 					existingContent,
 					pageImagePaths,
 					imageUpdates,
-					modifiedTime
+					modifiedTime,
+					audioFiles
 				);
 
 				await context.vault.modify(existingFile, mergedContent);
-				StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Merged note file with user edits preserved and metadata updated`);
+				StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Merged note file with user edits preserved, metadata updated, and audio files merged`);
 			} else {
 				// New file - generate from template
 				StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Creating new note file: ${filepath}`);
@@ -445,5 +514,28 @@ export class PaperProcessor {
 			StreamLogger.error("[PaperProcessor.generateOrMergeNoteFile] Failed to generate/merge note file:", error);
 			return null;
 		}
+	}
+
+	/**
+	 * Process non-.note files for Paper module
+	 * Audio files in Paper/Audio File/ are skipped - only audio files inside .note files are processed
+	 */
+	public static async processNonNoteFile(
+		_fileData: Uint8Array,
+		originalPath: string,
+		_metadata: FileMetadata,
+		_config: PaperModuleConfig,
+		_context: ProcessorContext,
+		_viwoodsConfig: ViwoodsProcessorConfig
+	): Promise<ProcessorResult> {
+		StreamLogger.log(`[PaperProcessor.processNonNoteFile] Skipping non-note file: ${originalPath}`);
+
+		// Skip all non-.note files for Paper module
+		// Audio files are only processed when extracted from inside .note files
+		return {
+			success: false,
+			createdFiles: [],
+			warnings: [`Paper module only processes .note files. Audio files in 'Paper/Audio File/' are skipped - only audio files inside .note files are processed.`],
+		};
 	}
 }

@@ -1,5 +1,6 @@
 import { TFile } from "obsidian";
 import { FileUtils } from "../utils/FileUtils";
+import { StreamLogger } from "../utils/StreamLogger";
 import {
 	FileProcessor,
 	ProcessorConfig,
@@ -12,6 +13,13 @@ import {
 } from "./types";
 
 /**
+ * Configuration for DefaultProcessor
+ */
+export interface DefaultProcessorConfig extends ProcessorConfig {
+	allowedExtensions?: string[]; // File extensions to process (default: ["md"])
+}
+
+/**
  * Default processor that simply writes files as-is to the vault
  * Used when no specific processor is configured for a file type
  */
@@ -19,7 +27,7 @@ export class DefaultProcessor implements FileProcessor {
 	readonly type = "default";
 	readonly name = "Default (No Processing)";
 	readonly description = "Downloads files without any processing";
-	readonly supportedExtensions: string[] = ["*"]; // Matches all extensions
+	readonly supportedExtensions: string[] = ["*"]; // Matches all extensions (but filtered by allowedExtensions)
 
 	async process(
 		fileData: Uint8Array,
@@ -29,6 +37,49 @@ export class DefaultProcessor implements FileProcessor {
 		context: ProcessorContext
 	): Promise<ProcessorResult> {
 		try {
+			const defaultConfig = config as DefaultProcessorConfig;
+
+			// Get the file extension
+			const fileExtension = metadata.name.split(".").pop()?.toLowerCase() || "";
+
+			// Parse allowedExtensions - handle both array and comma-separated string formats
+			let allowedExtensions: string[] = [];
+			const exts = defaultConfig.allowedExtensions;
+			if (Array.isArray(exts)) {
+				allowedExtensions = exts;
+			} else if (typeof exts === "string") {
+				// eslint-disable-next-line @typescript-eslint/no-base-to-string
+				allowedExtensions = String(exts).split(",").map((ext: string) => ext.trim().toLowerCase().replace(/^\./, ''));
+			}
+
+			// If no allowedExtensions configured, skip the file
+			// This prevents accidental downloading of all files
+			// User must explicitly configure what they want to download
+			if (allowedExtensions.length === 0) {
+				StreamLogger.log(`[DefaultProcessor] Skipping file - no allowedExtensions configured`, {
+					filePath: originalPath,
+					fileName: metadata.name,
+				});
+				return {
+					success: false,
+					createdFiles: [],
+					warnings: [`Default processor has no allowed extensions configured. Please configure allowedExtensions in plugin settings.`],
+				};
+			}
+
+			// Check if this file type is allowed to be processed
+			if (!allowedExtensions.includes(fileExtension) && !allowedExtensions.includes("*")) {
+				StreamLogger.log(`[DefaultProcessor] Skipping file with extension '${fileExtension}' (not in allowed extensions: ${allowedExtensions.join(", ")})`, {
+					filePath: originalPath,
+					fileName: metadata.name,
+				});
+				return {
+					success: false,
+					createdFiles: [],
+					warnings: [`File type '${fileExtension}' is not configured to be processed by Default processor`],
+				};
+			}
+
 			// Extract filename from path
 			const pathParts = originalPath.split("/");
 			const filename = pathParts[pathParts.length - 1];
@@ -81,8 +132,10 @@ export class DefaultProcessor implements FileProcessor {
 		return { valid: true };
 	}
 
-	getDefaultConfig(): ProcessorConfig {
-		return {};
+	getDefaultConfig(): DefaultProcessorConfig {
+		return {
+			allowedExtensions: [], // No default - user must configure explicitly
+		};
 	}
 
 	getDefaultTemplates(): Record<string, string> {
@@ -93,6 +146,15 @@ export class DefaultProcessor implements FileProcessor {
 	getConfigSchema(): ConfigSchema {
 		return {
 			fields: [
+				{
+					key: "allowedExtensions",
+					label: "Allowed File Extensions",
+					description: "File extensions to process (e.g., md, txt). Use '*' for all files. Audio files (mp4, mp3, m4a, wav) should NOT be included as they're handled by Viwoods processor.",
+					type: "text",
+					required: false,
+					defaultValue: "md",
+					placeholder: "md, txt, pdf",
+				},
 				{
 					key: "attachmentsFolder",
 					label: "Attachments Folder",

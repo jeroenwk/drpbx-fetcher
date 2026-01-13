@@ -522,7 +522,7 @@ export class ViwoodsProcessor implements FileProcessor {
 
 		// Route to appropriate module handler
 		// For now, only PickingProcessor handles non-.note files (screenshots)
-		// Other modules can be extended in the future
+		// Paper module audio files are only processed when extracted from inside .note files
 		switch (moduleType) {
 			case ViwoodsModuleType.PICKING:
 				return await PickingProcessor.processNonNoteFile(
@@ -533,9 +533,14 @@ export class ViwoodsProcessor implements FileProcessor {
 					context
 				);
 
-			// Future: Add handlers for other modules if they need to process non-.note files
-			// case ViwoodsModuleType.LEARNING:
-			//   return await LearningProcessor.processNonNoteFile(...);
+			case ViwoodsModuleType.PAPER:
+				// Skip non-note files for Paper module
+				// Audio files are only processed when extracted from inside .note files
+				return {
+					success: false,
+					createdFiles: [],
+					warnings: [`Paper module only processes .note files. Audio files in 'Paper/Audio File/' are skipped.`],
+				};
 
 			default:
 				return {

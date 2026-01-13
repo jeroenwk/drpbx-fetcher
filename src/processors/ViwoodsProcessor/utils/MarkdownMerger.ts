@@ -6,7 +6,8 @@ import { StreamLogger } from "../../../utils/StreamLogger";
 export interface PageSection {
 	pageNumber: number;
 	imageEmbed: string;  // The ![[...]] wiki link
-	userContent: string; // Everything after the image until next page or end
+	audioEmbeds: string[]; // Audio file embeds under the Notes section
+	userContent: string; // Everything after the audio/image until next page or end
 }
 
 /**
@@ -40,6 +41,7 @@ export class MarkdownMerger {
 		// Find all page sections by looking for image embeds
 		// Pattern: ![[Attachments/...]] or ![[any full path]]
 		const imageEmbedPattern = /^!\[\[(.+?)\]\]\s*$/;
+		const audioEmbedPattern = /^!\[\[(.+?\.(mp4|mp3|m4a|wav))\]\]\s*$/;
 		const pages: PageSection[] = [];
 		let header = "";
 		let footer = "";
@@ -49,9 +51,10 @@ export class MarkdownMerger {
 
 		for (let i = 0; i < lines.length; i++) {
 			const line = lines[i];
-			const match = line.match(imageEmbedPattern);
+			const imageMatch = line.match(imageEmbedPattern);
+			const audioMatch = line.match(audioEmbedPattern);
 
-			if (match) {
+			if (imageMatch) {
 				// Found an image embed - this starts a new page section
 				if (currentPage) {
 					// Save previous page
@@ -62,9 +65,14 @@ export class MarkdownMerger {
 				currentPage = {
 					pageNumber: pages.length + 1,
 					imageEmbed: line,
+					audioEmbeds: [],
 					userContent: "",
 				};
 				isInHeader = false;
+			} else if (audioMatch && currentPage) {
+				// Found an audio embed - add to current page's audio list
+				// Only count as audio if it's between the image and the next page break
+				currentPage.audioEmbeds.push(line);
 			} else if (currentPage) {
 				// We're in a page section - accumulate user content
 				currentPage.userContent += (currentPage.userContent ? "\n" : "") + line;
@@ -88,6 +96,7 @@ export class MarkdownMerger {
 		StreamLogger.log("[MarkdownMerger] Parsed markdown", {
 			headerLines: headerLines.length,
 			pageCount: pages.length,
+			totalAudioFiles: pages.reduce((sum, p) => sum + p.audioEmbeds.length, 0),
 		});
 
 		return {
@@ -138,21 +147,27 @@ export class MarkdownMerger {
 	 * @param newPages Array of new/updated page image paths
 	 * @param imageUpdates Optional mappings for updated images
 	 * @param modifiedTime Optional new modified time to update in header
+	 * @param audioFiles Optional array of audio files to embed under each Notes section
 	 * @returns Merged markdown content
 	 */
 	static merge(
 		existingContent: string,
 		newPages: Array<{ pageNumber: number; imagePath: string }>,
 		imageUpdates?: ImageUpdateMapping[],
-		modifiedTime?: Date
+		modifiedTime?: Date,
+		audioFiles?: Array<{ fileName: string; path: string }>
 	): string {
 		StreamLogger.log("[MarkdownMerger] Starting merge", {
 			newPageCount: newPages.length,
 			hasImageUpdates: !!imageUpdates?.length,
+			audioFilesCount: audioFiles?.length || 0,
 		});
 
 		const parsed = this.parseMarkdown(existingContent);
 		const updateMap = new Map(imageUpdates?.map(u => [u.pageNumber, u]) || []);
+
+		// Generate audio embeds from audio files
+		const newAudioEmbeds = audioFiles?.map(audio => `![[${audio.path}]]`) || [];
 
 		// Build merged pages
 		const mergedPages: PageSection[] = [];
@@ -167,27 +182,39 @@ export class MarkdownMerger {
 					? `![[${update.newPath}]]`
 					: existingPage.imageEmbed;
 
+				// Merge audio embeddings: preserve existing audio, add new ones that aren't duplicates
+				const mergedAudioEmbeds = [...existingPage.audioEmbeds];
+				for (const newAudio of newAudioEmbeds) {
+					if (!mergedAudioEmbeds.includes(newAudio)) {
+						mergedAudioEmbeds.push(newAudio);
+					}
+				}
+
 				mergedPages.push({
 					pageNumber: newPage.pageNumber,
 					imageEmbed,
+					audioEmbeds: mergedAudioEmbeds,
 					userContent: existingPage.userContent,
 				});
 
 				StreamLogger.log("[MarkdownMerger] Merged existing page", {
 					pageNumber: newPage.pageNumber,
 					hadUpdate: !!update,
+					audioCount: mergedAudioEmbeds.length,
 					preservedContentLength: existingPage.userContent.length,
 				});
 			} else {
-				// New page - add with default placeholder
+				// New page - add with default placeholder and audio embeddings
 				mergedPages.push({
 					pageNumber: newPage.pageNumber,
 					imageEmbed: `![[${newPage.imagePath}]]`,
+					audioEmbeds: newAudioEmbeds,
 					userContent: "\n\n### Notes\n\n*Add your notes here*",
 				});
 
 				StreamLogger.log("[MarkdownMerger] Added new page", {
 					pageNumber: newPage.pageNumber,
+					audioCount: newAudioEmbeds.length,
 				});
 			}
 		}
@@ -228,6 +255,12 @@ export class MarkdownMerger {
 			}
 
 			parts.push(page.imageEmbed);
+
+			// Add audio embeddings after the image, before user content
+			for (const audioEmbed of page.audioEmbeds) {
+				parts.push(audioEmbed);
+			}
+
 			if (page.userContent.trim()) {
 				parts.push(page.userContent);
 			}

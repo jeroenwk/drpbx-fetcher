@@ -700,6 +700,18 @@ export default class DrpbxFetcherPlugin extends Plugin {
               const processorMapping = processorResult?.mapping || null;
               const willBeProcessed = processor !== null;
 
+              // Skip files without processors early - don't download or create folders
+              if (!willBeProcessed) {
+                console.log(`Skipping ${file.name} - no processor configured for this file type`);
+                StreamLogger.log(`[DrpbxFetcher] Skipping file (no processor)`, {
+                  fileName: file.name,
+                  extension: fileExtension,
+                  path: file.path_display
+                });
+                skippedFiles++;
+                continue;
+              }
+
               // Check if file was already processed (for files that will be processed)
               // This prevents unnecessary downloads
               if (willBeProcessed && processor) {
@@ -730,30 +742,6 @@ export default class DrpbxFetcherPlugin extends Plugin {
                 } else {
                   // New file - will process it
                   console.log(`Will process new file: ${file.name}`);
-                }
-              }
-
-              // Only calculate paths and create folders for non-processed files
-              // Processors control their own output paths completely
-              let localFilePath = "";
-              if (!willBeProcessed) {
-                // Get relative path from the remote folder, preserving case
-                // Use path_display to keep original capitalization
-                const remoteFolderRegex = new RegExp("^" + mapping.remotePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "i");
-                // Safe: path_display is always defined for FileMetadata after filtering entries by .tag === "file"
-                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                const relativePath = file.path_display!.replace(remoteFolderRegex, "");
-
-                localFilePath = localFolder + relativePath;
-
-                // Ensure parent directories exist
-                const parentPath = localFilePath.substring(0, localFilePath.lastIndexOf("/"));
-                if (parentPath) {
-                  try {
-                    await this.app.vault.createFolder(parentPath);
-                  } catch (error) {
-                    // Folder might already exist
-                  }
                 }
               }
 
@@ -881,41 +869,6 @@ export default class DrpbxFetcherPlugin extends Plugin {
                     }
                   continue; // Skip default file handling
                 }
-              }
-
-              // Default file handling (no processor)
-              // Check if THIS EXACT file already exists with same size
-              let shouldWrite = true;
-              try {
-                const existingFile = this.app.vault.getAbstractFileByPath(localFilePath);
-                if (existingFile && existingFile instanceof TFolder === false) {
-                  const stat = await this.app.vault.adapter.stat(localFilePath);
-                  if (stat && stat.size === file.size) {
-                    // File exists with same name and same size - skip download
-                    shouldWrite = false;
-                    console.log(`Skipping ${localFilePath} - already exists with same size (${file.size} bytes)`);
-                  } else {
-                    console.log(`Updating ${localFilePath} - size changed (old: ${stat?.size}, new: ${file.size})`);
-                  }
-                }
-              } catch (error) {
-                // File doesn't exist, we should write it
-                console.log(`Creating new file: ${localFilePath}`);
-              }
-
-              if (shouldWrite) {
-                // Write file to vault
-                const existingFile = this.app.vault.getAbstractFileByPath(localFilePath);
-                if (existingFile instanceof TFile) {
-                  // Use modifyBinary to trigger Obsidian's file change detection
-                  await this.app.vault.modifyBinary(existingFile, uint8Array);
-                  // Trigger workspace to refresh views displaying this file (especially images)
-                  this.app.workspace.trigger('file-modified', existingFile);
-                } else {
-                  await this.app.vault.createBinary(localFilePath, uint8Array);
-                }
-                regularFiles++;
-                console.log(`✓ Synced: ${localFilePath} (${file.size} bytes)`);
               }
             } catch (error) {
               const errorMessage = error instanceof Error ? error.message : String(error);

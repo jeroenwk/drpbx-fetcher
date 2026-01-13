@@ -38,6 +38,11 @@ export interface ViwoodsNoteMetadata {
 		page: number;
 		image: string; // Current image path
 	}>;
+	audioFiles?: Array<{
+		fileName: string; // Audio filename
+		path: string; // Path to audio file in vault
+		timestamp?: number; // Audio file timestamp for matching
+	}>;
 }
 
 /**
