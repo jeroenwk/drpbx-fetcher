@@ -16,7 +16,7 @@ import {
  * Configuration for DefaultProcessor
  */
 export interface DefaultProcessorConfig extends ProcessorConfig {
-	allowedExtensions?: string[]; // File extensions to process (default: ["md"])
+	allowedExtensions?: string[]; // File extensions to process (if empty, auto-populates from routed file extension)
 }
 
 /**
@@ -52,19 +52,15 @@ export class DefaultProcessor implements FileProcessor {
 				allowedExtensions = String(exts).split(",").map((ext: string) => ext.trim().toLowerCase().replace(/^\./, ''));
 			}
 
-			// If no allowedExtensions configured, skip the file
-			// This prevents accidental downloading of all files
-			// User must explicitly configure what they want to download
+			// If no allowedExtensions configured, auto-populate with current file extension
+			// Since this file was explicitly routed via FileTypeMapping, trust that routing
 			if (allowedExtensions.length === 0) {
-				StreamLogger.log(`[DefaultProcessor] Skipping file - no allowedExtensions configured`, {
+				allowedExtensions = [fileExtension];
+				StreamLogger.log(`[DefaultProcessor] Auto-allowed extension from routing`, {
 					filePath: originalPath,
 					fileName: metadata.name,
+					extension: fileExtension,
 				});
-				return {
-					success: false,
-					createdFiles: [],
-					warnings: [`Default processor has no allowed extensions configured. Please configure allowedExtensions in plugin settings.`],
-				};
 			}
 
 			// Check if this file type is allowed to be processed
@@ -76,7 +72,7 @@ export class DefaultProcessor implements FileProcessor {
 				return {
 					success: false,
 					createdFiles: [],
-					warnings: [`File type '${fileExtension}' is not configured to be processed by Default processor`],
+					errors: [`File type '${fileExtension}' is not configured to be processed by Default processor`],
 				};
 			}
 
@@ -134,7 +130,7 @@ export class DefaultProcessor implements FileProcessor {
 
 	getDefaultConfig(): DefaultProcessorConfig {
 		return {
-			allowedExtensions: [], // No default - user must configure explicitly
+			allowedExtensions: [], // Empty by default - auto-populates from routed file extension
 		};
 	}
 
