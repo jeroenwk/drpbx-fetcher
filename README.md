@@ -11,6 +11,7 @@ This plugin automatically fetches and processes files from your Dropbox folders 
 - **Smart file processing** - Extract and transform different file types
 - **🎉 Complete Viwoods Memo Support** - Full processing of Viwoods Memo notes with todo integration
 - **📝 Viwoods Paper Notes** - Extract handwritten content with smart rename detection
+- **🎵 Audio File Extraction** - Extract audio recordings from .note files and embed in markdown
 - **📚 Viwoods Learning Notes** - Process reading notes with annotations
 - **🤝 Viwoods Meeting Notes** - Extract meeting content with screenshots and smart rename detection
 - **📋 Viwoods Daily Notes** - Process daily entries with date organization
@@ -21,8 +22,22 @@ This plugin automatically fetches and processes files from your Dropbox folders 
 - **📋 Custom templates** - Customize markdown output with Templater-compatible templates
 - **🎨 Template Export** - Export default templates to your vault for easy customization
 - **⏭️ Skip unchanged files** (based on file size)
+- **🚫 Smart file filtering** - Only downloads files with configured processors
 - **🔐 Secure OAuth 2.0** authentication with PKCE
 - **🛡️ Privacy-first** - No data sent to third-party servers
+
+## 🎉 New in v0.2.236: Audio Support & Smart Filtering
+
+### 🎵 Audio File Extraction for Paper Notes
+- **Extract Audio from .note Files**: Audio recordings stored inside .note ZIP files are now extracted to your attachments folder
+- **Automatic Embedding**: Extracted audio files are automatically embedded in the generated markdown under the Notes section
+- **Smart Metadata**: Audio files are tracked for proper handling during note updates and renames
+- **Skip External Audio**: Audio files in `Paper/Audio File/` are skipped (only audio inside .note files is processed)
+
+### 🚫 Improved File Filtering
+- **No Processor = No Download**: Files without explicit processor mappings are completely skipped
+- **Early Filtering**: Files are filtered before downloading, saving bandwidth and preventing empty folders
+- **Cleaner Vault**: Only configured file types are synced, keeping your vault organized
 
 ## 🎉 New in v0.2.223: Template System Overhaul
 

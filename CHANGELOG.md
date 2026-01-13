@@ -5,6 +5,23 @@ All notable changes to the Dropbox Fetcher plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.236] - 2026-01-13
+
+### 🎵 Audio File Support for Paper Module
+- **Extract Audio from .note Files**: Audio files stored inside .note ZIP files are now extracted and saved to the attachments folder
+- **Audio Embeddings**: Extracted audio files are automatically embedded in the generated markdown under the Notes section
+- **Audio Metadata Tracking**: Audio files are tracked in `ViwoodsNoteMetadata` for proper merge handling on note updates
+- **Skip External Audio Files**: Audio files in `Paper/Audio File/` Dropbox folder are now skipped (only audio inside .note files is processed)
+
+### 🚫 Improved File Filtering
+- **No Processor = No Download**: Files without an explicit processor mapping are now completely skipped (no download, no folder creation)
+- **Early Skip Logic**: Files are now filtered before downloading, saving bandwidth and preventing empty folder creation
+- **DefaultProcessor Configuration**: DefaultProcessor now requires explicit `allowedExtensions` configuration (defaults to empty for safety)
+
+### 📝 DefaultProcessor Changes
+- **Explicit Configuration Required**: DefaultProcessor no longer has hardcoded defaults. Users must configure `allowedExtensions` when creating a `.md` → `default` mapping
+- **Configurable Extensions**: Users can specify which file types to sync via comma-separated list (e.g., "md, txt, pdf")
+
 ## [0.2.223] - 2025-01-02
 
 ### 🎨 Template System Overhaul
