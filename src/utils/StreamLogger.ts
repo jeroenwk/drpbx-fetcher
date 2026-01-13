@@ -213,4 +213,32 @@ export class StreamLogger {
     instance.failureCount = 0;
     instance.disabled = false;
   }
+
+  /**
+   * Request the log server to recreate the log file
+   * This should be called when the plugin loads to start with a fresh log
+   */
+  static async resetLogFile(): Promise<void> {
+    const instance = this.getInstance();
+
+    // Only send reset request if stream logging is enabled
+    if (instance.config.type !== "stream") {
+      return;
+    }
+
+    const url = `http://${instance.config.host}:${instance.config.port}/reset-log`;
+
+    try {
+      await requestUrl({
+        url,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+    } catch (error) {
+      // Silently fail - this is not critical
+      // The server might not be running, which is fine
+    }
+  }
 }

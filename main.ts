@@ -1,4 +1,4 @@
-import { Plugin, requestUrl, RequestUrlParam, RequestUrlResponse, TFolder, TFile, Notice } from "obsidian";
+import { Plugin, requestUrl, RequestUrlParam, RequestUrlResponse, Notice } from "obsidian";
 import { Dropbox, files } from "dropbox";
 import { OAuthManager } from "./src/auth/OAuthManager";
 import { PlatformHelper } from "./src/utils/platform";
@@ -540,7 +540,7 @@ export default class DrpbxFetcherPlugin extends Plugin {
       let totalSourceFiles = 0;
       let processedSourceFiles = 0;
       let createdFiles = 0;
-      let regularFiles = 0;
+      const regularFiles = 0;
       let skippedFiles = 0;
       let skippedProcessors = 0;
 
@@ -1042,6 +1042,10 @@ export default class DrpbxFetcherPlugin extends Plugin {
       version,
       platform,
     });
+
+    // Request log server to recreate log file for fresh session
+    await StreamLogger.resetLogFile();
+
     StreamLogger.log("[DrpbxFetcher] Plugin loading...");
     console.log(`%c[DrpbxFetcher] VERSION: ${version}`, "font-weight: bold; color: #0066cc; font-size: 14px;");
     StreamLogger.log("[DrpbxFetcher] User Agent", { userAgent: navigator.userAgent });

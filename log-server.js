@@ -245,7 +245,7 @@ function createServer(port, minLevel) {
       return;
     }
 
-    // Only accept POST to /log endpoint
+    // Handle POST to /log endpoint
     if (req.method === 'POST' && req.url === '/log') {
       let body = '';
 
@@ -266,6 +266,14 @@ function createServer(port, minLevel) {
           res.end(JSON.stringify({ success: false, error: 'Invalid JSON' }));
         }
       });
+    } else if (req.method === 'POST' && req.url === '/reset-log') {
+      // Recreate log file
+      console.log(`${colors.yellow}Recreating log file...${colors.reset}`);
+      initLogFile();
+      console.log(`${colors.green}Log file recreated successfully${colors.reset}`);
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
     } else {
       // Return 404 for other endpoints
       res.writeHead(404, { 'Content-Type': 'text/plain' });
@@ -296,7 +304,9 @@ function createServer(port, minLevel) {
     }
 
     console.log();
-    console.log(`${colors.cyan}  Endpoint:${colors.reset} POST /log`);
+    console.log(`${colors.cyan}  Endpoints:${colors.reset}`);
+    console.log(`    ${colors.dim}•${colors.reset} POST /log ${colors.dim}(send log message)${colors.reset}`);
+    console.log(`    ${colors.dim}•${colors.reset} POST /reset-log ${colors.dim}(recreate log file)${colors.reset}`);
     console.log(`${colors.dim}  Press Ctrl+C to stop${colors.reset}`);
     console.log(`${colors.bright}${colors.green}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${colors.reset}\n`);
   });
