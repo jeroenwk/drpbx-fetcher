@@ -320,4 +320,16 @@ Each note entry contains:
 	hasDropboxFileId(dropboxFileId: string): boolean {
 		return Object.values(this.metadata).some(m => m.dropboxFileId === dropboxFileId);
 	}
+
+	/**
+	 * Generate metadata key from note file path
+	 * This is used as the key in settings.viwoodsNoteMetadata
+	 * Example: "Viwoods/Paper/how are you.md" -> "Viwoods/Paper/how are you.md"
+	 *
+	 * @param notePath Path to the markdown note file
+	 * @returns The metadata key (same as the note path)
+	 */
+	static getMetadataKey(notePath: string): string {
+		return notePath;
+	}
 }

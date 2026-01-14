@@ -17,7 +17,6 @@ import { TemplateDefaults } from "../TemplateDefaults";
 import { ImageCacheBuster } from "../../../utils/ImageCacheBuster";
 import { MetadataManager } from "../utils/MetadataManager";
 import { NoteRenameHandler } from "../utils/NoteRenameHandler";
-import { MarkdownMerger } from "../utils/MarkdownMerger";
 import { CrossReferenceManager } from "../utils/CrossReferenceManager";
 
 interface MemoNotesBean {
@@ -388,7 +387,7 @@ export class MemoProcessor {
 				}] : [],
 			};
 
-			metadataManager.set(MarkdownMerger.getMetadataKey(markdownPath), memoMetadata);
+			metadataManager.set(MetadataManager.getMetadataKey(markdownPath), memoMetadata);
 			StreamLogger.log(`[MemoProcessor.process] Tracked memo metadata for rename detection`, {
 				noteId,
 				notePath: markdownPath,

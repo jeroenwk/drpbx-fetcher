@@ -136,38 +136,6 @@ export interface ViwoodsProcessorConfig extends ProcessorConfig {
 
 	// Viwoods-specific attachments folder (overrides global attachmentsFolder for Viwoods modules)
 	viwoodsAttachmentsFolder?: string;
-
-	// Legacy fields for backwards compatibility (deprecated)
-	/** @deprecated Use learning.highlightsFolder instead */
-	highlightsFolder?: string;
-	/** @deprecated Use learning.annotationsFolder instead */
-	annotationsFolder?: string;
-	/** @deprecated Use learning.sourcesFolder instead */
-	sourcesFolder?: string;
-	/** @deprecated Use paper.pagesFolder instead */
-	pagesFolder?: string;
-	/** @deprecated Use learning.highlightTemplate instead */
-	highlightTemplate?: string;
-	/** @deprecated Use learning.annotationTemplate instead */
-	annotationTemplate?: string;
-	/** @deprecated Use paper.pageTemplate instead */
-	pageTemplate?: string;
-	/** @deprecated Use module-specific settings */
-	includeMetadata?: boolean;
-	/** @deprecated Use module-specific settings */
-	includeThumbnail?: boolean;
-	/** @deprecated Use module-specific settings */
-	extractImages?: boolean;
-	/** @deprecated Use module-specific settings */
-	createIndex?: boolean;
-	/** @deprecated Use learning.processAnnotations instead */
-	processAnnotations?: boolean;
-	/** @deprecated Use learning.annotationImagesFolder instead */
-	annotationImagesFolder?: string;
-	/** @deprecated Use learning.includeSummaryInAnnotation instead */
-	includeSummaryInAnnotation?: boolean;
-	/** @deprecated Use learning.createCompositeImages instead */
-	createCompositeImages?: boolean;
 }
 
 /**

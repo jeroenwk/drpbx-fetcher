@@ -18,7 +18,6 @@ import {
 } from "../ViwoodsTypes";
 import { TemplateDefaults } from "../TemplateDefaults";
 import { ImageCacheBuster } from "../../../utils/ImageCacheBuster";
-import { MarkdownMerger, ImageUpdateMapping } from "../utils/MarkdownMerger";
 import { ContentPreserver } from "../utils/ContentPreserver";
 import { MetadataManager } from "../utils/MetadataManager";
 import { NoteRenameHandler } from "../utils/NoteRenameHandler";
@@ -198,7 +197,7 @@ export class PaperProcessor {
 
 			// Process each page and collect screenshot paths and image update mappings
 			const screenshotPaths: string[] = [];
-			const imageUpdates: ImageUpdateMapping[] = [];
+			const imageUpdates: Array<{ pageNumber: number; oldPath: string; newPath: string }> = [];
 			const pageImagePaths: Array<{ pageNumber: number; imagePath: string; imageId: number; pageId: string }> = [];
 
 			if (pages && pages.length > 0) {
@@ -422,7 +421,7 @@ export class PaperProcessor {
 		createTime: Date,
 		_modifiedTime: Date,
 		pageImagePaths: Array<{ pageNumber: number; imagePath: string; imageId: number }>,
-		_imageUpdates: ImageUpdateMapping[],
+		_imageUpdates: Array<{ pageNumber: number; oldPath: string; newPath: string }>,
 		metadataManager: MetadataManager,
 		viwoodsConfig?: ViwoodsProcessorConfig
 	): Promise<string | null> {
@@ -432,7 +431,7 @@ export class PaperProcessor {
 			const filepath = FileUtils.joinPath(outputFolder, filename);
 
 			// Generate metadata key for settings
-			const metadataKey = MarkdownMerger.getMetadataKey(filepath);
+			const metadataKey = MetadataManager.getMetadataKey(filepath);
 
 			// Extract audio files from data
 			const audioFiles = data.audioFiles as Array<{ fileName: string; path: string }> || [];

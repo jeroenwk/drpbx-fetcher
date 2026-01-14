@@ -137,31 +137,4 @@ export class TemplateEngine {
 		const { moment } = require("obsidian");
 		return moment(date).format(format);
 	}
-
-	/**
-	 * Utility: Escape markdown special characters
-	 * This is kept for compatibility with old TemplateEngine API
-	 * @deprecated Perform escaping in templates using JavaScript if needed
-	 */
-	static escapeMarkdown(text: string): string {
-		console.warn(
-			"[Templater] TemplateEngine.escapeMarkdown() is deprecated. Use JavaScript string operations in templates instead."
-		);
-		return text.replace(/([*_`[\]()#+\-.!])/g, "\\$1");
-	}
-
-	/**
-	 * Utility: Truncate text to maximum length
-	 * This is kept for compatibility with old TemplateEngine API
-	 * @deprecated Perform truncation in templates using JavaScript if needed
-	 */
-	static truncate(text: string, maxLength: number, suffix = "..."): string {
-		console.warn(
-			"[Templater] TemplateEngine.truncate() is deprecated. Use JavaScript string operations in templates instead."
-		);
-		if (text.length <= maxLength) {
-			return text;
-		}
-		return text.substring(0, maxLength - suffix.length) + suffix;
-	}
 }

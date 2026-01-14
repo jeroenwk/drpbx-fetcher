@@ -16,7 +16,6 @@ import {
 } from "../ViwoodsTypes";
 import { TemplateDefaults } from "../TemplateDefaults";
 import { ImageCacheBuster } from "../../../utils/ImageCacheBuster";
-import { ImageUpdateMapping } from "../utils/MarkdownMerger";
 import { MetadataManager } from "../utils/MetadataManager";
 import { NoteRenameHandler } from "../utils/NoteRenameHandler";
 import { CrossReferenceManager } from "../utils/CrossReferenceManager";
@@ -194,7 +193,7 @@ export class MeetingProcessor {
 
 			// Process each page and collect screenshot paths and image update mappings
 			const screenshotPaths: string[] = [];
-			const imageUpdates: ImageUpdateMapping[] = [];
+			const imageUpdates: Array<{ pageNumber: number; oldPath: string; newPath: string }> = [];
 			const pageImagePaths: Array<{ pageNumber: number; imagePath: string; imageId: number; pageId: string }> = [];
 
 			if (pages && pages.length > 0) {
@@ -354,7 +353,7 @@ export class MeetingProcessor {
 		createTime: Date,
 		_modifiedTime: Date,
 		pageImagePaths: Array<{ pageNumber: number; imagePath: string; imageId: number; pageId: string }>,
-		_imageUpdates: ImageUpdateMapping[],
+		_imageUpdates: Array<{ pageNumber: number; oldPath: string; newPath: string }>,
 		metadataManager: MetadataManager,
 		viwoodsConfig: ViwoodsProcessorConfig
 	): Promise<string | null> {
