@@ -9,22 +9,38 @@ tags:
 dropbox_file_id: <% tp.config.dropbox_file_id %>
 ---
 
-## Attendees
+> [!note] Attendees
+> ...
+> ^<% tp.user.blockIds.attendees %>
 
-*Add attendees here*
-
-## Agenda
-
-*Add agenda items here*
+> [!note] Agenda
+> ...
+> ^<% tp.user.blockIds.agenda %>
 
 ## Meeting Notes
 
-<% tp.user.screenshotSections %>
+<%*
+// Loop over pages - each page shows image + Notes section for user content
+tp.user.pages.forEach((page, index) => {
+-%>
+<%* if (index > 0) { -%>
+___
 
-## Action Items
+<%* } -%>
+### Page <% page.pageNumber %>
 
-- [ ] *Add action items here*
+![[<% page.imagePath %>]]
 
-## Summary
+> [!note] Notes
+> ...
+> ^<% page.pageId %>
 
-*Add meeting summary here*
+<%* }) -%>
+
+> [!todo] Action Items
+> ...
+> ^<% tp.user.blockIds.actionItems %>
+
+> [!note] Summary
+> ...
+> ^<% tp.user.blockIds.summary %>

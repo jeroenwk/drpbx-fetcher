@@ -13,6 +13,8 @@ dropbox_file_id: <% tp.config.dropbox_file_id %>
 
 ## Tasks & Notes
 
-*Add additional tasks / notes here*
+> [!note] Tasks & Notes
+> ...
+> ^tasks-notes-<% tp.user.dateSlug %>
 
 <% tp.user.pageImages %>

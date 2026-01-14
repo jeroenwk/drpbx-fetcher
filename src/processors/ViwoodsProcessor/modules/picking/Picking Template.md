@@ -10,4 +10,18 @@ dropbox_file_id: <% tp.config.dropbox_file_id %>
 
 # <% tp.user.noteName %>
 
-<% tp.user.screenshotSections %>
+<%*
+// Loop over pages - each page shows image + Notes section for user content
+tp.user.pages.forEach((page, index) => {
+-%>
+<%* if (index > 0) { -%>
+___
+
+<%* } -%>
+![[<% page.imagePath %>]]
+
+> [!note] Notes
+> ...
+> ^<% page.pageId %>
+
+<%* }) -%>

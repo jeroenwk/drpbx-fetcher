@@ -9,11 +9,26 @@ import { PickingModuleConfig, NotesBean, NoteList, ViwoodsProcessorConfig, getVi
 import { TemplateDefaults } from "../TemplateDefaults";
 import { ImageCompositor } from "../ImageCompositor";
 import { ImageCacheBuster } from "../../../utils/ImageCacheBuster";
+import { ContentPreserver } from "../utils/ContentPreserver";
 
 /**
  * Handles processing of Picking module notes (quick captures)
  */
 export class PickingProcessor {
+	/**
+	 * Hash a string to a numeric string using a simple hash algorithm
+	 * Converts each character to its character code and sums them with bit shifting
+	 */
+	private static hashToNumericString(input: string): string {
+		let hash = 0;
+		for (let i = 0; i < input.length; i++) {
+			const char = input.charCodeAt(i);
+			hash = ((hash << 5) - hash) + char;
+			hash = hash & hash; // Convert to 32-bit integer
+		}
+		return Math.abs(hash).toString();
+	}
+
 	/**
 	 * Process Picking module quick capture notes
 	 */
@@ -169,25 +184,27 @@ export class PickingProcessor {
 				}
 			}
 
-			// Build screenshot sections manually
-			let screenshotSections = "";
-			for (const compositePath of compositePaths) {
-				// Use full path for wiki-style links (now in attachments folder)
-				const relativePath = compositePath;
-				screenshotSections += `![[${relativePath}]]\n\n### Notes\n\n*Add your notes here*\n\n---\n\n`;
-			}
+			// Build pages array for template with block IDs
+			const dropboxFileId = metadata.id;
+			const pages = compositePaths.map((imagePath, index) => ({
+				pageNumber: index + 1,
+				imagePath: imagePath,
+				pageId: `${this.hashToNumericString(dropboxFileId)}-${index + 1}`,
+			}));
 
 			// Generate capture note file
 			const notePath = await this.generateCaptureFile(
 				context,
 				config,
 				notesFolder,
+				resourcesFolder,
+				viwoodsConfig,
 				{
 					noteName,
 					noteSlug,
 					totalPages: noteList?.length || 0,
 					createTime: TemplateEngine.formatDate(createTime, "YYYY-MM-DD HH:mm"),
-					screenshotSections,
+					pages,
 				},
 				createTime
 			);
@@ -216,29 +233,53 @@ export class PickingProcessor {
 		context: ProcessorContext,
 		config: PickingModuleConfig,
 		outputFolder: string,
+		resourcesFolder: string,
+		viwoodsConfig: ViwoodsProcessorConfig,
 		data: Record<string, unknown>,
 		createTime: Date
 	): Promise<string | null> {
 		try {
-			const defaultTemplate = await TemplateDefaults.load("viwoods-picking-capture.md");
-			const template = await context.templateResolver.resolve(config.captureTemplate, defaultTemplate);
-			const content = await TemplateEngine.render(template, data, context, {
-				createTime: createTime
-			});
-
 			// Use the note name as filename
 			const filename = `${data.noteName}.md`;
 			const filepath = FileUtils.joinPath(outputFolder, filename);
 
-			// Check if file exists and use appropriate method
+			// Load and render template
+			const defaultTemplate = await TemplateDefaults.load("viwoods-picking-capture.md");
+			const template = await context.templateResolver.resolve(config.captureTemplate, defaultTemplate);
+			const freshContent = await TemplateEngine.render(template, data, context, {
+				createTime: createTime
+			});
+
+			// Check if file exists
 			const existingFile = context.vault.getAbstractFileByPath(filepath);
+
 			if (existingFile instanceof TFile) {
-				// Use modify to trigger Obsidian's file change detection
-				await context.vault.modify(existingFile, content);
+				// File exists - use ContentPreserver to merge
+				StreamLogger.log(`[PickingProcessor.generateCaptureFile] Merging existing capture file: ${filepath}`);
+				const existingContent = await context.vault.read(existingFile);
+
+				// Get Viwoods attachments folder for attachment detection
+				const attachmentsFolder = getViwoodsAttachmentsFolder(config, viwoodsConfig, context);
+
+				// Use ContentPreserver to merge
+				const result = ContentPreserver.preserve(
+					existingContent,
+					freshContent,
+					attachmentsFolder
+				);
+
+				await context.vault.modify(existingFile, result.content);
+				StreamLogger.log(`[PickingProcessor.generateCaptureFile] ContentPreserver merged capture file`, {
+					preservedTextBlocks: result.preservedTextBlocks,
+					preservedAttachments: result.preservedAttachments,
+					preservedCalloutBlocks: result.preservedCalloutBlocks,
+				});
 			} else {
-				await context.vault.create(filepath, content);
+				// New file - create
+				await context.vault.create(filepath, freshContent);
+				StreamLogger.log(`[PickingProcessor.generateCaptureFile] Created new capture file: ${filepath}`);
 			}
-			await StreamLogger.log(`[PickingProcessor.generateCaptureFile] Created capture file: ${filepath}`);
+
 			return filepath;
 		} catch (error) {
 			await StreamLogger.error("[PickingProcessor.generateCaptureFile] Failed to generate capture file:", error);

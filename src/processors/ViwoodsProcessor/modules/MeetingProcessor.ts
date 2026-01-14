@@ -5,28 +5,41 @@ import { StreamingZipUtils } from "../../../utils/StreamingZipUtils";
 import { StreamLogger } from "../../../utils/StreamLogger";
 import { TemplateEngine } from "../../templates/TemplateEngine";
 import { ProcessorContext, ProcessorResult, FileMetadata } from "../../types";
-import { FileTypeMapping } from "../../../models/Settings";
 import {
 	MeetingModuleConfig,
 	NoteFileInfo,
 	PageListFileInfo,
 	PageResource,
 	ResourceType,
-	DailyModuleConfig,
 	ViwoodsProcessorConfig,
 	getViwoodsAttachmentsFolder
 } from "../ViwoodsTypes";
 import { TemplateDefaults } from "../TemplateDefaults";
 import { ImageCacheBuster } from "../../../utils/ImageCacheBuster";
-import { MarkdownMerger, ImageUpdateMapping } from "../utils/MarkdownMerger";
+import { ImageUpdateMapping } from "../utils/MarkdownMerger";
 import { MetadataManager } from "../utils/MetadataManager";
 import { NoteRenameHandler } from "../utils/NoteRenameHandler";
 import { CrossReferenceManager } from "../utils/CrossReferenceManager";
+import { ContentPreserver } from "../utils/ContentPreserver";
 
 /**
  * Handles processing of Meeting module notes (meeting notes)
  */
 export class MeetingProcessor {
+	/**
+	 * Hash a string to a numeric string using a simple hash algorithm
+	 * Converts each character to its character code and sums them with bit shifting
+	 */
+	private static hashToNumericString(input: string): string {
+		let hash = 0;
+		for (let i = 0; i < input.length; i++) {
+			const char = input.charCodeAt(i);
+			hash = ((hash << 5) - hash) + char;
+			hash = hash & hash; // Convert to 32-bit integer
+		}
+		return Math.abs(hash).toString();
+	}
+
 	/**
 	 * Process Meeting module notes
 	 */
@@ -182,7 +195,7 @@ export class MeetingProcessor {
 			// Process each page and collect screenshot paths and image update mappings
 			const screenshotPaths: string[] = [];
 			const imageUpdates: ImageUpdateMapping[] = [];
-			const pageImagePaths: Array<{ pageNumber: number; imagePath: string }> = [];
+			const pageImagePaths: Array<{ pageNumber: number; imagePath: string; imageId: number; pageId: string }> = [];
 
 			if (pages && pages.length > 0) {
 				for (let i = 0; i < pages.length; i++) {
@@ -251,9 +264,12 @@ export class MeetingProcessor {
 								}
 
 								// Track page metadata for frontmatter
+								const blockId = `${this.hashToNumericString(dropboxFileId)}-${pageNum}`;
 								pageImagePaths.push({
 									pageNumber: pageNum,
 									imagePath: result.newPath,
+									imageId: result.timestamp,
+									pageId: blockId,
 								});
 							}
 						}
@@ -265,24 +281,21 @@ export class MeetingProcessor {
 				}
 			}
 
-			// Build screenshot sections manually (for new files)
-			let screenshotSections = "";
-			for (let i = 0; i < screenshotPaths.length; i++) {
-				const screenshotPath = screenshotPaths[i];
-				const pageNum = i + 1;
-				// Use full path for wiki-style links (now in attachments folder)
-				const relativePath = screenshotPath;
-				screenshotSections += `## Page ${pageNum}
+			// Build pages array for template
+			const templatePages = pageImagePaths.map((p, index) => ({
+				pageNumber: index + 1,
+				imagePath: p.imagePath,
+				pageId: p.pageId,
+			}));
 
-![[${relativePath}]]
-
-### Notes
-
-*Add your notes here*
-
----
-`;
-			}
+			// Generate block IDs for meeting sections
+			const blockIdPrefix = this.hashToNumericString(dropboxFileId);
+			const blockIds = {
+				attendees: `${blockIdPrefix}-ATTENDEES`,
+				agenda: `${blockIdPrefix}-AGENDA`,
+				actionItems: `${blockIdPrefix}-ACTION-ITEMS`,
+				summary: `${blockIdPrefix}-SUMMARY`,
+			};
 
 			// Generate or merge note file
 			const notePath = await this.generateOrMergeNoteFile(
@@ -300,13 +313,15 @@ export class MeetingProcessor {
 					modifiedTime: TemplateEngine.formatDate(modifiedTime, "YYYY-MM-DD HH:mm"),
 					meetingDate: TemplateEngine.formatDate(createTime, "YYYY-MM-DD"),
 					lastModified: noteInfo.lastModifiedTime,
-					screenshotSections,
+					pages: templatePages,
+					blockIds,
 				},
 				createTime,
 				modifiedTime,
 				pageImagePaths,
 				imageUpdates,
-				metadataManager
+				metadataManager,
+				viwoodsConfig
 			);
 			// Only add to createdFiles if not already added during rename
 			if (notePath && !wasRenamed) {
@@ -334,13 +349,14 @@ export class MeetingProcessor {
 		context: ProcessorContext,
 		config: MeetingModuleConfig,
 		outputFolder: string,
-		_resourcesFolder: string,
+		resourcesFolder: string,
 		data: Record<string, unknown>,
 		createTime: Date,
-		modifiedTime: Date,
-		pageImagePaths: Array<{ pageNumber: number; imagePath: string }>,
-		imageUpdates: ImageUpdateMapping[],
-		metadataManager: MetadataManager
+		_modifiedTime: Date,
+		pageImagePaths: Array<{ pageNumber: number; imagePath: string; imageId: number; pageId: string }>,
+		_imageUpdates: ImageUpdateMapping[],
+		metadataManager: MetadataManager,
+		viwoodsConfig: ViwoodsProcessorConfig
 	): Promise<string | null> {
 		try {
 			// Use the note name as filename
@@ -348,7 +364,7 @@ export class MeetingProcessor {
 			const filepath = FileUtils.joinPath(outputFolder, filename);
 
 			// Generate metadata key for settings
-			const metadataKey = MarkdownMerger.getMetadataKey(filepath);
+			const metadataKey = `${filepath}`; // Use filepath as key
 
 			// Create metadata object
 			const metadata = {
@@ -373,34 +389,44 @@ export class MeetingProcessor {
 			// Check if file exists
 			const existingFile = context.vault.getAbstractFileByPath(filepath);
 
-			if (existingFile instanceof TFile) {
-				// File exists - check if we have metadata
-				const existingMetadata = metadataManager.get(metadataKey);
+			// Load template (used for both new and existing files)
+			const defaultTemplate = await TemplateDefaults.load("viwoods-meeting-note.md");
+			const template = await context.templateResolver.resolve(config.meetingTemplate, defaultTemplate);
 
-				// File exists - use merge strategy
-				StreamLogger.log(`[MeetingProcessor.generateOrMergeNoteFile] Merging existing file: ${filepath}`, {
+			if (existingFile instanceof TFile) {
+				// File exists - use ContentPreserver strategy
+				StreamLogger.log(`[MeetingProcessor.generateOrMergeNoteFile] Using ContentPreserver for existing file: ${filepath}`, {
 					pageCount: pageImagePaths.length,
-					imageUpdates: imageUpdates.length,
-					hasMetadata: !!existingMetadata,
 				});
 
+				// Read existing content
 				const existingContent = await context.vault.read(existingFile);
 
-				// Always merge to preserve user content and update metadata
-				const mergedContent = MarkdownMerger.merge(
+				// Generate fresh content from template (as if creating new)
+				const freshContent = await TemplateEngine.render(template, data, context, {
+					createTime: createTime
+				});
+
+				// Get Viwoods attachments folder for attachment detection
+				const attachmentsFolder = getViwoodsAttachmentsFolder(config, viwoodsConfig, context);
+
+				// Use ContentPreserver to merge
+				const result = ContentPreserver.preserve(
 					existingContent,
-					pageImagePaths,
-					imageUpdates,
-					modifiedTime
+					freshContent,
+					attachmentsFolder
 				);
 
-				await context.vault.modify(existingFile, mergedContent);
-				StreamLogger.log(`[MeetingProcessor.generateOrMergeNoteFile] Merged note file with user edits preserved and metadata updated`);
+				await context.vault.modify(existingFile, result.content);
+				StreamLogger.log(`[MeetingProcessor.generateOrMergeNoteFile] ContentPreserver merged note file`, {
+					preservedTextBlocks: result.preservedTextBlocks,
+					preservedAttachments: result.preservedAttachments,
+					preservedCalloutBlocks: result.preservedCalloutBlocks,
+					mergedYamlProperties: result.mergedYamlProperties
+				});
 			} else {
 				// New file - generate from template
 				StreamLogger.log(`[MeetingProcessor.generateOrMergeNoteFile] Creating new note file: ${filepath}`);
-				const defaultTemplate = await TemplateDefaults.load("viwoods-meeting-note.md");
-				const template = await context.templateResolver.resolve(config.meetingTemplate, defaultTemplate);
 				const content = await TemplateEngine.render(template, data, context, {
 					createTime: createTime
 				});
@@ -414,10 +440,7 @@ export class MeetingProcessor {
 			// Incremental update: add link to daily note if it exists
 			try {
 				const creationDate = new Date(createTime);
-				const viwoodsConfig = context.pluginSettings.fileTypeMappings
-					.find((m: FileTypeMapping) => m.processorType === 'viwoods')?.config;
-
-				const dailyConfig = (viwoodsConfig as Record<string, unknown>)?.daily as DailyModuleConfig | undefined;
+				const dailyConfig = viwoodsConfig?.daily;
 				if (dailyConfig && dailyConfig.enabled) {
 					const dailyNotePath = CrossReferenceManager.getDailyNotePath(
 						creationDate,

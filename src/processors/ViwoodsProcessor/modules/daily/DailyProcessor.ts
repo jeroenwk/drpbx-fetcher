@@ -99,6 +99,7 @@ export class DailyProcessor {
 			const fileResult = await NoteFileManager.writeDailyNote(
 				context,
 				config,
+				viwoodsConfig,
 				dateString,
 				content
 			);
