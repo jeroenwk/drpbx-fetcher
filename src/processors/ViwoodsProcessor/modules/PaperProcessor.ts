@@ -29,6 +29,20 @@ import { CrossReferenceManager } from "../utils/CrossReferenceManager";
  */
 export class PaperProcessor {
 	/**
+	 * Hash a string to a numeric string using a simple hash algorithm
+	 * Converts each character to its character code and sums them with bit shifting
+	 */
+	private static hashToNumericString(input: string): string {
+		let hash = 0;
+		for (let i = 0; i < input.length; i++) {
+			const char = input.charCodeAt(i);
+			hash = ((hash << 5) - hash) + char;
+			hash = hash & hash; // Convert to 32-bit integer
+		}
+		return Math.abs(hash).toString();
+	}
+
+	/**
 	 * Process Paper module handwritten notes
 	 */
 	public static async process(
@@ -185,7 +199,7 @@ export class PaperProcessor {
 			// Process each page and collect screenshot paths and image update mappings
 			const screenshotPaths: string[] = [];
 			const imageUpdates: ImageUpdateMapping[] = [];
-			const pageImagePaths: Array<{ pageNumber: number; imagePath: string }> = [];
+			const pageImagePaths: Array<{ pageNumber: number; imagePath: string; imageId: number; pageId: string }> = [];
 
 			if (pages && pages.length > 0) {
 				for (let i = 0; i < pages.length; i++) {
@@ -254,9 +268,12 @@ export class PaperProcessor {
 								}
 
 								// Track page metadata for frontmatter
+								const blockId = `${this.hashToNumericString(dropboxFileId)}-${pageNum}`;
 								pageImagePaths.push({
 									pageNumber: pageNum,
 									imagePath: result.newPath,
+									imageId: result.timestamp,
+									pageId: blockId,
 								});
 							}
 						}
@@ -404,7 +421,7 @@ export class PaperProcessor {
 		data: Record<string, unknown>,
 		createTime: Date,
 		_modifiedTime: Date,
-		pageImagePaths: Array<{ pageNumber: number; imagePath: string }>,
+		pageImagePaths: Array<{ pageNumber: number; imagePath: string; imageId: number }>,
 		_imageUpdates: ImageUpdateMapping[],
 		metadataManager: MetadataManager,
 		viwoodsConfig?: ViwoodsProcessorConfig

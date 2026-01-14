@@ -18,9 +18,9 @@ ___
 <%* } -%>
 ![[<% page.imagePath %>]]
 
-### Notes
-
-*Add your notes here*
+> [!note] Page <% page.pageNumber %>
+> ...
+> ^<% page.pageId %>
 
 <%* }) -%>
 <%*

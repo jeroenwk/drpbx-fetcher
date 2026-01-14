@@ -28,12 +28,25 @@ export interface UserAddedContent {
 }
 
 /**
+ * Content extracted from a callout block with a block ID
+ */
+export interface BlockContent {
+	blockId: string;                       // The ^<id> identifier (without the ^)
+	calloutType: string;                   // The callout type (e.g., "note")
+	calloutTitle: string;                  // The callout title (e.g., "Page 1")
+	calloutLines: string[];                // Lines within the callout (excluding header and block ID)
+	fullMatch: string;                     // Full block text for reference
+	containsEllipsis: boolean;             // Whether the block contains the "..." placeholder line
+}
+
+/**
  * Result of the content preservation operation
  */
 export interface ContentPreserveResult {
 	content: string;                       // Final merged content
 	preservedTextBlocks: number;           // Count of preserved text blocks
 	preservedAttachments: number;          // Count of preserved attachments
+	preservedCalloutBlocks: number;        // Count of preserved callout blocks
 	mergedYamlProperties: string[];        // List of user YAML properties preserved
 }
 
@@ -67,6 +80,10 @@ export class ContentPreserver {
 	private static readonly USER_NOTES_HEADER = '## Your Notes';
 	private static readonly USER_ATTACHMENTS_HEADER = '### Your Attachments';
 
+	// Regex patterns for callout block parsing
+	private static readonly CALLOUT_BLOCK_PATTERN = /> \[!(\w+)\]([^\n]*)\n([\s\S]*?)\n> \^([^\n]+)/g;
+	private static readonly ELLIPSIS_PATTERN = /^> \.\.\.$/;
+
 	/**
 	 * Main entry point: merge fresh template output with existing file
 	 */
@@ -95,23 +112,37 @@ export class ContentPreserver {
 		const existingBody = this.extractBody(existingContent, existingFrontmatter.endIndex);
 		const freshBody = this.extractBody(freshContent, freshFrontmatter.endIndex);
 
-		// Find user-added content
+		// Extract callout blocks with block IDs from existing content
+		const existingBlocks = this.extractCalloutBlocks(existingBody);
+		StreamLogger.log("[ContentPreserver.preserve] Extracted callout blocks from existing content", {
+			blockCount: existingBlocks.size,
+			blockIds: Array.from(existingBlocks.keys())
+		});
+
+		// Find user-added content (non-block content)
 		const userAdditions = this.findUserAddedContent(
 			existingBody,
 			freshBody,
 			viwoodsAttachmentsFolder
 		);
 
+		// Merge callout blocks into fresh content
+		const mergedBody = this.mergeCalloutBlocks(freshBody, existingBlocks);
+
 		// Build final merged content
 		const finalContent = this.buildMergedContent(
 			mergedYaml,
-			freshBody,
+			mergedBody,
 			userAdditions
 		);
+
+		// Count preserved blocks (blocks that were found in both existing and fresh)
+		const preservedBlockCount = this.countPreservedBlocks(existingBlocks, freshBody);
 
 		StreamLogger.log("[ContentPreserver.preserve] Content preservation complete", {
 			preservedTextBlocks: userAdditions.textBlocks.length,
 			preservedAttachments: userAdditions.attachments.length,
+			preservedCalloutBlocks: preservedBlockCount,
 			preservedYamlProperties: preservedProperties.length
 		});
 
@@ -119,6 +150,7 @@ export class ContentPreserver {
 			content: finalContent,
 			preservedTextBlocks: userAdditions.textBlocks.length,
 			preservedAttachments: userAdditions.attachments.length,
+			preservedCalloutBlocks: preservedBlockCount,
 			mergedYamlProperties: preservedProperties
 		};
 	}
@@ -165,6 +197,214 @@ export class ContentPreserver {
 				endIndex
 			};
 		}
+	}
+
+	/**
+	 * Extract all callout blocks with block IDs from markdown content
+	 * Returns a Map of blockId -> BlockContent for easy lookup
+	 */
+	static extractCalloutBlocks(body: string): Map<string, BlockContent> {
+		const blocks = new Map<string, BlockContent>();
+		const lines = body.split('\n');
+		let i = 0;
+
+		while (i < lines.length) {
+			const line = lines[i];
+
+			// Look for callout start: "> [!type]title"
+			const calloutMatch = line.match(/^> \[!(\w+)\]([^\n]*)/);
+			if (calloutMatch) {
+				const calloutType = calloutMatch[1];
+				const calloutTitle = calloutMatch[2].trim();
+
+				// Collect all callout lines until we find a non-callout line or block ID
+				const calloutLines: string[] = [];
+				let blockId = '';
+				let j = i + 1;
+				let containsEllipsis = false;
+
+				while (j < lines.length) {
+					const checkLine = lines[j];
+
+					// Check for block ID: "> ^id"
+					const blockIdMatch = checkLine.match(/^> \^([^\n]+)$/);
+					if (blockIdMatch) {
+						blockId = blockIdMatch[1];
+						j++; // Include the block ID line
+						break;
+					}
+
+					// Check if line is still part of callout (starts with ">")
+					if (checkLine.startsWith('>')) {
+						calloutLines.push(checkLine);
+						if (this.ELLIPSIS_PATTERN.test(checkLine)) {
+							containsEllipsis = true;
+						}
+						j++;
+					} else {
+						// End of callout
+						break;
+					}
+				}
+
+				// If we found a block ID, store this block
+				if (blockId) {
+					const fullMatch = lines.slice(i, j).join('\n');
+					blocks.set(blockId, {
+						blockId,
+						calloutType,
+						calloutTitle,
+						calloutLines,
+						fullMatch,
+						containsEllipsis
+					});
+				}
+
+				i = j;
+			} else {
+				i++;
+			}
+		}
+
+		return blocks;
+	}
+
+	/**
+	 * Build a callout block string from components
+	 */
+	static buildCalloutBlock(
+		type: string,
+		title: string,
+		content: string[],
+		blockId: string
+	): string {
+		const parts: string[] = [];
+
+		// Add callout header
+		if (title) {
+			parts.push(`> [!${type}] ${title}`);
+		} else {
+			parts.push(`> [!${type}]`);
+		}
+
+		// Add content lines
+		for (const line of content) {
+			parts.push(line);
+		}
+
+		// Add block ID
+		parts.push(`> ^${blockId}`);
+
+		return parts.join('\n');
+	}
+
+	/**
+	 * Merge preserved callout blocks into fresh content
+	 * For each callout block with a block ID in fresh content:
+	 * - If we have preserved content for that block ID, replace the placeholder content
+	 * - Otherwise, keep the fresh content as-is
+	 */
+	static mergeCalloutBlocks(freshBody: string, preservedBlocks: Map<string, BlockContent>): string {
+		const lines = freshBody.split('\n');
+		const result: string[] = [];
+		let i = 0;
+
+		while (i < lines.length) {
+			const line = lines[i];
+
+			// Look for callout start: "> [!type]title"
+			const calloutMatch = line.match(/^> \[!(\w+)\]([^\n]*)/);
+			if (calloutMatch) {
+				const calloutType = calloutMatch[1];
+				const calloutTitle = calloutMatch[2].trim();
+
+				// Collect all callout lines until we find a block ID
+				const calloutLines: string[] = [];
+				let blockId = '';
+				let j = i + 1;
+
+				while (j < lines.length) {
+					const checkLine = lines[j];
+
+					// Check for block ID: "> ^id"
+					const blockIdMatch = checkLine.match(/^> \^([^\n]+)$/);
+					if (blockIdMatch) {
+						blockId = blockIdMatch[1];
+						j++; // Include the block ID line
+						break;
+					}
+
+					// Check if line is still part of callout (starts with ">")
+					if (checkLine.startsWith('>')) {
+						calloutLines.push(checkLine);
+						j++;
+					} else {
+						// End of callout (no block ID found - not a tracked block)
+						break;
+					}
+				}
+
+				// If we found a block ID, check if we have preserved content
+				if (blockId && preservedBlocks.has(blockId)) {
+					const preservedBlock = preservedBlocks.get(blockId);
+
+					if (preservedBlock) {
+						StreamLogger.log("[ContentPreserver.mergeCalloutBlocks] Preserving content for block", {
+							blockId,
+							lineCount: preservedBlock.calloutLines.length
+						});
+
+						// Rebuild block with preserved content
+						result.push(this.buildCalloutBlock(
+							calloutType,
+							calloutTitle,
+							preservedBlock.calloutLines,
+							blockId
+						));
+
+						// Skip to end of original block
+						i = j;
+						continue;
+					}
+				}
+
+				// No preserved content or no block ID - keep original
+				result.push(line);
+				for (let k = i + 1; k < j; k++) {
+					result.push(lines[k]);
+				}
+				i = j;
+			} else {
+				result.push(line);
+				i++;
+			}
+		}
+
+		return result.join('\n');
+	}
+
+	/**
+	 * Count how many blocks from existing content were preserved in fresh content
+	 */
+	static countPreservedBlocks(existingBlocks: Map<string, BlockContent>, freshBody: string): number {
+		const freshBlockIds = new Set<string>();
+		const lines = freshBody.split('\n');
+
+		for (const line of lines) {
+			const blockIdMatch = line.match(/^> \^([^\n]+)$/);
+			if (blockIdMatch) {
+				freshBlockIds.add(blockIdMatch[1]);
+			}
+		}
+
+		let count = 0;
+		for (const blockId of existingBlocks.keys()) {
+			if (freshBlockIds.has(blockId)) {
+				count++;
+			}
+		}
+
+		return count;
 	}
 
 	/**
@@ -245,6 +485,7 @@ export class ContentPreserver {
 
 	/**
 	 * Identify user-added content blocks (text and attachments not in fresh content)
+	 * Note: Callout blocks with block IDs are handled separately and are excluded here
 	 */
 	static findUserAddedContent(
 		existingBody: string,
@@ -256,9 +497,12 @@ export class ContentPreserver {
 			attachments: []
 		};
 
-		// First, extract content from existing "## Your Notes" section if present
+		// First, remove callout blocks with block IDs (they're handled separately)
+		const existingBodyWithoutBlocks = this.removeCalloutBlocks(existingBody);
+
+		// Extract content from existing "## Your Notes" section if present
 		// This is content we previously preserved - should be re-preserved
-		const { mainContent, userNotesContent, userAttachments } = this.extractUserNotesSection(existingBody);
+		const { mainContent, userNotesContent, userAttachments } = this.extractUserNotesSection(existingBodyWithoutBlocks);
 
 		// Add previously preserved attachments
 		result.attachments.push(...userAttachments);
@@ -363,6 +607,65 @@ export class ContentPreserver {
 		}
 
 		return result;
+	}
+
+	/**
+	 * Remove callout blocks with block IDs from content
+	 * Returns content without tracked callout blocks (they're handled separately)
+	 */
+	private static removeCalloutBlocks(body: string): string {
+		const lines = body.split('\n');
+		const result: string[] = [];
+		let i = 0;
+
+		while (i < lines.length) {
+			const line = lines[i];
+
+			// Look for callout start: "> [!type]title"
+			const calloutMatch = line.match(/^> \[!(\w+)\]([^\n]*)/);
+			if (calloutMatch) {
+				// Skip this callout block until we find a block ID or end of callout
+				let j = i + 1;
+				let foundBlockId = false;
+
+				while (j < lines.length) {
+					const checkLine = lines[j];
+
+					// Check for block ID: "> ^id"
+					if (checkLine.match(/^> \^([^\n]+)$/)) {
+						foundBlockId = true;
+						j++; // Include the block ID line
+						break;
+					}
+
+					// Check if line is still part of callout
+					if (checkLine.startsWith('>')) {
+						j++;
+					} else {
+						// End of callout without block ID - include it
+						break;
+					}
+				}
+
+				// If we found a block ID, skip this entire block
+				if (foundBlockId) {
+					i = j;
+					continue;
+				}
+
+				// No block ID - this is not a tracked block, include it
+				result.push(line);
+				for (let k = i + 1; k < j; k++) {
+					result.push(lines[k]);
+				}
+				i = j;
+			} else {
+				result.push(line);
+				i++;
+			}
+		}
+
+		return result.join('\n');
 	}
 
 	/**

@@ -28,7 +28,7 @@ export class ImageCacheBuster {
 		vault: Vault,
 		basePath: string,
 		imageData: Uint8Array
-	): Promise<{ newPath: string; oldPath: string | null }> {
+	): Promise<{ newPath: string; oldPath: string | null; timestamp: number }> {
 		// Extract path components
 		const lastSlash = basePath.lastIndexOf("/");
 		const dir = lastSlash >= 0 ? basePath.substring(0, lastSlash) : "";
@@ -55,7 +55,7 @@ export class ImageCacheBuster {
 		// Create the new timestamped file
 		await vault.createBinary(newPath, imageData.buffer as ArrayBuffer);
 
-		return { newPath, oldPath };
+		return { newPath, oldPath, timestamp };
 	}
 
 	/**
