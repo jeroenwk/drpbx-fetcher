@@ -19,6 +19,7 @@ import {
 import { TemplateDefaults } from "../TemplateDefaults";
 import { ImageCacheBuster } from "../../../utils/ImageCacheBuster";
 import { MarkdownMerger, ImageUpdateMapping } from "../utils/MarkdownMerger";
+import { ContentPreserver } from "../utils/ContentPreserver";
 import { MetadataManager } from "../utils/MetadataManager";
 import { NoteRenameHandler } from "../utils/NoteRenameHandler";
 import { CrossReferenceManager } from "../utils/CrossReferenceManager";
@@ -357,7 +358,8 @@ export class PaperProcessor {
 				modifiedTime,
 				pageImagePaths,
 				imageUpdates,
-				metadataManager
+				metadataManager,
+				viwoodsConfig
 			);
 			// Only add to createdFiles if not already added during rename
 			if (notePath && !wasRenamed) {
@@ -386,10 +388,13 @@ export class PaperProcessor {
 	 *
 	 * Two processing paths:
 	 * 1. NEW FILES: Use template with loops (explicit structure)
-	 * 2. EXISTING FILES: Use MarkdownMerger to preserve user content (bypasses template)
+	 * 2. EXISTING FILES: Use ContentPreserver to preserve user content
 	 *
-	 * The template-bypass for existing files is intentional - templates cannot handle
-	 * user content preservation as reliably as structured parsing + rebuilding.
+	 * ContentPreserver approach:
+	 * - Generate fresh content from template (as if creating new)
+	 * - Compare with existing file to identify user additions
+	 * - Merge YAML frontmatter (preserving user-added properties)
+	 * - Append user-added content at bottom under "## Your Notes" section
 	 */
 	private static async generateOrMergeNoteFile(
 		context: ProcessorContext,
@@ -398,10 +403,11 @@ export class PaperProcessor {
 		_resourcesFolder: string,
 		data: Record<string, unknown>,
 		createTime: Date,
-		modifiedTime: Date,
+		_modifiedTime: Date,
 		pageImagePaths: Array<{ pageNumber: number; imagePath: string }>,
-		imageUpdates: ImageUpdateMapping[],
-		metadataManager: MetadataManager
+		_imageUpdates: ImageUpdateMapping[],
+		metadataManager: MetadataManager,
+		viwoodsConfig?: ViwoodsProcessorConfig
 	): Promise<string | null> {
 		try {
 			// Use the note name as filename
@@ -439,37 +445,46 @@ export class PaperProcessor {
 			// Check if file exists
 			const existingFile = context.vault.getAbstractFileByPath(filepath);
 
-			if (existingFile instanceof TFile) {
-				// File exists - check if we have metadata
-				const existingMetadata = metadataManager.get(metadataKey);
+			// Load template (used for both new and existing files)
+			const defaultTemplate = await TemplateDefaults.load("viwoods-paper-note.md");
+			const template = await context.templateResolver.resolve(config.noteTemplate, defaultTemplate);
 
-				// File exists - use merge strategy
-				StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Merging existing file: ${filepath}`, {
+			if (existingFile instanceof TFile) {
+				// File exists - use ContentPreserver strategy
+				StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Using ContentPreserver for existing file: ${filepath}`, {
 					pageCount: pageImagePaths.length,
-					imageUpdates: imageUpdates.length,
 					audioFilesCount: audioFiles.length,
-					hasMetadata: !!existingMetadata,
 				});
 
+				// Read existing content
 				const existingContent = await context.vault.read(existingFile);
 
-				// Always merge to preserve user content and update metadata
-				// Include audio files in the merge - they will be added under the Notes section
-				const mergedContent = MarkdownMerger.merge(
+				// Generate fresh content from template (as if creating new)
+				const freshContent = await TemplateEngine.render(template, data, context, {
+					createTime: createTime
+				});
+
+				// Get Viwoods attachments folder for attachment detection
+				const attachmentsFolder = viwoodsConfig
+					? getViwoodsAttachmentsFolder(config, viwoodsConfig, context)
+					: context.pluginSettings.attachmentsFolder || "Attachments";
+
+				// Use ContentPreserver to merge
+				const result = ContentPreserver.preserve(
 					existingContent,
-					pageImagePaths,
-					imageUpdates,
-					modifiedTime,
-					audioFiles
+					freshContent,
+					attachmentsFolder
 				);
 
-				await context.vault.modify(existingFile, mergedContent);
-				StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Merged note file with user edits preserved, metadata updated, and audio files merged`);
+				await context.vault.modify(existingFile, result.content);
+				StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] ContentPreserver merged note file`, {
+					preservedTextBlocks: result.preservedTextBlocks,
+					preservedAttachments: result.preservedAttachments,
+					mergedYamlProperties: result.mergedYamlProperties
+				});
 			} else {
 				// New file - generate from template
 				StreamLogger.log(`[PaperProcessor.generateOrMergeNoteFile] Creating new note file: ${filepath}`);
-				const defaultTemplate = await TemplateDefaults.load("viwoods-paper-note.md");
-				const template = await context.templateResolver.resolve(config.noteTemplate, defaultTemplate);
 				const content = await TemplateEngine.render(template, data, context, {
 					createTime: createTime
 				});
@@ -483,10 +498,10 @@ export class PaperProcessor {
 			// Incremental update: add link to daily note if it exists
 			try {
 				const creationDate = new Date(createTime);
-				const viwoodsConfig = context.pluginSettings.fileTypeMappings
+				const viwoodsConfigFromSettings = context.pluginSettings.fileTypeMappings
 					.find((m: FileTypeMapping) => m.processorType === 'viwoods')?.config;
 
-				const dailyConfig = (viwoodsConfig as Record<string, unknown>)?.daily as DailyModuleConfig | undefined;
+				const dailyConfig = (viwoodsConfigFromSettings as Record<string, unknown>)?.daily as DailyModuleConfig | undefined;
 				if (dailyConfig && dailyConfig.enabled) {
 					const dailyNotePath = CrossReferenceManager.getDailyNotePath(
 						creationDate,
