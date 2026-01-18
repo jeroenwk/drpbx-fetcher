@@ -15,8 +15,6 @@ export class ProcessorConfigModal extends Modal {
 	private plugin: DrpbxFetcherPlugin;
 	// Track module-level attachmentsFolder text components for dynamic placeholder updates
 	private moduleAttachmentsFields: Array<{ fieldKey: string; textComponent: TextComponent; field: ConfigField }> = [];
-	// Track progress elements for progress fields (currently unused but kept for potential future use)
-	private progressElements: Map<string, { progressBar: HTMLElement; statusText: HTMLElement }> = new Map();
 
 	constructor(
 		app: App,
@@ -526,6 +524,14 @@ export class ProcessorConfigModal extends Modal {
 							await this.processor.handleButtonAction(field.buttonAction, context, {
 								formValues: this.formValues as ProcessorConfig,
 							});
+
+							// Refresh info field if this was a delete action
+							if (field.buttonAction === "deleteModel") {
+								const infoField = this.findInfoFieldElement();
+								if (infoField) {
+									await this.refreshInfoField(infoField);
+								}
+							}
 						} catch (error) {
 							const err = error as Error;
 							new Notice(`Action failed: ${err.message}`);
@@ -537,57 +543,28 @@ export class ProcessorConfigModal extends Modal {
 	}
 
 	private renderProgressField(setting: Setting, field: ConfigField): void {
-		// Container for button and progress bar
+		// Container for button
 		const controlContainer = setting.controlEl.createDiv("progress-field-container");
 		controlContainer.style.display = "flex";
 		controlContainer.style.flexDirection = "column";
 		controlContainer.style.gap = "0.5rem";
 		controlContainer.style.width = "100%";
 
-		// Button row
-		const buttonRow = controlContainer.createDiv("progress-button-row");
-		buttonRow.style.display = "flex";
-		buttonRow.style.alignItems = "center";
-		buttonRow.style.gap = "0.5rem";
-
 		// Create button
-		const buttonEl = buttonRow.createEl("button", {
+		const buttonEl = controlContainer.createEl("button", {
 			text: field.buttonText || "Download",
 			cls: "mod-cta",
 		});
+		buttonEl.style.minWidth = "150px";
 
-		// Progress bar container (hidden initially)
-		const progressContainer = controlContainer.createDiv("progress-bar-container");
-		progressContainer.style.display = "none";
-		progressContainer.style.width = "100%";
+		// Store reference to info field element for refresh after completion
+		let infoFieldTextEl: HTMLElement | null = null;
 
-		// Progress bar background
-		const progressBarBg = progressContainer.createDiv("progress-bar-bg");
-		progressBarBg.style.width = "100%";
-		progressBarBg.style.height = "8px";
-		progressBarBg.style.backgroundColor = "var(--background-modifier-border)";
-		progressBarBg.style.borderRadius = "4px";
-		progressBarBg.style.overflow = "hidden";
-
-		// Progress bar fill
-		const progressBar = progressBarBg.createDiv("progress-bar-fill");
-		progressBar.style.width = "0%";
-		progressBar.style.height = "100%";
-		progressBar.style.backgroundColor = "var(--interactive-accent)";
-		progressBar.style.transition = "width 0.3s ease";
-
-		// Status text
-		const statusText = progressContainer.createDiv("progress-status");
-		statusText.style.fontSize = "0.85em";
-		statusText.style.color = "var(--text-muted)";
-		statusText.style.marginTop = "0.25rem";
-		statusText.textContent = "Preparing...";
-
-		// Store references for progress updates
-		this.progressElements.set(field.key, {
-			progressBar,
-			statusText,
-		});
+		// Find the cachedModelsInfo field element if it exists
+		const cachedInfoField = this.findInfoFieldElement();
+		if (cachedInfoField) {
+			infoFieldTextEl = cachedInfoField;
+		}
 
 		// Button click handler
 		buttonEl.addEventListener("click", async () => {
@@ -595,13 +572,12 @@ export class ProcessorConfigModal extends Modal {
 				return;
 			}
 
+			const originalButtonText = field.buttonText || "Download";
+
 			try {
-				// Show progress, disable button
-				progressContainer.style.display = "block";
+				// Disable button and show initial status
 				buttonEl.disabled = true;
-				buttonEl.textContent = "Downloading...";
-				progressBar.style.width = "0%";
-				statusText.textContent = "Starting download...";
+				buttonEl.textContent = "0% - Starting...";
 
 				// Create context
 				const context = {
@@ -614,11 +590,10 @@ export class ProcessorConfigModal extends Modal {
 					pluginSettings: this.plugin.settings,
 				};
 
-				// Progress callback
+				// Progress callback - updates button text with percentage
 				const onProgress = (progress: number, status: string) => {
 					const percent = Math.round(progress * 100);
-					progressBar.style.width = `${percent}%`;
-					statusText.textContent = status;
+					buttonEl.textContent = `${percent}% - ${status}`;
 				};
 
 				await this.processor.handleButtonAction(field.buttonAction, context, {
@@ -627,37 +602,80 @@ export class ProcessorConfigModal extends Modal {
 				});
 
 				// Success
-				progressBar.style.width = "100%";
-				progressBar.style.backgroundColor = "var(--text-success)";
-				statusText.textContent = "✓ Download complete!";
-				buttonEl.textContent = "✓ Downloaded";
+				buttonEl.textContent = "✓ Complete!";
+				buttonEl.style.backgroundColor = "var(--text-success)";
 
-				// Hide progress after delay
+				// Refresh info field to show updated cached models
+				if (infoFieldTextEl) {
+					await this.refreshInfoField(infoFieldTextEl);
+				}
+
+				// Reset button after delay
 				setTimeout(() => {
-					progressContainer.style.display = "none";
 					buttonEl.disabled = false;
-					buttonEl.textContent = field.buttonText || "Download";
-					progressBar.style.width = "0%";
-					progressBar.style.backgroundColor = "var(--interactive-accent)";
+					buttonEl.textContent = originalButtonText;
+					buttonEl.style.backgroundColor = "";
 				}, 3000);
 
 			} catch (error) {
-				const err = error as Error;
-				progressBar.style.backgroundColor = "var(--text-error)";
-				statusText.textContent = `❌ Error: ${err.message}`;
+				buttonEl.textContent = `❌ Error`;
+				buttonEl.style.backgroundColor = "var(--text-error)";
 				buttonEl.disabled = false;
-				buttonEl.textContent = field.buttonText || "Download";
 
 				// Reset after delay
 				setTimeout(() => {
-					progressContainer.style.display = "none";
-					progressBar.style.width = "0%";
-					progressBar.style.backgroundColor = "var(--interactive-accent)";
+					buttonEl.textContent = originalButtonText;
+					buttonEl.style.backgroundColor = "";
 				}, 5000);
 
 				console.error(`Progress action '${field.buttonAction}' failed:`, error);
 			}
 		});
+	}
+
+	/**
+	 * Find the info field element for cached models display
+	 */
+	private findInfoFieldElement(): HTMLElement | null {
+		const infoFields = this.contentEl.querySelectorAll(".info-field-text");
+		return infoFields.length > 0 ? infoFields[0] as HTMLElement : null;
+	}
+
+	/**
+	 * Refresh the info field with current cached models
+	 */
+	private async refreshInfoField(infoTextEl: HTMLElement): Promise<void> {
+		if (this.processor.type !== "voicenotes") {
+			return;
+		}
+
+		try {
+			const { WebLLMClient } = await import("../processors/VoiceNotesProcessor/services/WebLLMClient");
+			const cachedModels = await WebLLMClient.getCachedModels();
+
+			if (cachedModels.length === 0) {
+				infoTextEl.textContent = "No models downloaded yet. Click 'Download Model' to get started.";
+				infoTextEl.style.color = "var(--text-muted)";
+			} else {
+				const selectedModel = this.getNestedValue(this.formValues, "llm.model") as string;
+				const isSelectedCached = selectedModel && cachedModels.includes(selectedModel);
+
+				const modelList = cachedModels.map((m: string) => {
+					const isCurrent = m === selectedModel ? " (selected)" : "";
+					return `  • ${this.formatModelName(m)}${isCurrent}`;
+				}).join("\n");
+
+				infoTextEl.innerHTML = `Cached models (${cachedModels.length}):\n${modelList}`;
+
+				if (isSelectedCached) {
+					infoTextEl.style.color = "var(--text-success)";
+				} else {
+					infoTextEl.style.color = "var(--text-muted)";
+				}
+			}
+		} catch (error) {
+			console.error("Error refreshing info field:", error);
+		}
 	}
 
 	private async handleSave(errorsContainer: HTMLElement): Promise<void> {
