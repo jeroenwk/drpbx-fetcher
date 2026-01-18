@@ -140,6 +140,11 @@ export const AVAILABLE_MODELS = [
 		label: "Gemma 2 2B (1.3GB)",
 		size: "1.3GB",
 	},
+	{
+		value: "Mistral-Small-24B-Instruct-v0.1-q4f16_1-MLC",
+		label: "Mistral Small 3.1 (16GB) - High Quality",
+		size: "16GB",
+	},
 ] as const;
 
 /**

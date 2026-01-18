@@ -498,6 +498,7 @@ export class ProcessorConfigModal extends Modal {
 			"Qwen2.5-0.5B-Instruct-q4f16_1-MLC": "Qwen2.5 0.5B (300MB)",
 			"Llama-3.2-1B-Instruct-q4f16_1-MLC": "Llama 3.2 1B (650MB)",
 			"gemma-2-2b-it-q4f16_1-MLC": "Gemma 2 2B (1.3GB)",
+			"Mistral-Small-24B-Instruct-v0.1-q4f16_1-MLC": "Mistral Small 3.1 (16GB)",
 		};
 
 		return modelNames[modelId] || modelId;
