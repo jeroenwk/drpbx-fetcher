@@ -96,6 +96,10 @@ export class WebLLMClient {
 	private engine: MLCEngineInstance | null = null;
 	private currentModel: string | null = null;
 	private isInitializing = false;
+	private cachedModels: Set<string> = new Set();
+
+	/** IndexedDB database name for WebLLM cache */
+	private static readonly INDEXED_DB_NAME = "web-llm-model-cache";
 
 	/**
 	 * Check if WebGPU is available in the current environment
@@ -221,6 +225,138 @@ export class WebLLMClient {
 	 */
 	getCurrentModel(): string | null {
 		return this.currentModel;
+	}
+
+	/**
+	 * Get list of cached models from IndexedDB
+	 * Returns a list of model IDs that have been downloaded
+	 * Static method - can be called without instantiating the client
+	 */
+	static async getCachedModels(): Promise<string[]> {
+		StreamLogger.log("[WebLLMClient.getCachedModels] Checking IndexedDB for cached models");
+
+		return new Promise((resolve) => {
+			const request = indexedDB.open(WebLLMClient.INDEXED_DB_NAME, 1);
+
+			request.onerror = () => {
+				StreamLogger.warn("[WebLLMClient.getCachedModels] Could not open IndexedDB", {
+					error: request.error,
+				});
+				resolve([]);
+			};
+
+			request.onsuccess = () => {
+				const db = request.result;
+				if (!db.objectStoreNames.contains("models")) {
+					StreamLogger.log("[WebLLMClient.getCachedModels] No models store found in IndexedDB");
+					db.close();
+					resolve([]);
+					return;
+				}
+
+				const transaction = db.transaction(["models"], "readonly");
+				const objectStore = transaction.objectStore("models");
+				const getAllKeysRequest = objectStore.getAllKeys();
+
+				getAllKeysRequest.onsuccess = () => {
+					const keys = getAllKeysRequest.result as string[];
+					StreamLogger.log("[WebLLMClient.getCachedModels] Found cached models", {
+						count: keys.length,
+						models: keys,
+					});
+					db.close();
+					resolve(keys);
+				};
+
+				getAllKeysRequest.onerror = () => {
+					StreamLogger.warn("[WebLLMClient.getCachedModels] Error getting keys from IndexedDB");
+					db.close();
+					resolve([]);
+				};
+			};
+
+			request.onblocked = () => {
+				StreamLogger.warn("[WebLLMClient.getCachedModels] IndexedDB request blocked");
+				resolve([]);
+			};
+		});
+	}
+
+	/**
+	 * Check if a specific model is cached (downloaded)
+	 * Static method - can be called without instantiating the client
+	 */
+	static async isModelCached(model: string): Promise<boolean> {
+		const cachedModels = await WebLLMClient.getCachedModels();
+		const isCached = cachedModels.includes(model);
+		StreamLogger.log("[WebLLMClient.isModelCached] Checking if model is cached", {
+			model,
+			isCached,
+		});
+		return isCached;
+	}
+
+	/**
+	 * Delete a specific model from IndexedDB cache
+	 * Also unloads the model if it's currently loaded
+	 */
+	async deleteCachedModel(model: string): Promise<void> {
+		StreamLogger.log("[WebLLMClient.deleteCachedModel] Deleting model from cache", { model });
+
+		// Unload the model if it's currently loaded
+		if (this.currentModel === model) {
+			StreamLogger.log("[WebLLMClient.deleteCachedModel] Unloading currently active model");
+			await this.unload();
+		}
+
+		return new Promise((resolve, reject) => {
+			const request = indexedDB.open(WebLLMClient.INDEXED_DB_NAME, 1);
+
+			request.onerror = () => {
+				const error = request.error;
+				StreamLogger.error("[WebLLMClient.deleteCachedModel] Could not open IndexedDB", error);
+				reject(new Error(`Failed to open IndexedDB: ${error?.message}`));
+			};
+
+			request.onsuccess = () => {
+				const db = request.result;
+				if (!db.objectStoreNames.contains("models")) {
+					StreamLogger.log("[WebLLMClient.deleteCachedModel] No models store found, nothing to delete");
+					db.close();
+					resolve();
+					return;
+				}
+
+				const transaction = db.transaction(["models"], "readwrite");
+				const objectStore = transaction.objectStore("models");
+				const deleteRequest = objectStore.delete(model);
+
+				deleteRequest.onsuccess = () => {
+					StreamLogger.log("[WebLLMClient.deleteCachedModel] Model deleted successfully", { model });
+					db.close();
+					resolve();
+				};
+
+				deleteRequest.onerror = () => {
+					const error = deleteRequest.error;
+					StreamLogger.error("[WebLLMClient.deleteCachedModel] Failed to delete model", error);
+					db.close();
+					reject(new Error(`Failed to delete model: ${error?.message}`));
+				};
+
+				transaction.onerror = () => {
+					const error = transaction.error;
+					StreamLogger.error("[WebLLMClient.deleteCachedModel] Transaction error", error);
+					db.close();
+					reject(new Error(`Transaction failed: ${error?.message}`));
+				};
+			};
+
+			request.onblocked = () => {
+				StreamLogger.warn("[WebLLMClient.deleteCachedModel] IndexedDB request blocked");
+				reject(new Error("IndexedDB request blocked - close other tabs using this feature"));
+			};
+		});
 	}
 
 	/**

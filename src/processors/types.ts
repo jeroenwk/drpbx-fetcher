@@ -50,7 +50,7 @@ export type FileMetadata = files.FileMetadata;
 /**
  * Configuration schema field types for UI generation
  */
-export type ConfigFieldType = "text" | "folder" | "file" | "boolean" | "number" | "select" | "button" | "progress";
+export type ConfigFieldType = "text" | "folder" | "file" | "boolean" | "number" | "select" | "button" | "progress" | "info";
 
 /**
  * Configuration schema field definition

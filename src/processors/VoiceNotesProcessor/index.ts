@@ -436,6 +436,12 @@ export class VoiceNotesProcessor implements FileProcessor {
 					defaultValue: true,
 				},
 				{
+					key: "cachedModelsInfo",
+					label: "Downloaded Models",
+					description: "Shows which AI models are currently downloaded to your device",
+					type: "info",
+				},
+				{
 					key: "downloadModel",
 					label: "Download AI Model",
 					description: "Download the selected AI model to your device (required before first use)",
@@ -443,6 +449,14 @@ export class VoiceNotesProcessor implements FileProcessor {
 					buttonText: "Download Model",
 					buttonAction: "downloadModel",
 					progressSourceKey: "llm.model",
+				},
+				{
+					key: "deleteModel",
+					label: "Delete Downloaded Model",
+					description: "Delete the currently selected AI model from IndexedDB to free up space",
+					type: "button",
+					buttonText: "Delete Model",
+					buttonAction: "deleteModel",
 				},
 				{
 					key: "testLlm",
@@ -468,6 +482,8 @@ export class VoiceNotesProcessor implements FileProcessor {
 			await this.testLLMConnection(context);
 		} else if (action === "downloadModel") {
 			await this.downloadModel(context, options);
+		} else if (action === "deleteModel") {
+			await this.deleteModel(context, options);
 		}
 	}
 
@@ -499,8 +515,14 @@ export class VoiceNotesProcessor implements FileProcessor {
 			this.llmClient = getWebLLMClient();
 		}
 
-		// Progress callback
+		// Check if model is already cached
+		const isCached = await WebLLMClient.isModelCached(model);
+		StreamLogger.log("[VoiceNotesProcessor.downloadModel] Model cache status", { model, isCached });
+
+		// Progress callback - always called at least once to ensure UI updates
+		let progressCalled = false;
 		const progressCallback: ModelProgressCallback = (progress, status) => {
+			progressCalled = true;
 			StreamLogger.log("[VoiceNotesProcessor.downloadModel] Progress", {
 				progress: (progress * 100).toFixed(1),
 				status,
@@ -511,10 +533,61 @@ export class VoiceNotesProcessor implements FileProcessor {
 			}
 		};
 
+		// Report initial status
+		if (options?.onProgress) {
+			options.onProgress(0, isCached ? "Loading cached model..." : "Downloading model...");
+		}
+
 		// Initialize (download) the model
 		await this.llmClient.initialize(model, progressCallback);
 
+		// Ensure progress callback was called at least once (for cached models that load instantly)
+		if (!progressCalled && options?.onProgress) {
+			StreamLogger.log("[VoiceNotesProcessor.downloadModel] No progress events fired, reporting completion");
+			options.onProgress(1, "Model loaded successfully");
+		} else if (options?.onProgress) {
+			// Ensure final progress is at 100%
+			options.onProgress(1, "Model loaded successfully");
+		}
+
 		StreamLogger.log("[VoiceNotesProcessor.downloadModel] Download complete", { model });
+	}
+
+	/**
+	 * Delete the cached AI model
+	 */
+	private async deleteModel(
+		context: ProcessorContext,
+		options?: ButtonActionOptions
+	): Promise<void> {
+		StreamLogger.log("[VoiceNotesProcessor.deleteModel] Starting delete");
+
+		// Get selected model from form values
+		const formValues = options?.formValues as VoiceNotesProcessorConfig | undefined;
+		const model = formValues?.llm?.model || DEFAULT_CONFIG.llm.model;
+
+		StreamLogger.log("[VoiceNotesProcessor.deleteModel] Deleting model", { model });
+
+		// Initialize client
+		if (!this.llmClient) {
+			this.llmClient = getWebLLMClient();
+		}
+
+		// Check if model is cached
+		const isCached = await WebLLMClient.isModelCached(model);
+
+		if (!isCached) {
+			new Notice(`ℹ️ Model "${model}" is not downloaded.\n\nNo need to delete.`, 5000);
+			StreamLogger.log("[VoiceNotesProcessor.deleteModel] Model not cached, nothing to delete");
+			return;
+		}
+
+		// Delete the model from cache
+		await this.llmClient.deleteCachedModel(model);
+
+		StreamLogger.log("[VoiceNotesProcessor.deleteModel] Model deleted successfully", { model });
+
+		new Notice(`✓ Model "${model}" deleted successfully!\n\nThe model has been removed from IndexedDB.`, 5000);
 	}
 
 	/**

@@ -233,6 +233,10 @@ export class ProcessorConfigModal extends Modal {
 				this.renderProgressField(setting, field);
 				break;
 
+			case "info":
+				this.renderInfoField(setting, field);
+				break;
+
 			case "text":
 			default:
 				this.renderTextField(setting, field, currentValue as string);
@@ -410,6 +414,95 @@ export class ProcessorConfigModal extends Modal {
 					this.setNestedValue(this.formValues, field.key, value);
 				});
 		});
+	}
+
+	private renderInfoField(setting: Setting, field: ConfigField): void {
+		// Create a container for the info display
+		const infoContainer = setting.controlEl.createDiv("info-field-container");
+		infoContainer.style.display = "flex";
+		infoContainer.style.flexDirection = "column";
+		infoContainer.style.gap = "0.5rem";
+		infoContainer.style.width = "100%";
+
+		// Info text element (placeholder text that gets updated dynamically)
+		const infoText = infoContainer.createDiv("info-field-text");
+		infoText.style.fontSize = "0.9em";
+		infoText.style.color = "var(--text-muted)";
+		infoText.style.padding = "0.5rem";
+		infoText.style.backgroundColor = "var(--background-secondary)";
+		infoText.style.borderRadius = "4px";
+		infoText.textContent = "Checking cached models...";
+
+		// Check for cached models asynchronously
+		this.updateInfoField(field, infoText);
+
+		// Re-check when modal is opened (onOpen is called after constructor)
+		setTimeout(() => {
+			this.updateInfoField(field, infoText);
+		}, 100);
+	}
+
+	/**
+	 * Update info field with cached model information
+	 */
+	private async updateInfoField(field: ConfigField, infoText: HTMLElement): Promise<void> {
+		// Only process for voice notes processor
+		if (this.processor.type !== "voicenotes") {
+			infoText.textContent = "Information not available";
+			return;
+		}
+
+		// Import WebLLMClient dynamically
+		try {
+			const { WebLLMClient } = await import("../processors/VoiceNotesProcessor/services/WebLLMClient");
+
+			// Get cached models
+			const cachedModels = await WebLLMClient.getCachedModels();
+
+			if (cachedModels.length === 0) {
+				infoText.textContent = "No models downloaded yet. Click 'Download Model' to get started.";
+				infoText.style.color = "var(--text-muted)";
+			} else {
+				// Get current selected model from form
+				const selectedModel = this.getNestedValue(this.formValues, "llm.model") as string;
+
+				// Check if selected model is cached
+				const isSelectedCached = selectedModel && cachedModels.includes(selectedModel);
+
+				// Format model list
+				const modelList = cachedModels.map((m: string) => {
+					const isCurrent = m === selectedModel ? " (selected)" : "";
+					return `  • ${this.formatModelName(m)}${isCurrent}`;
+				}).join("\n");
+
+				infoText.innerHTML = `Cached models (${cachedModels.length}):\n${modelList}`;
+
+				if (isSelectedCached) {
+					infoText.style.color = "var(--text-success)";
+				} else {
+					infoText.style.color = "var(--text-muted)";
+				}
+			}
+		} catch (error) {
+			infoText.textContent = "Unable to check cached models.";
+			infoText.style.color = "var(--text-error)";
+			console.error("Error updating info field:", error);
+		}
+	}
+
+	/**
+	 * Format model ID for display (shorten technical model names)
+	 */
+	private formatModelName(modelId: string): string {
+		// Map of model IDs to readable names
+		const modelNames: Record<string, string> = {
+			"Phi-3-mini-4k-instruct-q4f16_1-MLC": "Phi-3 Mini (1.4GB)",
+			"Qwen2.5-0.5B-Instruct-q4f16_1-MLC": "Qwen2.5 0.5B (300MB)",
+			"Llama-3.2-1B-Instruct-q4f16_1-MLC": "Llama 3.2 1B (650MB)",
+			"gemma-2-2b-it-q4f16_1-MLC": "Gemma 2 2B (1.3GB)",
+		};
+
+		return modelNames[modelId] || modelId;
 	}
 
 	private renderButtonField(setting: Setting, field: ConfigField): void {
