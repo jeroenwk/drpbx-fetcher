@@ -15,6 +15,8 @@ export class ProcessorConfigModal extends Modal {
 	private plugin: DrpbxFetcherPlugin;
 	// Track module-level attachmentsFolder text components for dynamic placeholder updates
 	private moduleAttachmentsFields: Array<{ fieldKey: string; textComponent: TextComponent; field: ConfigField }> = [];
+	// Track progress elements for progress fields (currently unused but kept for potential future use)
+	private progressElements: Map<string, { progressBar: HTMLElement; statusText: HTMLElement }> = new Map();
 
 	constructor(
 		app: App,
@@ -227,6 +229,10 @@ export class ProcessorConfigModal extends Modal {
 				this.renderButtonField(setting, field);
 				break;
 
+			case "progress":
+				this.renderProgressField(setting, field);
+				break;
+
 			case "text":
 			default:
 				this.renderTextField(setting, field, currentValue as string);
@@ -424,7 +430,9 @@ export class ProcessorConfigModal extends Modal {
 								pluginSettings: this.plugin.settings,
 							};
 
-							await this.processor.handleButtonAction(field.buttonAction, context);
+							await this.processor.handleButtonAction(field.buttonAction, context, {
+								formValues: this.formValues as ProcessorConfig,
+							});
 						} catch (error) {
 							const err = error as Error;
 							new Notice(`Action failed: ${err.message}`);
@@ -435,17 +443,141 @@ export class ProcessorConfigModal extends Modal {
 		});
 	}
 
+	private renderProgressField(setting: Setting, field: ConfigField): void {
+		// Container for button and progress bar
+		const controlContainer = setting.controlEl.createDiv("progress-field-container");
+		controlContainer.style.display = "flex";
+		controlContainer.style.flexDirection = "column";
+		controlContainer.style.gap = "0.5rem";
+		controlContainer.style.width = "100%";
+
+		// Button row
+		const buttonRow = controlContainer.createDiv("progress-button-row");
+		buttonRow.style.display = "flex";
+		buttonRow.style.alignItems = "center";
+		buttonRow.style.gap = "0.5rem";
+
+		// Create button
+		const buttonEl = buttonRow.createEl("button", {
+			text: field.buttonText || "Download",
+			cls: "mod-cta",
+		});
+
+		// Progress bar container (hidden initially)
+		const progressContainer = controlContainer.createDiv("progress-bar-container");
+		progressContainer.style.display = "none";
+		progressContainer.style.width = "100%";
+
+		// Progress bar background
+		const progressBarBg = progressContainer.createDiv("progress-bar-bg");
+		progressBarBg.style.width = "100%";
+		progressBarBg.style.height = "8px";
+		progressBarBg.style.backgroundColor = "var(--background-modifier-border)";
+		progressBarBg.style.borderRadius = "4px";
+		progressBarBg.style.overflow = "hidden";
+
+		// Progress bar fill
+		const progressBar = progressBarBg.createDiv("progress-bar-fill");
+		progressBar.style.width = "0%";
+		progressBar.style.height = "100%";
+		progressBar.style.backgroundColor = "var(--interactive-accent)";
+		progressBar.style.transition = "width 0.3s ease";
+
+		// Status text
+		const statusText = progressContainer.createDiv("progress-status");
+		statusText.style.fontSize = "0.85em";
+		statusText.style.color = "var(--text-muted)";
+		statusText.style.marginTop = "0.25rem";
+		statusText.textContent = "Preparing...";
+
+		// Store references for progress updates
+		this.progressElements.set(field.key, {
+			progressBar,
+			statusText,
+		});
+
+		// Button click handler
+		buttonEl.addEventListener("click", async () => {
+			if (!field.buttonAction || !this.processor.handleButtonAction) {
+				return;
+			}
+
+			try {
+				// Show progress, disable button
+				progressContainer.style.display = "block";
+				buttonEl.disabled = true;
+				buttonEl.textContent = "Downloading...";
+				progressBar.style.width = "0%";
+				statusText.textContent = "Starting download...";
+
+				// Create context
+				const context = {
+					vault: this.app.vault,
+					app: this.app,
+					templateResolver: {
+						resolve: async () => "",
+						clearCache: () => {},
+					},
+					pluginSettings: this.plugin.settings,
+				};
+
+				// Progress callback
+				const onProgress = (progress: number, status: string) => {
+					const percent = Math.round(progress * 100);
+					progressBar.style.width = `${percent}%`;
+					statusText.textContent = status;
+				};
+
+				await this.processor.handleButtonAction(field.buttonAction, context, {
+					onProgress,
+					formValues: this.formValues as ProcessorConfig,
+				});
+
+				// Success
+				progressBar.style.width = "100%";
+				progressBar.style.backgroundColor = "var(--text-success)";
+				statusText.textContent = "✓ Download complete!";
+				buttonEl.textContent = "✓ Downloaded";
+
+				// Hide progress after delay
+				setTimeout(() => {
+					progressContainer.style.display = "none";
+					buttonEl.disabled = false;
+					buttonEl.textContent = field.buttonText || "Download";
+					progressBar.style.width = "0%";
+					progressBar.style.backgroundColor = "var(--interactive-accent)";
+				}, 3000);
+
+			} catch (error) {
+				const err = error as Error;
+				progressBar.style.backgroundColor = "var(--text-error)";
+				statusText.textContent = `❌ Error: ${err.message}`;
+				buttonEl.disabled = false;
+				buttonEl.textContent = field.buttonText || "Download";
+
+				// Reset after delay
+				setTimeout(() => {
+					progressContainer.style.display = "none";
+					progressBar.style.width = "0%";
+					progressBar.style.backgroundColor = "var(--interactive-accent)";
+				}, 5000);
+
+				console.error(`Progress action '${field.buttonAction}' failed:`, error);
+			}
+		});
+	}
+
 	private async handleSave(errorsContainer: HTMLElement): Promise<void> {
 		// Clear previous errors
 		this.validationErrors = [];
 		errorsContainer.empty();
 		errorsContainer.style.display = "none";
 
-		// Validate required fields
+		// Validate required fields (use getNestedValue for nested keys like "llm.model")
 		const schema = this.processor.getConfigSchema();
 		for (const field of schema.fields) {
 			if (field.required) {
-				const value = this.formValues[field.key];
+				const value = this.getNestedValue(this.formValues, field.key);
 				if (value === undefined || value === null || value === "") {
 					this.validationErrors.push(`${field.label} is required`);
 				}

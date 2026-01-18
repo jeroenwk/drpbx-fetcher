@@ -50,7 +50,7 @@ export type FileMetadata = files.FileMetadata;
 /**
  * Configuration schema field types for UI generation
  */
-export type ConfigFieldType = "text" | "folder" | "file" | "boolean" | "number" | "select" | "button";
+export type ConfigFieldType = "text" | "folder" | "file" | "boolean" | "number" | "select" | "button" | "progress";
 
 /**
  * Configuration schema field definition
@@ -68,6 +68,8 @@ export interface ConfigField {
 	groupToggleKey?: string; // Key to check if group should be shown (e.g., "learning.enabled")
 	buttonText?: string; // For button type - text to display on the button
 	buttonAction?: string; // For button type - action identifier for the processor to handle
+	/** For progress type - key in config that holds the currently selected value (e.g., "llm.model") */
+	progressSourceKey?: string;
 }
 
 /**
@@ -220,9 +222,24 @@ export interface FileProcessor {
 	 * Called when a button field is clicked in the processor configuration modal
 	 * @param action Action identifier from buttonAction field
 	 * @param context Processing context (vault, app, etc.)
+	 * @param options Optional options including progress callback and current form values
 	 * @returns Promise that resolves when action is complete
 	 */
-	handleButtonAction?(action: string, context: ProcessorContext): Promise<void>;
+	handleButtonAction?(
+		action: string,
+		context: ProcessorContext,
+		options?: ButtonActionOptions
+	): Promise<void>;
+}
+
+/**
+ * Options for handleButtonAction
+ */
+export interface ButtonActionOptions {
+	/** Callback to report progress (0.0-1.0) and status message */
+	onProgress?: (progress: number, status: string) => void;
+	/** Current form values (useful for accessing selected options) */
+	formValues?: ProcessorConfig;
 }
 
 /**

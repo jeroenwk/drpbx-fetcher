@@ -6,6 +6,7 @@ import { DrpbxFetcherSettings, DEFAULT_SETTINGS } from "./src/models/Settings";
 import { ProcessorRegistry } from "./src/processors/ProcessorRegistry";
 import { DefaultProcessor } from "./src/processors/DefaultProcessor";
 import { ViwoodsProcessor } from "./src/processors/ViwoodsProcessor/index";
+import { VoiceNotesProcessor } from "./src/processors/VoiceNotesProcessor/index";
 import { FileUtils } from "./src/utils/FileUtils";
 import { TemplateResolver } from "./src/processors/templates/TemplateResolver";
 import { StreamLogger } from "./src/utils/StreamLogger";
@@ -1054,6 +1055,7 @@ export default class DrpbxFetcherPlugin extends Plugin {
     const registry = ProcessorRegistry.getInstance();
     registry.register(new DefaultProcessor());
     registry.register(new ViwoodsProcessor());
+    registry.register(new VoiceNotesProcessor());
     console.log("Registered file processors:", registry.listAll().map(p => p.name).join(", "));
     StreamLogger.log("[DrpbxFetcher] Registered file processors:", { processors: registry.listAll().map(p => p.name) });
 
