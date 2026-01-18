@@ -15,6 +15,8 @@ export class ProcessorConfigModal extends Modal {
 	private plugin: DrpbxFetcherPlugin;
 	// Track module-level attachmentsFolder text components for dynamic placeholder updates
 	private moduleAttachmentsFields: Array<{ fieldKey: string; textComponent: TextComponent; field: ConfigField }> = [];
+	// Track delete button setting for dynamic updates
+	private deleteButtonSetting: Setting | null = null;
 
 	constructor(
 		app: App,
@@ -395,8 +397,30 @@ export class ProcessorConfigModal extends Modal {
 			dropdown.setValue(currentValue || String(field.defaultValue || ""));
 			dropdown.onChange((value) => {
 				this.setNestedValue(this.formValues, field.key, value);
+
+				// If this is the model selection dropdown, update related UI elements
+				if (field.key === "llm.model" && this.processor.type === "voicenotes") {
+					this.onModelSelectionChanged(value);
+				}
 			});
 		});
+	}
+
+	/**
+	 * Handle model selection change - update info field and delete button
+	 */
+	private async onModelSelectionChanged(newModel: string): Promise<void> {
+		// Update the downloaded models info field to highlight the new selection
+		const infoField = this.findInfoFieldElement();
+		if (infoField) {
+			await this.refreshInfoField(infoField);
+		}
+
+		// Update the delete button state for the new selection
+		if (this.deleteButtonSetting) {
+			const modelName = this.formatModelName(newModel);
+			await this.updateDeleteButtonState(this.deleteButtonSetting, newModel, modelName);
+		}
 	}
 
 	private renderTextField(
@@ -422,10 +446,9 @@ export class ProcessorConfigModal extends Modal {
 		infoContainer.style.gap = "0.5rem";
 		infoContainer.style.width = "100%";
 
-		// Info text element (placeholder text that gets updated dynamically)
+		// Info container element that will hold the list
 		const infoText = infoContainer.createDiv("info-field-text");
 		infoText.style.fontSize = "0.9em";
-		infoText.style.color = "var(--text-muted)";
 		infoText.style.padding = "0.5rem";
 		infoText.style.backgroundColor = "var(--background-secondary)";
 		infoText.style.borderRadius = "4px";
@@ -461,25 +484,46 @@ export class ProcessorConfigModal extends Modal {
 				infoText.textContent = "No models downloaded yet. Click 'Download Model' to get started.";
 				infoText.style.color = "var(--text-muted)";
 			} else {
+				// Clear existing content
+				infoText.empty();
+
 				// Get current selected model from form
 				const selectedModel = this.getNestedValue(this.formValues, "llm.model") as string;
 
 				// Check if selected model is cached
 				const isSelectedCached = selectedModel && cachedModels.includes(selectedModel);
 
-				// Format model list
-				const modelList = cachedModels.map((m: string) => {
-					const isCurrent = m === selectedModel ? " (selected)" : "";
-					return `  • ${this.formatModelName(m)}${isCurrent}`;
-				}).join("\n");
+				// Create title
+				const title = infoText.createDiv();
+				title.textContent = `Downloaded models (${cachedModels.length}):`;
+				title.style.marginBottom = "0.5rem";
+				title.style.fontWeight = "500";
+				title.style.color = isSelectedCached ? "var(--text-success)" : "var(--text-muted)";
 
-				infoText.innerHTML = `Cached models (${cachedModels.length}):\n${modelList}`;
+				// Create list
+				const list = infoText.createEl("ul");
+				list.style.margin = "0";
+				list.style.paddingLeft = "1.5rem";
+				list.style.listStyleType = "disc";
 
-				if (isSelectedCached) {
-					infoText.style.color = "var(--text-success)";
-				} else {
-					infoText.style.color = "var(--text-muted)";
-				}
+				// Add each model to the list
+				cachedModels.forEach((modelId: string) => {
+					const listItem = list.createEl("li");
+					listItem.style.marginBottom = "0.25rem";
+
+					const modelName = this.formatModelName(modelId);
+					const isCurrent = modelId === selectedModel;
+
+					if (isCurrent) {
+						// Bold and color for selected model
+						listItem.style.fontWeight = "bold";
+						listItem.style.color = "var(--text-accent)";
+						listItem.textContent = modelName;
+					} else {
+						listItem.style.color = "var(--text-muted)";
+						listItem.textContent = modelName;
+					}
+				});
 			}
 		} catch (error) {
 			infoText.textContent = "Unable to check cached models.";
@@ -505,6 +549,20 @@ export class ProcessorConfigModal extends Modal {
 	}
 
 	private renderButtonField(setting: Setting, field: ConfigField): void {
+		// For delete model action, check if model is downloaded and update UI accordingly
+		if (field.buttonAction === "deleteModel") {
+			// Store reference to delete button setting for dynamic updates
+			this.deleteButtonSetting = setting;
+
+			const selectedModel = this.getNestedValue(this.formValues, "llm.model") as string;
+			if (selectedModel) {
+				const modelName = this.formatModelName(selectedModel);
+
+				// Check if model is cached asynchronously
+				this.updateDeleteButtonState(setting, selectedModel, modelName);
+			}
+		}
+
 		setting.addButton((button) => {
 			button
 				.setButtonText(field.buttonText || "Click")
@@ -526,11 +584,18 @@ export class ProcessorConfigModal extends Modal {
 								formValues: this.formValues as ProcessorConfig,
 							});
 
-							// Refresh info field if this was a delete action
+							// Refresh info field and button state if this was a delete action
 							if (field.buttonAction === "deleteModel") {
 								const infoField = this.findInfoFieldElement();
 								if (infoField) {
 									await this.refreshInfoField(infoField);
+								}
+
+								// Update delete button state after deletion
+								const selectedModel = this.getNestedValue(this.formValues, "llm.model") as string;
+								if (selectedModel) {
+									const modelName = this.formatModelName(selectedModel);
+									await this.updateDeleteButtonState(setting, selectedModel, modelName);
 								}
 							}
 						} catch (error) {
@@ -541,6 +606,42 @@ export class ProcessorConfigModal extends Modal {
 					}
 				});
 		});
+	}
+
+	/**
+	 * Update delete button state based on whether model is cached
+	 */
+	private async updateDeleteButtonState(
+		setting: Setting,
+		selectedModel: string,
+		modelName: string
+	): Promise<void> {
+		if (this.processor.type !== "voicenotes") {
+			return;
+		}
+
+		try {
+			const { WebLLMClient } = await import("../processors/VoiceNotesProcessor/services/WebLLMClient");
+			const isCached = await WebLLMClient.isModelCached(selectedModel);
+
+			if (isCached) {
+				setting.setDesc(`Delete "${modelName}" from your device to free up storage space`);
+				// Enable button
+				const buttonEl = setting.controlEl.querySelector("button");
+				if (buttonEl) {
+					buttonEl.disabled = false;
+				}
+			} else {
+				setting.setDesc(`"${modelName}" is not downloaded - nothing to delete`);
+				// Disable button
+				const buttonEl = setting.controlEl.querySelector("button");
+				if (buttonEl) {
+					buttonEl.disabled = true;
+				}
+			}
+		} catch (error) {
+			console.error("Error checking model cache status:", error);
+		}
 	}
 
 	private renderProgressField(setting: Setting, field: ConfigField): void {
@@ -578,7 +679,7 @@ export class ProcessorConfigModal extends Modal {
 			try {
 				// Disable button and show initial status
 				buttonEl.disabled = true;
-				buttonEl.textContent = "0% - Starting...";
+				buttonEl.textContent = "0%";
 
 				// Create context
 				const context = {
@@ -591,10 +692,10 @@ export class ProcessorConfigModal extends Modal {
 					pluginSettings: this.plugin.settings,
 				};
 
-				// Progress callback - updates button text with percentage
+				// Progress callback - updates button text with percentage only
 				const onProgress = (progress: number, status: string) => {
 					const percent = Math.round(progress * 100);
-					buttonEl.textContent = `${percent}% - ${status}`;
+					buttonEl.textContent = `${percent}%`;
 				};
 
 				await this.processor.handleButtonAction(field.buttonAction, context, {
@@ -658,21 +759,43 @@ export class ProcessorConfigModal extends Modal {
 				infoTextEl.textContent = "No models downloaded yet. Click 'Download Model' to get started.";
 				infoTextEl.style.color = "var(--text-muted)";
 			} else {
+				// Clear existing content
+				infoTextEl.empty();
+
 				const selectedModel = this.getNestedValue(this.formValues, "llm.model") as string;
 				const isSelectedCached = selectedModel && cachedModels.includes(selectedModel);
 
-				const modelList = cachedModels.map((m: string) => {
-					const isCurrent = m === selectedModel ? " (selected)" : "";
-					return `  • ${this.formatModelName(m)}${isCurrent}`;
-				}).join("\n");
+				// Create title
+				const title = infoTextEl.createDiv();
+				title.textContent = `Downloaded models (${cachedModels.length}):`;
+				title.style.marginBottom = "0.5rem";
+				title.style.fontWeight = "500";
+				title.style.color = isSelectedCached ? "var(--text-success)" : "var(--text-muted)";
 
-				infoTextEl.innerHTML = `Cached models (${cachedModels.length}):\n${modelList}`;
+				// Create list
+				const list = infoTextEl.createEl("ul");
+				list.style.margin = "0";
+				list.style.paddingLeft = "1.5rem";
+				list.style.listStyleType = "disc";
 
-				if (isSelectedCached) {
-					infoTextEl.style.color = "var(--text-success)";
-				} else {
-					infoTextEl.style.color = "var(--text-muted)";
-				}
+				// Add each model to the list
+				cachedModels.forEach((modelId: string) => {
+					const listItem = list.createEl("li");
+					listItem.style.marginBottom = "0.25rem";
+
+					const modelName = this.formatModelName(modelId);
+					const isCurrent = modelId === selectedModel;
+
+					if (isCurrent) {
+						// Bold and color for selected model
+						listItem.style.fontWeight = "bold";
+						listItem.style.color = "var(--text-accent)";
+						listItem.textContent = modelName;
+					} else {
+						listItem.style.color = "var(--text-muted)";
+						listItem.textContent = modelName;
+					}
+				});
 			}
 		} catch (error) {
 			console.error("Error refreshing info field:", error);
