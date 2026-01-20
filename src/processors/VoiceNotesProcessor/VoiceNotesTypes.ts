@@ -9,10 +9,18 @@ import { ProcessorConfig } from "../types";
  * Configuration for LLM model selection and parameters
  */
 export interface LLMConfig {
-	/** WebLLM model identifier (e.g., "Phi-3-mini-4k-instruct-q4f16_1-MLC") */
+	/** LLM model identifier (e.g., "Phi-3-mini-4k-instruct-q4f16_1-MLC" or "gemini-2.5-flash-lite-preview-06-25") */
 	model: string;
 	/** Temperature for generation (0.0 = deterministic, 1.0 = creative) */
 	temperature: number;
+	/** Gemini API key (required for Gemini cloud models) */
+	geminiApiKey?: string;
+	/** OpenRouter API key (required for OpenRouter models like amazon/nova-lite-v1) */
+	openRouterApiKey?: string;
+	/** Enable reasoning/thinking for supported models (Gemini 2.5+) */
+	enableReasoning?: boolean;
+	/** Token budget for reasoning (default 1024, max 24576) */
+	reasoningBudget?: number;
 }
 
 /**
@@ -117,35 +125,107 @@ export interface LinkReplacement {
 }
 
 /**
- * WebLLM model options available for selection
+ * Model type: local (WebLLM) or cloud (API-based)
  */
-export const AVAILABLE_MODELS = [
+export type ModelType = "local" | "cloud";
+
+/**
+ * Model configuration entry
+ */
+export interface ModelConfig {
+	value: string;
+	label: string;
+	size: string;
+	type: ModelType;
+}
+
+/**
+ * LLM model options available for selection
+ */
+export const AVAILABLE_MODELS: readonly ModelConfig[] = [
 	{
 		value: "Phi-3-mini-4k-instruct-q4f16_1-MLC",
 		label: "Phi-3 Mini (1.4GB) - Recommended",
 		size: "1.4GB",
+		type: "local",
 	},
 	{
 		value: "Qwen2.5-0.5B-Instruct-q4f16_1-MLC",
 		label: "Qwen2.5 0.5B (300MB) - Lightweight",
 		size: "300MB",
+		type: "local",
 	},
 	{
 		value: "Llama-3.2-1B-Instruct-q4f16_1-MLC",
 		label: "Llama 3.2 1B (650MB)",
 		size: "650MB",
+		type: "local",
 	},
 	{
 		value: "gemma-2-2b-it-q4f16_1-MLC",
 		label: "Gemma 2 2B (1.3GB)",
 		size: "1.3GB",
+		type: "local",
 	},
 	{
 		value: "Mistral-Small-24B-Instruct-v0.1-q4f16_1-MLC",
 		label: "Mistral Small 3.1 (16GB) - High Quality",
 		size: "16GB",
+		type: "local",
+	},
+	{
+		value: "gemini-2.5-flash-lite-preview-09-2025",
+		label: "Gemini 2.5 Flash Lite Preview (Cloud)",
+		size: "Cloud",
+		type: "cloud",
+	},
+	{
+		value: "amazon/nova-lite-v1",
+		label: "Amazon Nova Lite 1.0 (OpenRouter)",
+		size: "Cloud",
+		type: "cloud",
 	},
 ] as const;
+
+/**
+ * Helper function to check if a model is a cloud model
+ * Checks both the model list and common prefixes for cloud models
+ */
+export function isCloudModel(modelId: string): boolean {
+	// First check if it's in our known models list
+	const model = AVAILABLE_MODELS.find((m) => m.value === modelId);
+	if (model) {
+		return model.type === "cloud";
+	}
+
+	// Fallback: check for common cloud model prefixes
+	// This handles cases where saved config has a model name not in the current list
+	if (modelId.startsWith("gemini-")) {
+		return true;
+	}
+
+	// OpenRouter models use "provider/model" format (e.g., "amazon/nova-lite-v1")
+	if (modelId.includes("/")) {
+		return true;
+	}
+
+	return false;
+}
+
+/**
+ * Helper function to check if a model is an OpenRouter model
+ * OpenRouter models use "provider/model" format (e.g., "amazon/nova-lite-v1")
+ */
+export function isOpenRouterModel(modelId: string): boolean {
+	return modelId.includes("/");
+}
+
+/**
+ * Helper function to get model configuration by ID
+ */
+export function getModelConfig(modelId: string): ModelConfig | undefined {
+	return AVAILABLE_MODELS.find((m) => m.value === modelId);
+}
 
 /**
  * Default configuration values
