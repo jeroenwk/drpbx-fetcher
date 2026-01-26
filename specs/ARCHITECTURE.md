@@ -1,7 +1,7 @@
 # Drpbx-Fetcher Plugin Architecture Specification
 
-**Version:** 0.2.130
-**Last Updated:** 2025-10-21
+**Version:** 0.2.318
+**Last Updated:** 2025-01-26
 
 ## Table of Contents
 
@@ -65,11 +65,16 @@ graph TB
     subgraph "Processing System"
         Registry[ProcessorRegistry<br/>Singleton]
         Default[DefaultProcessor]
+        VoiceNotes[VoiceNotesProcessor<br/>AI-Powered Links]
         Viwoods[ViwoodsProcessor<br/>6-Module System]
-        TemplateEngine[TemplateEngine]
+        TemplaterParser[TemplaterParser]
+        TemplaterExec[TemplaterExecutor]
+        TemplaterCtx[TemplaterContext]
+        TemplateEngine[TemplateEngine<br/>Legacy]
         TemplateResolver[TemplateResolver]
         MetadataMgr[MetadataManager]
         RenameHandler[NoteRenameHandler]
+        ContentPreserver[ContentPreserver]
         ImageCache[ImageCacheBuster]
     end
 
@@ -82,7 +87,16 @@ graph TB
         Memo[MemoProcessor]
         Annotation[AnnotationProcessor]
         ImageComp[ImageCompositor]
-        MarkdownMerger[MarkdownMerger]
+        CrossRef[CrossReferenceManager]
+    end
+
+    subgraph "Voice Notes AI"
+        WebLLM[WebLLMClient<br/>Local LLM]
+        Gemini[GeminiClient<br/>Cloud LLM]
+        OpenRouter[OpenRouterClient<br/>Cloud LLM]
+        TextRewriter[TextRewriter]
+        NoteFinder[NoteFinder<br/>Fuzzy Match]
+        RefExtractor[ReferenceExtractor]
     end
 
     subgraph "File Handling"
@@ -112,7 +126,15 @@ graph TB
     DBX --> FileAPI
 
     Registry --> Default
+    Registry --> VoiceNotes
     Registry --> Viwoods
+
+    VoiceNotes --> WebLLM
+    VoiceNotes --> Gemini
+    VoiceNotes --> OpenRouter
+    VoiceNotes --> TextRewriter
+    VoiceNotes --> NoteFinder
+    VoiceNotes --> RefExtractor
 
     Viwoods --> Learning
     Viwoods --> Paper
@@ -120,18 +142,22 @@ graph TB
     Viwoods --> Meeting
     Viwoods --> Picking
     Viwoods --> Memo
-    
+
     Learning --> Annotation
     Paper --> Annotation
     Learning --> ImageComp
     Paper --> ImageComp
     Picking --> ImageComp
-    
-    RenameHandler --> MarkdownMerger
+    Daily --> CrossRef
+
+    ContentPreserver --> RenameHandler
     MetadataMgr --> RenameHandler
     ImageCache --> FileUtils
 
     Viwoods --> ZipUtils
+    Viwoods --> TemplaterParser
+    Viwoods --> TemplaterExec
+    Viwoods --> TemplaterCtx
     Viwoods --> TemplateEngine
     Viwoods --> TemplateResolver
     Viwoods --> MetadataMgr
@@ -261,9 +287,72 @@ Complex processor for proprietary Viwoods note format (.note files are ZIP archi
 
 **Location:** `/src/processors/ViwoodsProcessor/index.ts:37-763`
 
+#### VoiceNotesProcessor (src/processors/VoiceNotesProcessor/index.ts)
+
+AI-powered processor for voice-dictated markdown notes that converts text mentions of notes into Obsidian wiki-links.
+
+**Features:**
+- **Smart Link Detection**: Automatically detects note references in text
+- **Local LLM Support**: Uses WebLLM for browser-based local AI processing
+- **Cloud LLM Support**: Gemini API and OpenRouter integration
+- **Fuzzy Matching**: Advanced note matching with configurable similarity thresholds
+- **Model Management**: Download, manage, and delete AI models from settings UI
+
+**Configuration:**
+- `enabled` - Enable/disable Voice Notes processing
+- `dictationTag` - Tag to identify voice-dictated notes (default: "dictation")
+- `llm.model` - AI model to use for link detection
+- `llm.geminiApiKey` - Gemini API key for cloud models
+- `llm.openRouterApiKey` - OpenRouter API key for OpenRouter models
+- `llm.temperature` - LLM generation temperature (0.0-1.0)
+- `matching.similarityThreshold` - Minimum similarity for note matching (0.0-1.0)
+- `matching.fuzzyMatching` - Enable/disable fuzzy matching algorithm
+- `createMissingLinks` - Create wiki-links even when no matching note is found
+
+**Location:** `/src/processors/VoiceNotesProcessor/index.ts:37-844`
+
 ---
 
-### 5. Utilities
+### 5. Templater Template System
+
+#### TemplaterParser (src/processors/templates/TemplaterParser.ts)
+
+Parser for Templater-style template syntax.
+
+**Syntax Support:**
+- `<% code %>` - Dynamic command: outputs result of code execution
+- `<%* code %>` - Execution command: uses tR variable for output accumulation
+- `<%# comment %>` - Comment: ignored during template execution
+- `<%- code -%>` - Trim surrounding whitespace
+
+**Location:** `/src/processors/templates/TemplaterParser.ts:36-137`
+
+#### TemplaterExecutor (src/processors/templates/TemplaterExecutor.ts)
+
+JavaScript code executor for Templater templates.
+
+**Methods:**
+- `executeDynamic(code, context)` - Execute dynamic command, return result
+- `executeScript(code, context)` - Execute script with tR variable
+- `executeCombined(code, context)` - Execute combined template code
+
+**Location:** `/src/processors/templates/TemplaterExecutor.ts:7-156`
+
+#### TemplaterContext (src/processors/templates/TemplaterContext.ts)
+
+Provides the `tp` object with utility modules for templates.
+
+**Modules:**
+- `tp.date` - Date formatting and manipulation
+- `tp.file` - File information and operations
+- `tp.frontmatter` - YAML frontmatter access
+- `tp.config` - Processor configuration access
+
+**Location:** `/src/processors/templates/TemplaterContext.ts`
+
+---
+
+### 6. Utilities
 
 #### StreamingZipUtils (src/utils/StreamingZipUtils.ts)
 
@@ -278,12 +367,14 @@ Memory-efficient ZIP processing using `@zip.js/zip.js`.
 
 #### TemplateEngine (src/processors/templates/TemplateEngine.ts)
 
-Simple template rendering system.
+Legacy template rendering system (still used for some cases).
 
 **Syntax:**
-- `{{variable}}` - Variable replacement
-- `{{date:FORMAT}}` - Formatted date
-- `{{time:FORMAT}}` - Formatted time
+- `{{variable}}` - Variable replacement (legacy)
+- `{{date:FORMAT}}` - Formatted date (legacy)
+- `{{time:FORMAT}}` - Formatted time (legacy)
+
+**Note:** New templates use Templater syntax (`<% %>`) via TemplaterParser and TemplaterExecutor.
 
 **Location:** `/src/processors/templates/TemplateEngine.ts:10-97`
 

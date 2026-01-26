@@ -19,12 +19,35 @@ This plugin automatically fetches and processes files from your Dropbox folders 
 - **🔄 Automatic rename detection** - Tracks renamed notes and updates markdown files automatically
 - **🆔 Smart identity tracking** - Uses internal note IDs to preserve user content across renames
 - **🖼️ Smart image management** - Cache-busting, automatic cleanup, and rename handling
-- **📋 Custom templates** - Customize markdown output with Templater-compatible templates
+- **📋 Custom templates** - Customize markdown output with Templater syntax (`<% %>`)
 - **🎨 Template Export** - Export default templates to your vault for easy customization
 - **⏭️ Skip unchanged files** (based on file size)
 - **🚫 Smart file filtering** - Only downloads files with configured processors
 - **🔐 Secure OAuth 2.0** authentication with PKCE
 - **🛡️ Privacy-first** - No data sent to third-party servers
+- **🎤 Voice Notes Processor** - AI-powered link detection for voice-dictated notes using local or cloud LLMs
+
+## 🎉 New in v0.2.318: Voice Notes Processor & Content Preservation
+
+### 🎤 AI-Powered Voice Notes Processing
+- **Smart Link Detection**: Automatically converts text mentions of notes into Obsidian wiki-links
+- **Local LLM Support**: Uses WebLLM for browser-based local AI processing (no API key needed)
+- **Cloud LLM Support**: Optional Gemini API and OpenRouter integration for cloud processing
+- **Multiple Models**: Support for Phi-3, Gemma, Llama, Gemini, Mistral, and more via OpenRouter
+- **Model Management**: Download, manage, and delete AI models directly from settings UI
+- **Fuzzy Matching**: Advanced note matching with configurable similarity thresholds
+- **Dictation Tag**: Configurable tag to identify voice-dictated notes (default: `#dictation`)
+- **Progress Tracking**: Real-time progress updates for model downloads and processing
+
+### 🧪 Content Preservation System
+- **Callout Preservation**: User-modified callout blocks are preserved in-place during updates
+- **Smart Merging**: ContentPreserver system protects user edits while updating template-generated content
+- **Standardized Preservation**: All Viwoods modules (Paper, Meeting, Daily, Picking) use consistent content preservation
+
+### 🛠️ Processor Improvements
+- **Re-fetch Command**: New command to mark files as unprocessed for re-fetching
+- **DefaultProcessor**: Auto-populates `allowedExtensions` from routed file extension
+- **Folder Mapping**: DefaultProcessor now correctly respects folder mapping for `.md` files
 
 ## 🎉 New in v0.2.236: Audio Support & Smart Filtering
 
@@ -161,11 +184,11 @@ The plugin automatically fetches all configured folders when Obsidian starts (wi
 - **User modifications are preserved** - The plugin will NOT overwrite modified output files (markdown, images, EPUBs) during re-fetch
 - **Clear tracking option** - Settings include a button to clear processed files tracking, allowing re-fetch of deleted files
 
-### File Processors (New!)
+### File Processors
 
 The plugin can intelligently process different file types during fetch:
 
-**viwoods Notes (.note files)**
+**Viwoods Notes (.note files)**
 - Extract text highlights from EPUB reader format
 - Extract handwritten annotations with composite images
 - Extract EPUB files from .note archives
@@ -176,11 +199,19 @@ The plugin can intelligently process different file types during fetch:
 - Use custom templates for output formatting
 - **[Quick Start Guide](docs/viwoods-setup.md)**
 
-**Coming Soon**
-- PDF annotation extraction
-- EPUB highlights processing
-- Image metadata extraction
-- And more...
+**Voice Notes (.md files)**
+- AI-powered link detection for voice-dictated notes
+- Converts text mentions of notes into Obsidian wiki-links
+- Local LLM support using WebLLM (browser-based, no API key needed)
+- Cloud LLM support via Gemini API and OpenRouter
+- Multiple model options: Phi-3, Gemma, Llama, Gemini, Mistral, and more
+- Fuzzy matching with configurable similarity thresholds
+- Configurable dictation tag (default: `#dictation`)
+
+**Default Processor**
+- Download files without processing
+- Configurable output folder
+- Configurable allowed extensions
 
 **[📖 Read the File Processors Documentation](docs/FILE-PROCESSORS.md)**
 

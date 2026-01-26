@@ -39,6 +39,29 @@ The File Processor system allows the Dropbox Fetcher plugin to intelligently pro
   - Todo items and reminders (Memo module)
   - Composite annotation images (handwriting + page backgrounds)
 
+### Voice Notes Processor
+- **Type:** `voicenotes`
+- **Extensions:** `.md`
+- **Description:** AI-powered link detection for voice-dictated markdown notes
+- **Features:**
+  - **Smart Link Detection**: Automatically converts text mentions of notes into Obsidian wiki-links
+  - **Local LLM Support**: Uses WebLLM for browser-based local AI processing (no API key needed)
+  - **Cloud LLM Support**: Optional Gemini API and OpenRouter integration
+  - **Multiple Models**: Support for Phi-3, Gemma, Llama, Gemini, Mistral, and more
+  - **Fuzzy Matching**: Advanced note matching with configurable similarity thresholds
+  - **Model Management**: Download, manage, and delete AI models from settings
+- **Configuration:**
+  - `enabled`: Enable/disable Voice Notes processing
+  - `dictationTag`: Tag to identify voice-dictated notes (default: "dictation")
+  - `llm.model`: AI model to use for link detection
+  - `llm.geminiApiKey`: Gemini API key for cloud models
+  - `llm.openRouterApiKey`: OpenRouter API key for OpenRouter models
+  - `llm.temperature`: LLM generation temperature (0.0-1.0)
+  - `matching.similarityThreshold`: Minimum similarity for note matching (0.0-1.0)
+  - `matching.fuzzyMatching`: Enable/disable fuzzy matching algorithm
+  - `matching.excludeFolders`: Folders to exclude from note search
+  - `createMissingLinks`: Create wiki-links even when no matching note is found
+
 ## Using File Processors
 
 ### 1. Adding a Processor
@@ -184,89 +207,100 @@ Future updates will include a visual configuration modal.
 
 ## Custom Templates
 
-### Template Syntax
+### Template Syntax (Templater)
 
-Templates use Obsidian's template syntax:
+Templates use Templater-compatible syntax for dynamic content:
 
-- `{{variable}}` - Simple variable replacement
-- `{{date}}` or `{{date:YYYY-MM-DD}}` - Current date with optional format
-- `{{time}}` or `{{time:HH:mm}}` - Current time with optional format
+- `<% code %>` - Dynamic command: outputs the result of code execution
+- `<%* code %>` - Execution command: executes code with `tR` variable for output accumulation
+- `<%# comment %>` - Comment: ignored during template execution
+- `<%- code -%>` - Trim surrounding whitespace
 
-### Template Syntax
+### Templater Modules
 
-Templates use Obsidian's template syntax:
+Templates have access to the `tp` object with these modules:
 
-- `{{variable}}` - Simple variable replacement
-- `{{date}}` or `{{date:YYYY-MM-DD}}` - Current date with optional format
-- `{{time}}` or `{{time:HH:mm}}` - Current time with optional format
+**tp.date**
+- `<% tp.date.now("YYYY-MM-DD") %>` - Current date with format
+- `<% tp.date.now() %>` - Current date and time
+
+**tp.file**
+- `<% tp.file.title %>` - Current filename
+- `<% tp.file.path %>` - Current file path
+
+**tp.frontmatter**
+- `<% tp.frontmatter.key %>` - Access YAML frontmatter values
+
+**tp.config**
+- `<% tp.config.moduleSetting %>` - Access processor configuration
 
 ### Module-Specific Template Variables
 
 #### Learning Module
 **Highlight Template:**
-- `{{bookTitle}}` - Book name
-- `{{bookAuthor}}` - Book author (if available)
-- `{{highlightCount}}` - Number of highlights
-- `{{sourceLink}}` - Link to source EPUB/PDF
+- `<% bookTitle %>` - Book name
+- `<% bookAuthor %>` - Book author (if available)
+- `<% highlightCount %>` - Number of highlights
+- `<% sourceLink %>` - Link to source EPUB/PDF
 
 **Annotation Template:**
-- `{{bookTitle}}` - Book name
-- `{{chapterName}}` - Chapter name
-- `{{textContent}}` - Highlighted text
-- `{{summary}}` - Annotation/note text
-- `{{pageNumber}}` - Page number
-- `{{annotationImagePath}}` - Path to composite annotation image
+- `<% bookTitle %>` - Book name
+- `<% chapterName %>` - Chapter name
+- `<% textContent %>` - Highlighted text
+- `<% summary %>` - Annotation/note text
+- `<% pageNumber %>` - Page number
+- `<% annotationImagePath %>` - Path to composite annotation image
 
 #### Paper Module
-**Highlight Template:**
-- `{{noteTitle}}` - Title of the note
-- `{{noteName}}` - Filename
-- `{{noteSlug}}` - Slugified name for tags
-- `{{pageNumber}}` - Current page number
-- `{{totalPages}}` - Total pages in note
-- `{{createTime}}` - Note creation timestamp
-- `{{sourceLink}}` - Link to original .note file
-- `{{pageImagePath}}` - Path to page image
-- `{{strokeCount}}` - Number of handwriting strokes
-- `{{pointCount}}` - Total number of points in strokes
+**Note Template:**
+- `<% noteTitle %>` - Title of the note
+- `<% noteName %>` - Filename
+- `<% noteSlug %>` - Slugified name for tags
+- `<% pageNumber %>` - Current page number
+- `<% totalPages %>` - Total pages in note
+- `<% createTime %>` - Note creation timestamp
+- `<% sourceLink %>` - Link to original .note file
+- `<% pageImagePath %>` - Path to page image
+- `<% strokeCount %>` - Number of handwriting strokes
+- `<% pointCount %>` - Total number of points in strokes
 
 #### Daily Module
 **Daily Template:**
-- `{{date}}` - ISO date (YYYY-MM-DD)
-- `{{year}}`, `{{month}}`, `{{day}}` - Date components
-- `{{lastTab}}` - Active tab in Viwoods Daily
-- `{{pageImagePath}}` - Path to daily page image
-- `{{createTime}}` - Daily note creation time
+- `<% date %>` - ISO date (YYYY-MM-DD)
+- `<% year %>`, `<% month %>`, `<% day %>` - Date components
+- `<% lastTab %>` - Active tab in Viwoods Daily
+- `<% pageImagePath %>` - Path to daily page image
+- `<% createTime %>` - Daily note creation time
 
 #### Meeting Module
 **Meeting Template:**
-- `{{meetingTitle}}` - Meeting name
-- `{{noteTitle}}` - Note title
-- `{{createTime}}` - Meeting creation time
-- `{{pageImagePath}}` - Path to meeting page image
-- `{{totalPages}}` - Total pages in meeting
+- `<% meetingTitle %>` - Meeting name
+- `<% noteTitle %>` - Note title
+- `<% createTime %>` - Meeting creation time
+- `<% pageImagePath %>` - Path to meeting page image
+- `<% totalPages %>` - Total pages in meeting
 
 #### Picking Module
 **Picking Template:**
-- `{{captureTitle}}` - Capture title
-- `{{captureType}}` - Type (Screenshot/Photo/Note)
-- `{{imageCount}}` - Number of images
-- `{{captureImagePath}}` - Path to composite capture image
-- `{{screenshotPath}}` - Path to screenshot
-- `{{createTime}}` - Capture creation time
+- `<% captureTitle %>` - Capture title
+- `<% captureType %>` - Type (Screenshot/Photo/Note)
+- `<% imageCount %>` - Number of images
+- `<% captureImagePath %>` - Path to composite capture image
+- `<% screenshotPath %>` - Path to screenshot
+- `<% createTime %>` - Capture creation time
 
 #### Memo Module
 **Memo Template:**
-- `{{memoTitle}}` - Memo filename
-- `{{created}}`, `{{modified}}` - Formatted timestamps
-- `{{isTodo}}` - Todo status boolean
-- `{{isTodoFinished}}` - Todo completion status
-- `{{hasRemind}}` - Has reminder boolean
-- `{{remindTime}}` - Formatted reminder time
-- `{{pageCount}}` - Number of pages
-- `{{memoImagePath}}` - Main image path
-- `{{screenshotPath}}` - Screenshot path
-- `{{memoContent}}` - Todo checkbox content
+- `<% memoTitle %>` - Memo filename
+- `<% created %>`, `<% modified %>` - Formatted timestamps
+- `<% isTodo %>` - Todo status boolean
+- `<% isTodoFinished %>` - Todo completion status
+- `<% hasRemind %>` - Has reminder boolean
+- `<% remindTime %>` - Formatted reminder time
+- `<% pageCount %>` - Number of pages
+- `<% memoImagePath %>` - Main image path
+- `<% screenshotPath %>` - Screenshot path
+- `<% memoContent %>` - Todo checkbox content
 
 ### Creating Custom Templates
 
@@ -282,27 +316,27 @@ Templates use Obsidian's template syntax:
 ### Example Custom Highlight Template
 
 ```markdown
-# 📝 {{noteTitle}}
+# 📝 <% noteTitle %>
 
-> Highlighted on {{date:MMMM Do, YYYY}}
+> Highlighted on <% tp.date.now("MMMM Do, YYYY") %>
 
 ---
 
-## Page {{pageNumber}} of {{totalPages}}
+## Page <% pageNumber %> of <% totalPages %>
 
-![[{{pageImagePath}}]]
+![[<% pageImagePath %>]]
 
-**Strokes:** {{strokeCount}} | **Points:** {{pointCount}}
+**Strokes:** <% strokeCount %> | **Points:** <% pointCount %>
 
 ### My Notes
 
 
 
 ### Tags
-#highlight #notes/{{noteSlug}}
+#highlight #notes/<% noteSlug %>
 
 ---
-[View Original]({{sourceLink}})
+[View Original](<% sourceLink %>)
 ```
 
 ## How It Works
@@ -361,6 +395,7 @@ The Viwoods processor automatically detects which module created a note:
    - If path is empty or file not found, use default template
    - Templates are cached for performance
    - Module-specific template variables available
+   - Templates use Templater-compatible syntax (`<% %>`)
 
 ## Architecture
 
@@ -372,6 +407,16 @@ src/
 │   ├── types.ts                    # Core interfaces
 │   ├── ProcessorRegistry.ts        # Processor registry
 │   ├── DefaultProcessor.ts         # Default passthrough
+│   ├── VoiceNotesProcessor/        # Voice Notes processing
+│   │   ├── index.ts                # Main processor
+│   │   ├── VoiceNotesTypes.ts      # Type definitions
+│   │   └── services/               # LLM and text processing
+│   │       ├── WebLLMClient.ts     # Local LLM support
+│   │       ├── GeminiClient.ts     # Gemini API client
+│   │       ├── OpenRouterClient.ts # OpenRouter API client
+│   │       ├── NoteFinder.ts       # Fuzzy note matching
+│   │       ├── TextRewriter.ts     # Link replacement
+│   │       └── ReferenceExtractor.ts # Reference extraction
 │   ├── ViwoodsProcessor/           # Complete Viwoods system
 │   │   ├── index.ts                # Main processor router
 │   │   ├── AnnotationProcessor.ts  # Shared annotation handling
@@ -379,7 +424,10 @@ src/
 │   │   ├── TemplateDefaults.ts     # Default templates
 │   │   ├── ViwoodsTypes.ts         # Type definitions
 │   │   ├── utils/                  # Utilities
-│   │   │   └── MarkdownMerger.ts   # Content preservation
+│   │   │   ├── ContentPreserver.ts # Content preservation
+│   │   │   ├── CrossReferenceManager.ts # Daily cross-references
+│   │   │   ├── MetadataManager.ts  # Note metadata handling
+│   │   │   └── NoteRenameHandler.ts # Rename detection
 │   │   └── modules/                # Module processors
 │   │       ├── LearningProcessor.ts    # EPUB/PDF notes
 │   │       ├── PaperProcessor.ts        # Handwritten notes
@@ -388,12 +436,20 @@ src/
 │   │       ├── PickingProcessor.ts      # Quick captures
 │   │       └── MemoProcessor.ts         # Text memos
 │   └── templates/
-│       ├── TemplateEngine.ts       # Template rendering
+│       ├── TemplateEngine.ts       # Template rendering (legacy)
 │       ├── TemplateResolver.ts     # Template loading
+│       ├── TemplaterParser.ts      # Templater syntax parser
+│       ├── TemplaterExecutor.ts    # Templater code executor
+│       ├── TemplaterContext.ts     # Templater tp object
+│       ├── modules/                # Templater modules
+│       │   ├── DateModule.ts       # tp.date functions
+│       │   ├── FileModule.ts       # tp.file functions
+│       │   ├── FrontmatterModule.ts # tp.frontmatter functions
+│       │   └── ConfigModule.ts     # tp.config functions
 │       └── defaults/               # Default templates
 │           ├── viwoods-highlight.md
 │           ├── viwoods-annotation.md
-│           ├── viwoods-page.md
+│           ├── viwoods-note.md
 │           ├── viwoods-daily.md
 │           ├── viwoods-meeting.md
 │           ├── viwoods-picking.md
@@ -404,9 +460,7 @@ src/
 │   ├── FileUtils.ts                # File operations
 │   ├── ZipUtils.ts                 # ZIP extraction (legacy)
 │   ├── StreamingZipUtils.ts        # Streaming ZIP extraction
-│   ├── MetadataManager.ts          # Note metadata handling
 │   ├── ImageCacheBuster.ts         # Image refresh handling
-│   ├── NoteRenameHandler.ts        # Rename detection
 │   ├── TempFileManager.ts          # Temporary file handling
 │   ├── StreamLogger.ts             # Logging system
 │   ├── crypto.ts                   # OAuth crypto
@@ -523,14 +577,12 @@ async process(...) {
 
 Planned features:
 
-- **Visual configuration modal** with form-based editing
 - **Template editor** with syntax highlighting and preview
 - **More processors**: PDF, EPUB (standalone), markdown enrichment, image processing
 - **Batch processing** for faster syncs
 - **Conflict resolution** for duplicate files
 - **Preview mode** to see what would be created
 - **Template marketplace** for sharing custom templates
-- **Enhanced rename detection** for more file types
 - **Image optimization** and compression options
 - **Background sync** with configurable intervals
 

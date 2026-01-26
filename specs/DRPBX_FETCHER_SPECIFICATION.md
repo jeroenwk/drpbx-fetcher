@@ -61,7 +61,36 @@ DRPBX Fetcher is an Obsidian plugin that fetches and processes files from Dropbo
   - Memo (text memos)
 - **Architecture**: Modular design with dedicated processors per module
 
-### 4. Authentication System (`src/auth/`)
+##### Voice Notes Processor (`src/processors/VoiceNotesProcessor/index.ts`)
+- **Purpose**: AI-powered link detection for voice-dictated markdown notes
+- **Features**:
+  - Smart link detection using local or cloud LLMs
+  - Local LLM support via WebLLM (browser-based)
+  - Cloud LLM support via Gemini API and OpenRouter
+  - Fuzzy matching with configurable similarity thresholds
+  - Model management (download/delete from settings)
+- **Configuration**: Dictation tag, model selection, matching options
+
+### 4. Template System (`src/processors/templates/`)
+
+#### Templater Components
+- **TemplaterParser**: Parser for Templater syntax (`<% %>`)
+- **TemplaterExecutor**: JavaScript code executor for templates
+- **TemplaterContext**: Provides `tp` object with utility modules
+
+#### Template Syntax
+- `<% code %>` - Dynamic command: outputs result
+- `<%* code %>` - Execution command: uses tR variable
+- `<%# comment %>` - Comment: ignored during execution
+- `<%- code -%>` - Trim surrounding whitespace
+
+#### Templater Modules
+- `tp.date` - Date formatting and manipulation
+- `tp.file` - File information and operations
+- `tp.frontmatter` - YAML frontmatter access
+- `tp.config` - Processor configuration access
+
+### 5. Authentication System (`src/auth/`)
 
 #### OAuth Manager (`src/auth/OAuthManager.ts`)
 - **Platform support**: Desktop and mobile OAuth flows
@@ -70,7 +99,7 @@ DRPBX Fetcher is an Obsidian plugin that fetches and processes files from Dropbo
 - **PKCE support**: Proof Key for Code Exchange for security
 - **Token management**: Automatic refresh token handling
 
-### 5. Utility Libraries (`src/utils/`)
+### 6. Utility Libraries (`src/utils/`)
 
 #### File Utilities (`src/utils/FileUtils.ts`)
 - **Path operations**: Sanitization, joining, parent directory extraction
@@ -209,15 +238,37 @@ DRPBX Fetcher is an Obsidian plugin that fetches and processes files from Dropbo
 
 ## Template System
 
-### Template Engine (`src/processors/templates/TemplateEngine.ts`)
-- **Template resolution**: Custom path or default fallback
-- **Caching**: Performance optimization
-- **Context injection**: Dynamic variable substitution
+### Templater Template Components
+- **TemplaterParser** (`src/processors/templates/TemplaterParser.ts`)
+  - Parses Templater syntax (`<% %>`)
+  - Supports dynamic, execution, and comment commands
+  - Tokenizes templates for efficient processing
+
+- **TemplaterExecutor** (`src/processors/templates/TemplaterExecutor.ts`)
+  - Executes JavaScript code in templates
+  - Supports dynamic commands (`<% code %>`) and execution commands (`<%* code %>`)
+  - Provides tR variable for output accumulation
+
+- **TemplaterContext** (`src/processors/templates/TemplaterContext.ts`)
+  - Provides the `tp` object with utility modules
+  - Modules: tp.date, tp.file, tp.frontmatter, tp.config
+
+### Template Syntax
+- `<% code %>` - Dynamic command: outputs the result of code execution
+- `<%* code %>` - Execution command: executes code with tR variable for output
+- `<%# comment %>` - Comment: ignored during template execution
+- `<%- code -%>` - Trim surrounding whitespace
+
+### Template Resolution
+- **Custom path**: User-specified template path in vault
+- **Default fallback**: Built-in default templates
+- **Caching**: Performance optimization with template caching
+- **Context injection**: Dynamic variable substitution via tp object
 
 ### Template Defaults (`src/processors/templates/defaults/`)
 - **Module-specific templates**: Each Viwoods module has dedicated templates
 - **Customization**: Users can override defaults with custom templates
-- **Variables**: Rich context data available for templates
+- **Variables**: Rich context data available for templates via tp object
 
 ## Configuration System
 

@@ -5,6 +5,48 @@ All notable changes to the Dropbox Fetcher plugin will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.318] - 2025-01-26
+
+### 🎤 Voice Notes Processor - Major New Feature
+- **AI-Powered Link Detection**: Automatically converts text mentions of notes into Obsidian wiki-links
+- **Local LLM Support**: Uses WebLLM for browser-based local AI processing (no API key needed)
+- **Cloud LLM Support**: Optional Gemini API and OpenRouter integration for cloud processing
+- **Smart Link Placement**: Intelligently places converted links while preserving user content
+- **Fuzzy Matching**: Advanced note matching with configurable similarity thresholds
+- **Model Management**: Download, manage, and delete AI models from settings UI
+- **Progress Tracking**: Real-time progress updates for model downloads and processing
+- **Dictation Tag**: Configurable tag to identify voice-dictated notes (default: `#dictation`)
+- **Multiple Model Options**: Support for Phi-3, Gemma, Llama, Gemini, Mistral, and more via OpenRouter
+
+### 🎨 Templater Template System
+- **Full Templater Syntax**: Templates now use Templater syntax (`<% %>`) instead of Handlebars
+- **Dynamic Commands**: `<% code %>` - Outputs the result of code execution
+- **Execution Commands**: `<%* code %>` - Executes code with `tR` variable for output accumulation
+- **Comments**: `<%# comment %>` - Ignored during template execution
+- **Templater Modules**: tp.date, tp.file, tp.frontmatter, tp.config available in templates
+- **Template Parser**: Complete parser for Templater syntax with tokenization
+- **Template Executor**: Safe JavaScript execution in template context
+
+### 🧪 ContentPreserver System
+- **Callout Preservation**: User-modified callout blocks are preserved in-place during updates
+- **Smart Merging**: Preserves user edits while updating template-generated content
+- **Paper Notes**: Refactored to use ContentPreserver for better content preservation
+- **Meeting, Daily, Picking**: Standardized to use ContentPreserver system
+
+### 🛠️ Processor Improvements
+- **DefaultProcessor**: Auto-populates `allowedExtensions` from routed file extension
+- **Folder Mapping**: DefaultProcessor now correctly respects folder mapping for `.md` files
+- **Re-fetch Command**: New command to mark files as unprocessed for re-fetching
+
+### 📝 Template Changes
+- **Daily Tag Change**: Daily note tag changed from `#daily-note` to `#journal`
+- **Template Tests**: Added comprehensive tests for TemplateEngine and TemplaterExecutor
+
+### 🔧 Developer Experience
+- **Log File Recreation**: Log file recreated on plugin reload and log-server start
+- **Test Reset Script**: New script to clean Viwoods test data
+- **Dead Code Removal**: Removed legacy and unused code for cleaner codebase
+
 ## [0.2.236] - 2026-01-13
 
 ### 🎵 Audio File Support for Paper Module
